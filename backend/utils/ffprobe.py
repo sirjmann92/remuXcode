@@ -37,6 +37,11 @@ class VideoStream:
         return self.codec_name.lower() in ('hevc', 'h265')
     
     @property
+    def is_av1(self) -> bool:
+        """Check if stream is AV1."""
+        return self.codec_name.lower() in ('av1', 'av01')
+    
+    @property
     def is_h264(self) -> bool:
         """Check if stream is H.264/AVC."""
         return self.codec_name.lower() in ('h264', 'avc', 'avc1')
@@ -175,6 +180,12 @@ class MediaInfo:
         """Check if primary video is already HEVC."""
         video = self.primary_video
         return video is not None and video.is_hevc
+    
+    @property
+    def is_av1(self) -> bool:
+        """Check if primary video is already AV1."""
+        video = self.primary_video
+        return video is not None and video.is_av1
     
     def get_audio_by_language(self, lang_codes: List[str]) -> List[AudioStream]:
         """Get audio streams matching language codes."""

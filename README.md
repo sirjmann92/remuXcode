@@ -2,13 +2,13 @@
 
 Unified media converter service for Sonarr/Radarr that handles:
 - **DTS Audio** → AC3/AAC (device compatibility)
-- **10-bit H.264** → HEVC (anime-only by default)
+- **10-bit H.264** → HEVC or AV1 (anime-only by default)
 - **Stream Cleanup** → Remove unwanted language tracks
 
 ## Features
 
 - 🎯 **Smart Format Selection**: AC3 for surround (5.1+), AAC for stereo/7.1+
-- 🎬 **HEVC Encoding**: Convert 10-bit H.264 to HEVC (anime-only by default)
+- 🎬 **HEVC/AV1 Encoding**: Convert 10-bit H.264 to HEVC or AV1 (configurable)
 - 🌸 **Anime Detection**: Auto-detects anime for optimized encoding (`-tune animation`)
 - 🌍 **Language Cleanup**: Keep only original language + English tracks
 - 📊 **Bitrate Matching**: Preserves quality while respecting format limits
@@ -405,12 +405,27 @@ cleanup:
 
 ### Video
 
+Codec preference is configurable via `VIDEO_CODEC` (default: `hevc`).
+
+#### HEVC Mode (default)
+
 | Setting | Anime | Live Action |
 |---------|-------|-------------|
 | CRF | 19 | 22 |
 | Preset | slow | medium |
 | Tune | animation | none |
 | Output | HEVC 10-bit | HEVC 10-bit |
+
+#### AV1 Mode
+
+| Setting | Anime | Live Action |
+|---------|-------|-------------|
+| CRF | 28 | 30 |
+| Preset | 6 | 8 |
+| Encoder | SVT-AV1 | SVT-AV1 |
+| Output | AV1 10-bit | AV1 10-bit |
+
+> **AV1 vs HEVC:** AV1 achieves ~30% better compression but encodes significantly slower and has less hardware decoder support. HEVC is recommended for most users.
 
 **Note:** Video conversion is anime-only by default (`anime_only: true`). DTS audio conversion applies to all content.
 

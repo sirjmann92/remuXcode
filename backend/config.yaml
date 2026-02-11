@@ -4,9 +4,15 @@
 # Video conversion settings
 video:
   enabled: ${VIDEO_ENCODING_ENABLED:-true}
-  # Convert 10-bit x264/AVC to HEVC (main use case for anime)
+  
+  # Codec preference: hevc or av1
+  # HEVC: Better device compatibility, faster encoding, good hardware support
+  # AV1: Better compression (~30% smaller), future-proof, slower encoding, limited hardware support
+  codec: ${VIDEO_CODEC:-hevc}
+  
+  # Convert 10-bit x264/AVC to HEVC/AV1 (main use case for anime)
   convert_10bit_x264: true
-  # Convert 8-bit x264/AVC to HEVC (optional, mainly for space savings)
+  # Convert 8-bit x264/AVC to HEVC/AV1 (optional, mainly for space savings)
   convert_8bit_x264: false
   
   # Only convert anime content (skip live action videos)
@@ -28,6 +34,17 @@ video:
   live_action_preset: medium
   live_action_tune: ""  # No tune for live action
   live_action_framerate: ""  # Empty = auto-detect from source
+  
+  # AV1 encoding settings - Anime
+  # AV1 uses higher CRF values (shifted scale compared to x265)
+  av1_anime_crf: 28  # Equivalent to ~HEVC CRF 19
+  av1_anime_preset: 6  # SVT-AV1 preset 0-13 (lower = slower/better)
+  av1_anime_framerate: "24000/1001"
+  
+  # AV1 encoding settings - Live Action  
+  av1_live_action_crf: 30  # Equivalent to ~HEVC CRF 22
+  av1_live_action_preset: 8  # Faster preset for live action
+  av1_live_action_framerate: ""  # Auto-detect
   
   # Common HEVC settings
   pix_fmt: yuv420p10le  # 10-bit output

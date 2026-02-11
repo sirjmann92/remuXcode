@@ -49,12 +49,12 @@ class VideoConversionResult:
 
 class VideoConverter:
     """
-    Converts video to HEVC with content-aware encoding settings.
+    Converts video to HEVC or AV1 with content-aware encoding settings.
     
     Features:
     - 10-bit H.264 detection (main conversion target)
     - Anime vs live action detection for optimal settings
-    - Backup original files
+    - HEVC (libx265) and AV1 (libsvtav1) codec support
     - Interrupt-safe with cleanup
     """
     
@@ -79,6 +79,11 @@ class VideoConverter:
         self.anime_detector = anime_detector or AnimeDetector()
         self.get_volume_root = get_volume_root or (lambda _: '/tmp')
     
+    @property
+    def target_codec(self) -> str:
+        """Target codec name based on config."""
+        return self.config.codec.lower()
+    
     def should_convert(self, file_path: str) -> bool:
         """
         Check if a file should be converted.
@@ -86,7 +91,7 @@ class VideoConverter:
         Returns True if:
         - Video is 10-bit H.264 and config.convert_10bit_x264 is True
         - Video is 8-bit H.264 and config.convert_8bit_x264 is True
-        - Video is not already HEVC
+        - Video is not already the target codec (HEVC or AV1)
         - If anime_only is True, only converts anime content
         """
         if not self.config.enabled:
@@ -100,8 +105,11 @@ class VideoConverter:
         if video is None:
             return False
         
-        # Already HEVC - skip
-        if video.is_hevc:
+        # Already target codec - skip
+        if self.target_codec == 'av1' and video.is_av1:
+            logger.debug(f"Skipping AV1 file: {file_path}")
+            return False
+        if self.target_codec == 'hevc' and video.is_hevc:
             logger.debug(f"Skipping HEVC file: {file_path}")
             return False
         
@@ -128,7 +136,7 @@ class VideoConverter:
         force_content_type: Optional[ContentType] = None
     ) -> VideoConversionResult:
         """
-        Convert video to HEVC.
+        Convert video to HEVC or AV1.
         
         Args:
             input_file: Path to input file
@@ -138,6 +146,7 @@ class VideoConverter:
         Returns:
             VideoConversionResult with conversion details
         """
+        codec_to = self.target_codec
         input_path = Path(input_file)
         
         if not input_path.exists():
@@ -148,7 +157,7 @@ class VideoConverter:
                 original_size=0,
                 new_size=0,
                 codec_from='unknown',
-                codec_to='hevc',
+                codec_to=codec_to,
                 content_type='unknown',
                 error=f"Input file not found: {input_file}"
             )
@@ -163,7 +172,7 @@ class VideoConverter:
                 original_size=0,
                 new_size=0,
                 codec_from='unknown',
-                codec_to='hevc',
+                codec_to=codec_to,
                 content_type='unknown',
                 error="Failed to analyze input file"
             )
@@ -177,7 +186,7 @@ class VideoConverter:
                 original_size=info.size,
                 new_size=0,
                 codec_from='unknown',
-                codec_to='hevc',
+                codec_to=codec_to,
                 content_type='unknown',
                 error="No video stream found"
             )
@@ -190,7 +199,8 @@ class VideoConverter:
         else:
             content_type = ContentType.LIVE_ACTION
         
-        logger.info(f"Converting {input_file} ({video.codec_name} {video.bit_depth}-bit → HEVC, {content_type.value})")
+        codec_label = 'AV1' if codec_to == 'av1' else 'HEVC'
+        logger.info(f"Converting {input_file} ({video.codec_name} {video.bit_depth}-bit → {codec_label}, {content_type.value})")
         
         # Prepare output path
         replace_input = output_file is None
@@ -203,7 +213,8 @@ class VideoConverter:
         volume_root = self.get_volume_root(input_file)
         temp_dir = Path(volume_root) / f".remuxcode-temp-{uuid.uuid4().hex[:8]}"
         temp_dir.mkdir(parents=True, exist_ok=True)
-        temp_file = temp_dir / f"{input_path.name}.hevc-tmp.mkv"
+        temp_suffix = 'av1' if codec_to == 'av1' else 'hevc'
+        temp_file = temp_dir / f"{input_path.name}.{temp_suffix}-tmp.mkv"
         
         try:
             # Clean up any leftover temp files
@@ -229,7 +240,7 @@ class VideoConverter:
                     original_size=info.size,
                     new_size=0,
                     codec_from=video.codec_name,
-                    codec_to='hevc',
+                    codec_to=codec_to,
                     content_type=content_type.value,
                     error=f"FFmpeg failed: {result.stderr[:500]}"
                 )
@@ -269,7 +280,7 @@ class VideoConverter:
                 original_size=info.size,
                 new_size=new_size,
                 codec_from=video.codec_name,
-                codec_to='hevc',
+                codec_to=codec_to,
                 content_type=content_type.value
             )
             
@@ -285,7 +296,7 @@ class VideoConverter:
                 original_size=info.size,
                 new_size=0,
                 codec_from=video.codec_name,
-                codec_to='hevc',
+                codec_to=codec_to,
                 content_type=content_type.value,
                 error=f"FFmpeg timeout (exceeded {self.config.job_timeout}s)"
             )
@@ -303,7 +314,7 @@ class VideoConverter:
                 original_size=info.size,
                 new_size=0,
                 codec_from=video.codec_name,
-                codec_to='hevc',
+                codec_to=codec_to,
                 content_type=content_type.value,
                 error=str(e)
             )
@@ -315,6 +326,18 @@ class VideoConverter:
         content_type: ContentType
     ) -> List[str]:
         """Build ffmpeg command with content-appropriate settings."""
+        
+        if self.target_codec == 'av1':
+            return self._build_av1_command(input_file, output_file, content_type)
+        return self._build_hevc_command(input_file, output_file, content_type)
+    
+    def _build_hevc_command(
+        self,
+        input_file: str,
+        output_file: str,
+        content_type: ContentType
+    ) -> List[str]:
+        """Build ffmpeg command for HEVC (libx265) encoding."""
         
         # Select encoding parameters based on content type
         if content_type == ContentType.ANIME:
@@ -366,6 +389,78 @@ class VideoConverter:
         cmd.extend(['-x265-params', ':'.join(x265_params)])
         
         # Add framerate and color settings
+        cmd.extend(['-fps_mode', 'cfr'])
+        
+        # Add specific framerate if configured
+        if framerate:
+            cmd.extend(['-r', framerate])
+        
+        cmd.extend([
+            '-color_primaries', 'bt709',
+            '-color_trc', 'bt709',
+            '-colorspace', 'bt709',
+        ])
+        
+        # Copy audio, subtitles, and attachments
+        cmd.extend([
+            '-c:a', 'copy',
+            '-c:s', 'copy',
+            '-c:t', 'copy',
+        ])
+        
+        # Output file
+        cmd.append(output_file)
+        
+        return cmd
+    
+    def _build_av1_command(
+        self,
+        input_file: str,
+        output_file: str,
+        content_type: ContentType
+    ) -> List[str]:
+        """Build ffmpeg command for AV1 (libsvtav1) encoding."""
+        
+        # Select encoding parameters based on content type
+        if content_type == ContentType.ANIME:
+            crf = self.config.av1_anime_crf
+            preset = self.config.av1_anime_preset
+            framerate = self.config.av1_anime_framerate
+        else:
+            crf = self.config.av1_live_action_crf
+            preset = self.config.av1_live_action_preset
+            framerate = self.config.av1_live_action_framerate
+        
+        # SVT-AV1 params
+        svtav1_params = [
+            f"tune=0",  # 0=VQ (visual quality), 1=PSNR
+        ]
+        
+        # Add animation-specific tuning for anime
+        if content_type == ContentType.ANIME:
+            svtav1_params.append("enable-overlay=0")
+            svtav1_params.append("film-grain=0")
+        
+        cmd = [
+            'ffmpeg',
+            '-hide_banner',
+            '-loglevel', 'warning',
+            '-stats',
+            '-analyzeduration', '10M',
+            '-probesize', '10M',
+            '-i', input_file,
+            '-map', '0',
+            '-map_chapters', '0',
+            '-c:v', 'libsvtav1',
+            '-pix_fmt', 'yuv420p10le',  # AV1 10-bit
+            '-crf', str(crf),
+            '-preset', str(preset),
+        ]
+        
+        # Add SVT-AV1 params
+        cmd.extend(['-svtav1-params', ':'.join(svtav1_params)])
+        
+        # Add framerate settings
         cmd.extend(['-fps_mode', 'cfr'])
         
         # Add specific framerate if configured

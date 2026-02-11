@@ -57,6 +57,7 @@ class CleanupConfig:
 class VideoConfig:
     """Video conversion settings."""
     enabled: bool = True
+    codec: str = 'hevc'  # hevc or av1
     convert_10bit_x264: bool = True
     convert_8bit_x264: bool = False
     
@@ -66,20 +67,30 @@ class VideoConfig:
     # Anime-specific settings
     anime_auto_detect: bool = True
     anime_paths: List[str] = field(default_factory=lambda: ['/Anime/', '/アニメ/'])
-    anime_crf: int = 18
+    
+    # HEVC settings - Anime
+    anime_crf: int = 19
     anime_preset: str = 'slow'
     anime_tune: str = 'animation'
+    anime_framerate: str = '24000/1001'  # 23.976 fps
     
-    # Live action settings
+    # HEVC settings - Live action
     live_action_crf: int = 22
     live_action_preset: str = 'medium'
     live_action_tune: Optional[str] = None  # or 'grain'
     live_action_framerate: str = ''  # Empty = auto-detect from source
     
-    # Anime framerate
-    anime_framerate: str = '24000/1001'  # 23.976 fps
+    # AV1 settings - Anime (SVT-AV1 encoder)
+    av1_anime_crf: int = 28  # Equivalent to ~HEVC CRF 19
+    av1_anime_preset: int = 6  # 0-13, lower = slower/better
+    av1_anime_framerate: str = '24000/1001'
     
-    # Common encoding settings
+    # AV1 settings - Live action
+    av1_live_action_crf: int = 30  # Equivalent to ~HEVC CRF 22
+    av1_live_action_preset: int = 8  # Faster preset
+    av1_live_action_framerate: str = ''
+    
+    # Common encoding settings (HEVC-specific, not used for AV1)
     vbv_maxrate: int = 5000
     vbv_bufsize: int = 10000
     level: str = '4.1'
@@ -282,6 +293,7 @@ class Config:
         """Parse video configuration section."""
         return VideoConfig(
             enabled=self._get('video.enabled', True),
+            codec=self._get('video.codec', 'hevc'),
             convert_10bit_x264=self._get('video.convert_10bit_x264', True),
             convert_8bit_x264=self._get('video.convert_8bit_x264', False),
             anime_only=self._get('video.anime_only', True),
@@ -295,6 +307,12 @@ class Config:
             live_action_preset=self._get('video.live_action_preset', 'medium'),
             live_action_tune=self._get('video.live_action_tune'),
             live_action_framerate=self._get('video.live_action_framerate', ''),
+            av1_anime_crf=self._get('video.av1_anime_crf', 28),
+            av1_anime_preset=self._get('video.av1_anime_preset', 6),
+            av1_anime_framerate=self._get('video.av1_anime_framerate', '24000/1001'),
+            av1_live_action_crf=self._get('video.av1_live_action_crf', 30),
+            av1_live_action_preset=self._get('video.av1_live_action_preset', 8),
+            av1_live_action_framerate=self._get('video.av1_live_action_framerate', ''),
             vbv_maxrate=self._get('video.vbv_maxrate', 5000),
             vbv_bufsize=self._get('video.vbv_bufsize', 10000),
             level=self._get('video.level', '4.1'),
