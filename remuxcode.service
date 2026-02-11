@@ -1,0 +1,39 @@
+[Unit]
+Description=remuXcode - Media Transcoding Service
+Documentation=https://github.com/sirjmann92/remuXcode
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+Group=YOUR_USERNAME
+WorkingDirectory=/path/to/remuxcode
+
+# Environment file for secrets and configuration
+EnvironmentFile=/path/to/remuxcode/.env
+
+# Main command
+ExecStart=/usr/bin/python3 /path/to/remuxcode/remuxcode.py
+
+# Restart on failure
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=remuxcode
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+# Allow access to media directories (adjust as needed)
+ReadWritePaths=/path/to/media
+ReadWritePaths=/var/log
+ReadWritePaths=/path/to/remuxcode
+
+[Install]
+WantedBy=multi-user.target

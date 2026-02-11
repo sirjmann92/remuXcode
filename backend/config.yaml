@@ -1,0 +1,198 @@
+# remuXcode Configuration
+# Environment variables can be used with ${VAR_NAME} syntax
+
+# Video conversion settings
+video:
+  enabled: ${VIDEO_ENCODING_ENABLED:-true}
+  # Convert 10-bit x264/AVC to HEVC (main use case for anime)
+  convert_10bit_x264: true
+  # Convert 8-bit x264/AVC to HEVC (optional, mainly for space savings)
+  convert_8bit_x264: false
+  
+  # Only convert anime content (skip live action videos)
+  # Set to false to convert ALL 10-bit H.264 regardless of content type
+  anime_only: ${ANIME_ONLY:-true}
+  
+  # Auto-detect anime vs live action content (for encoding settings)
+  anime_auto_detect: true
+  
+  # HEVC encoding settings - Anime
+  # Anime benefits from slower presets and animation tune
+  anime_crf: 19
+  anime_preset: slow
+  anime_tune: animation
+  anime_framerate: "24000/1001"  # 23.976 fps (standard for anime)
+  
+  # HEVC encoding settings - Live Action
+  live_action_crf: 22
+  live_action_preset: medium
+  live_action_tune: ""  # No tune for live action
+  live_action_framerate: ""  # Empty = auto-detect from source
+  
+  # Common HEVC settings
+  pix_fmt: yuv420p10le  # 10-bit output
+  profile: main10
+  level: "4.1"
+  
+  # VBV settings for streaming compatibility
+  # Lower values force more efficient encoding (important for anime)
+  vbv_maxrate: 5000  # kbps - max bitrate
+  vbv_bufsize: 10000  # kbps - buffer size
+
+# Audio conversion settings
+audio:
+  enabled: ${AUDIO_CONVERSION_ENABLED:-true}
+  
+  # What to convert
+  convert_dts: true     # Convert DTS to AC3/AAC
+  convert_truehd: true  # Convert TrueHD to AC3/AAC
+  
+  # Keep original track alongside converted?
+  keep_original: false
+  
+  # Target format preferences
+  prefer_ac3: true      # Use AC3 for 5.1 (better device compatibility)
+  # If false, uses E-AC3 for 5.1
+  
+  # Bitrate caps (kbps)
+  ac3_bitrate: 640      # Max for Dolby Digital
+  eac3_bitrate: 1536    # Max for Dolby Digital Plus
+  aac_surround_bitrate: 512  # For 5.1+ AAC
+  aac_stereo_bitrate: 320    # For stereo AAC
+
+# Stream cleanup settings
+cleanup:
+  enabled: ${STREAM_CLEANUP_ENABLED:-true}
+  
+  # Clean audio streams based on language
+  clean_audio: ${AUDIO_CLEANUP_ENABLED:-true}
+  
+  # Clean subtitle streams based on language
+  clean_subtitles: ${SUBTITLE_CLEANUP_ENABLED:-true}
+  
+  # Languages to always keep (ISO 639-2 codes)
+  # Original language is auto-detected and always kept
+  keep_languages:
+    - eng  # English
+  
+  # Keep undefined language streams
+  keep_undefined: false
+  
+  # Keep commentary tracks regardless of language
+  keep_commentary: true
+  
+  # Keep audio description tracks
+  keep_audio_description: true
+  
+  # Keep SDH/CC subtitles
+  keep_sdh: true
+
+# Language detection settings
+language:
+  # Primary: Parse NFO files for original title
+  nfo_enabled: true
+  
+  # Secondary: Query Sonarr/Radarr API
+  api_enabled: true
+  
+  # Fallback: Infer from path (Anime folder = Japanese)
+  path_fallback_enabled: true
+  
+  # Path patterns for language detection
+  path_patterns:
+    - pattern: "(?i)/anime/"
+      language: jpn
+    - pattern: "(?i)/korean/"
+      language: kor
+    - pattern: "(?i)/chinese/"
+      language: chi
+    - pattern: "(?i)/spanish/"
+      language: spa
+    - pattern: "(?i)/french/"
+      language: fre
+  
+  # Default if all detection fails
+  default_language: eng
+
+# Sonarr integration
+sonarr:
+  enabled: true
+  url: ${SONARR_URL}
+  api_key: ${SONARR_API_KEY}
+  
+  # Path mapping (local path -> Sonarr path)
+  # Use if your local paths differ from what Sonarr sees
+  path_mappings:
+    # - local: /mnt/media
+    #   remote: /tv
+
+# Radarr integration
+radarr:
+  enabled: true
+  url: ${RADARR_URL}
+  api_key: ${RADARR_API_KEY}
+  
+  # Path mapping
+  path_mappings:
+    # - local: /mnt/media
+    #   remote: /movies
+
+# Processing settings
+processing:
+  # Temporary directory for encoding
+  temp_dir: /tmp
+  
+  # Number of concurrent conversion jobs (CPU intensive!)
+  # Each job encodes a full video file with FFmpeg
+  # Recommended: 1 for most systems (prevents CPU overload)
+  # Can override with REMUXCODE_WORKERS environment variable
+  max_concurrent_jobs: 1
+  
+  # Job timeout (seconds) - 0 for no timeout, default 7200 (2 hours)
+  job_timeout: 7200
+  
+  # Retry failed jobs
+  retry_enabled: true
+  max_retries: 3
+  retry_delay: 60  # seconds
+
+# Webhook settings
+webhook:
+  # Port for webhook listener
+  port: 8765
+  
+  # Bind address (0.0.0.0 for all interfaces)
+  bind: "0.0.0.0"
+  
+  # Processing delay (seconds) - wait for file to be fully written
+  processing_delay: 5
+  
+  # Authentication (optional)
+  auth_enabled: false
+  auth_token: ${WEBHOOK_TOKEN}
+
+# Logging settings
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  file: /var/log/remuxcode.log
+  max_size: 10485760  # 10MB
+  backup_count: 5
+
+# Notification settings (future feature)
+notifications:
+  enabled: false
+  
+  # Discord webhook
+  discord:
+    enabled: false
+    webhook_url: ${DISCORD_WEBHOOK_URL}
+  
+  # Email
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    from_address: ""
+    to_addresses: []
