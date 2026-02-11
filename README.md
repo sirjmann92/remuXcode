@@ -362,7 +362,9 @@ MEDIA_WEBHOOK_PORT=7889
 LOG_LEVEL=INFO
 ```
 
-### YAML Configuration (backend/config.yaml)
+### YAML Configuration (Optional)
+
+The [backend/config.yaml](backend/config.yaml) file contains advanced settings. **Most users don't need to edit this** - the defaults work well and can be overridden via `.env` variables.
 
 ```yaml
 video:
@@ -371,7 +373,7 @@ video:
   convert_8bit_x264: false    # Optional
   anime_only: true            # Only convert anime content
   anime_auto_detect: true     # Auto-detect anime
-  anime_crf: 20               # Quality (lower = better)
+  anime_crf: 19               # Quality (lower = better)
   anime_preset: slow          # Encoding speed
   anime_tune: animation       # x265 tune for anime
 
@@ -405,7 +407,7 @@ cleanup:
 
 | Setting | Anime | Live Action |
 |---------|-------|-------------|
-| CRF | 20 | 22 |
+| CRF | 19 | 22 |
 | Preset | slow | medium |
 | Tune | animation | none |
 | Output | HEVC 10-bit | HEVC 10-bit |
