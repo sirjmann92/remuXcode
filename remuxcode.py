@@ -269,7 +269,7 @@ class JobQueue:
             self._save_job_to_store(job)
         
         try:
-            result = process_file(job.file_path, job.job_type)
+            result = process_file(job.file_path, job.job_type, job_id)
             
             # Check if cancelled during processing
             if job.status == JobStatus.CANCELLED:
@@ -440,13 +440,14 @@ def get_volume_root(file_path: str) -> str:
     return '/tmp'
 
 
-def process_file(file_path: str, job_type: JobType) -> Dict[str, Any]:
+def process_file(file_path: str, job_type: JobType, job_id: str = None) -> Dict[str, Any]:
     """
     Process a single file with the specified conversion type.
     
     Args:
         file_path: Path to the media file
         job_type: Type of conversion to perform
+        job_id: Unique identifier for this job (used for temp directories)
     
     Returns:
         Dictionary with conversion results
@@ -469,7 +470,7 @@ def process_file(file_path: str, job_type: JobType) -> Dict[str, Any]:
     # Audio conversion (DTS -> AC3/AAC)
     if do_audio and audio_converter.should_convert(file_path):
         logger.info(f"Converting audio: {Path(file_path).name}")
-        result = audio_converter.convert(file_path)
+        result = audio_converter.convert(file_path, job_id=job_id)
         results['audio'] = {
             'success': result.success,
             'streams_converted': result.streams_converted,
@@ -478,10 +479,10 @@ def process_file(file_path: str, job_type: JobType) -> Dict[str, Any]:
         if not result.success:
             logger.error(f"Audio conversion failed: {result.error}")
     
-    # Video conversion (H.264 -> HEVC)
+    # Video conversion (H.264 -> HEVC/AV1)
     if do_video and video_converter.should_convert(file_path):
         logger.info(f"Converting video: {Path(file_path).name}")
-        result = video_converter.convert(file_path)
+        result = video_converter.convert(file_path, job_id=job_id)
         results['video'] = {
             'success': result.success,
             'codec_from': result.codec_from,
@@ -496,7 +497,7 @@ def process_file(file_path: str, job_type: JobType) -> Dict[str, Any]:
     # Stream cleanup (remove unwanted languages)
     if do_cleanup and stream_cleanup.should_cleanup(file_path):
         logger.info(f"Cleaning streams: {Path(file_path).name}")
-        result = stream_cleanup.cleanup(file_path)
+        result = stream_cleanup.cleanup(file_path, job_id=job_id)
         results['cleanup'] = {
             'success': result.success,
             'audio_removed': result.audio_removed,
@@ -1165,7 +1166,7 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
                 return
             
             job = ConversionJob(
-                id=str(uuid.uuid4()),
+                id=uuid.uuid4().hex[:12],
                 job_type=job_type,
                 file_path=file_path,
                 status=JobStatus.PENDING,
@@ -1229,7 +1230,7 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
         for file_path in files:
             if os.path.exists(file_path):
                 job = ConversionJob(
-                    id=str(uuid.uuid4()),
+                    id=uuid.uuid4().hex[:12],
                     job_type=JobType.FULL,
                     file_path=file_path,
                     status=JobStatus.PENDING,
@@ -1276,7 +1277,7 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
                     file_path = translate_path(file_path)
                     if os.path.exists(file_path):
                         job = ConversionJob(
-                            id=str(uuid.uuid4()),
+                            id=uuid.uuid4().hex[:12],
                             job_type=job_type,
                             file_path=file_path,
                             status=JobStatus.PENDING,
@@ -1342,7 +1343,7 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
                         file_path = translate_path(file_path)
                         if os.path.exists(file_path):
                             job = ConversionJob(
-                                id=str(uuid.uuid4()),
+                                id=uuid.uuid4().hex[:12],
                                 job_type=job_type,
                                 file_path=file_path,
                                 status=JobStatus.PENDING,

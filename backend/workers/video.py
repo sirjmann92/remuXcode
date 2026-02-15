@@ -133,7 +133,8 @@ class VideoConverter:
         self,
         input_file: str,
         output_file: Optional[str] = None,
-        force_content_type: Optional[ContentType] = None
+        force_content_type: Optional[ContentType] = None,
+        job_id: Optional[str] = None
     ) -> VideoConversionResult:
         """
         Convert video to HEVC or AV1.
@@ -142,6 +143,7 @@ class VideoConverter:
             input_file: Path to input file
             output_file: Path for output file (defaults to replacing input)
             force_content_type: Override content type detection
+            job_id: Unique job identifier (used for temp directory naming)
         
         Returns:
             VideoConversionResult with conversion details
@@ -210,8 +212,11 @@ class VideoConverter:
         output_path = Path(output_file)
         
         # Create temp file in same volume as source (for instant rename)
+        if job_id is None:
+            job_id = uuid.uuid4().hex[:12]
+        
         volume_root = self.get_volume_root(input_file)
-        temp_dir = Path(volume_root) / f".remuxcode-temp-{uuid.uuid4().hex[:8]}"
+        temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
         temp_dir.mkdir(parents=True, exist_ok=True)
         temp_suffix = 'av1' if codec_to == 'av1' else 'hevc'
         temp_file = temp_dir / f"{input_path.name}.{temp_suffix}-tmp.mkv"

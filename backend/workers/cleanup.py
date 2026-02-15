@@ -208,7 +208,7 @@ class StreamCleanup:
         
         # Create temp directory in same volume as source (for instant rename)
         if job_id is None:
-            job_id = str(uuid.uuid4())
+            job_id = uuid.uuid4().hex[:12]
         
         volume_root = self.get_volume_root(input_file)
         temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
