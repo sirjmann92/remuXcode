@@ -30,8 +30,11 @@ ProtectSystem=strict
 ProtectHome=read-only
 PrivateTmp=true
 
-# Allow access to media directories (adjust as needed)
-ReadWritePaths=/path/to/media
+# ⚠️  CRITICAL: Add ALL your media mount paths here!
+# Without these, the service will have read-only access and conversions will fail.
+# Add one ReadWritePaths line for EACH mount point you use:
+ReadWritePaths=/mnt/your-nas-mount-1
+ReadWritePaths=/mnt/your-nas-mount-2
 ReadWritePaths=/var/log
 ReadWritePaths=/path/to/remuxcode
 

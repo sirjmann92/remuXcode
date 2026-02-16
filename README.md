@@ -52,7 +52,12 @@ python3 tests/test_workers.py "/path/to/your/movie.mkv"
 ```bash
 # Edit service file paths
 nano remuxcode.service
-# Update: User, Group, WorkingDirectory, EnvironmentFile, ExecStart, ReadWritePaths
+# Update: User, Group, WorkingDirectory, EnvironmentFile, ExecStart
+# ⚠️  IMPORTANT: Add ALL your media mount paths to ReadWritePaths:
+#    ReadWritePaths=/mnt/NAStradamus
+#    ReadWritePaths=/mnt/NASferatu
+#    ReadWritePaths=/mnt/stash
+#    Without these, the service cannot write to these directories!
 
 # Copy service file
 sudo cp remuxcode.service /etc/systemd/system/
