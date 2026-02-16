@@ -18,7 +18,7 @@ import time
 import uuid
 import glob
 import queue
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 from dataclasses import dataclass
@@ -1044,8 +1044,10 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
                 search_lower = search.lower()
                 all_series = [s for s in all_series if search_lower in s.get('title', '').lower()]
             
+            logger.info(f"Analyzing {len(all_series)} series (analyze={analyze})")
+            
             results = []
-            for series in all_series:
+            for idx, series in enumerate(all_series, 1):
                 series_id = series['id']
                 host_path = translate_path(series.get('path', ''))
                 
@@ -1072,16 +1074,23 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
                         episode_files = ep_response.json()
                         item['total_episodes'] = len(episode_files)
                         
+                        if analyze and len(all_series) > 1:
+                            logger.info(f"  [{idx}/{len(all_series)}] {series.get('title')} - {len(episode_files)} episodes")
+                        
                         for ep_file in episode_files:
                             ep_path = translate_path(ep_file.get('path', ''))
                             media_info = ep_file.get('mediaInfo', {})
                             audio_codec = media_info.get('audioCodec', '').upper()
+                            video_codec = media_info.get('videoCodec', '').lower()
                             
                             if 'DTS' in audio_codec:
                                 item['dts_count'] += 1
                             
-                            # Full analysis (optional)
-                            if analyze and os.path.exists(ep_path):
+                            # Skip already-converted files (HEVC/AV1/x265)
+                            is_already_converted = any(c in video_codec for c in ['hevc', 'h265', 'x265', 'av1'])
+                            
+                            # Full analysis (optional) - only on files that might need conversion
+                            if analyze and not is_already_converted and os.path.exists(ep_path):
                                 try:
                                     info = ffprobe.get_file_info(ep_path)
                                     if info:
@@ -1453,7 +1462,7 @@ def main():
         logger.info(f"  {container} -> {host}")
     
     # Start HTTP server
-    server = HTTPServer((WEBHOOK_HOST, WEBHOOK_PORT), MediaWebhookHandler)
+    server = ThreadingHTTPServer((WEBHOOK_HOST, WEBHOOK_PORT), MediaWebhookHandler)
     logger.info(f"Listening on http://{WEBHOOK_HOST}:{WEBHOOK_PORT}")
     logger.info("Ready to receive requests")
     
