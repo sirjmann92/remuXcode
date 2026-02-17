@@ -92,6 +92,44 @@ backend/
 - [x] Comprehensive code cleanup and optimization
 - [x] Rebranding to remuXcode (v2.0.0)
 
+## Phase 1.7: Configuration & Control Improvements
+
+### Goal
+Improve consistency and clarity of content filtering and processing controls.
+
+### Planned Features
+- [ ] **Global Content Filter (ANIME_ONLY refactor)**
+  - Current issue: `ANIME_ONLY` only affects video encoding, audio/cleanup ignore it
+  - Make `ANIME_ONLY` a **global** content filter applied to ALL workers
+  - When `ANIME_ONLY=true`: All workers (video, audio, cleanup) skip non-anime files
+  - When `ANIME_ONLY=false`: Process all content types
+  - Clear hierarchy: Content filter → Worker enable flags → Worker-specific settings
+  
+- [ ] **Future: Extended Content Type Filtering**
+  - Consider adding more granular content type controls:
+    - Option 1: List-based `CONTENT_TYPES=anime,live_action,animated`
+    - Option 2: Individual flags `PROCESS_ANIME`, `PROCESS_LIVE_ACTION`, etc.
+  - Only implement if needed based on user feedback
+
+### Architecture
+```
+ANIME_ONLY (global content filter)
+├─ true  → Only process anime files (all workers check this)
+└─ false → Process all content (anime + non-anime)
+
+Then independently control operations:
+├─ VIDEO_ENCODING_ENABLED     → Enable/disable video encoding
+├─ AUDIO_CONVERSION_ENABLED    → Enable/disable audio conversion
+├─ STREAM_CLEANUP_ENABLED      → Enable/disable stream cleanup
+└─ [worker-specific settings]  → CRF, presets, bitrates, etc.
+```
+
+### Implementation Notes
+- Move anime detection check into `process_file()` before workers run
+- All workers respect global content filter (exit early if filtered)
+- Update documentation to clarify the configuration hierarchy
+- Backward compatible: Default behavior unchanged (`ANIME_ONLY=true` still default)
+
 ## Phase 2: Docker + WebUI (NEXT)
 
 ### Architecture

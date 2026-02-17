@@ -11,9 +11,10 @@ video:
   codec: ${VIDEO_CODEC:-hevc}
   
   # Convert 10-bit x264/AVC to HEVC/AV1 (main use case for anime)
-  convert_10bit_x264: true
+  convert_10bit_x264: ${CONVERT_10BIT_X264:-true}
   # Convert 8-bit x264/AVC to HEVC/AV1 (optional, mainly for space savings)
-  convert_8bit_x264: false
+  # WARNING: 8-bit x264 -> HEVC often results in LARGER files
+  convert_8bit_x264: ${CONVERT_8BIT_X264:-false}
   
   # Only convert anime content (skip live action videos)
   # Set to false to convert ALL 10-bit H.264 regardless of content type
