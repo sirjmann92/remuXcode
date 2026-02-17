@@ -54,9 +54,9 @@ python3 tests/test_workers.py "/path/to/your/movie.mkv"
 nano remuxcode.service
 # Update: User, Group, WorkingDirectory, EnvironmentFile, ExecStart
 # ⚠️  IMPORTANT: Add ALL your media mount paths to ReadWritePaths:
-#    ReadWritePaths=/mnt/NAStradamus
-#    ReadWritePaths=/mnt/NASferatu
-#    ReadWritePaths=/mnt/stash
+#    ReadWritePaths=/mnt/mount_1
+#    ReadWritePaths=/mnt/mount_2
+#    ReadWritePaths=/mnt/mount_3
 #    Without these, the service cannot write to these directories!
 
 # Copy service file
