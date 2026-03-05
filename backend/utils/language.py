@@ -233,20 +233,21 @@ class LanguageDetector:
             tree = ET.parse(nfo_file)
             root = tree.getroot()
             
-            # Look for language tag
-            lang_elem = root.find('.//language')
-            if lang_elem is not None and lang_elem.text:
-                return normalize_language_code(lang_elem.text)
-            
-            # Try originallanguage tag
-            lang_elem = root.find('.//originallanguage')
-            if lang_elem is not None and lang_elem.text:
-                return normalize_language_code(lang_elem.text)
-            
-            # Try original_language (some NFO formats)
-            lang_elem = root.find('.//original_language')
-            if lang_elem is not None and lang_elem.text:
-                return normalize_language_code(lang_elem.text)
+            # Prefer explicit original language tags anywhere in the document
+            # (some formats nest these under metadata blocks)
+            for tag in ('.//originallanguage', './/original_language'):
+                lang_elem = root.find(tag)
+                if lang_elem is not None and lang_elem.text:
+                    return normalize_language_code(lang_elem.text)
+
+            # Fallback: only use top-level/movie-level language fields.
+            # Do NOT use .//language because many NFOs include streamdetails
+            # language tags for video/audio/subtitle streams, which are not the
+            # original content language.
+            for tag in ('./language', './movie/language'):
+                lang_elem = root.find(tag)
+                if lang_elem is not None and lang_elem.text:
+                    return normalize_language_code(lang_elem.text)
             
             return None
             
