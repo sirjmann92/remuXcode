@@ -143,12 +143,22 @@ class LanguageDetector:
         sonarr_url: str = '',
         sonarr_api_key: str = '',
         radarr_url: str = '',
-        radarr_api_key: str = ''
+        radarr_api_key: str = '',
+        path_mappings: Optional[List[tuple]] = None
     ):
         self.sonarr_url = sonarr_url.rstrip('/')
         self.sonarr_api_key = sonarr_api_key
         self.radarr_url = radarr_url.rstrip('/')
         self.radarr_api_key = radarr_api_key
+        # List of (container_prefix, host_prefix) tuples for path translation
+        self.path_mappings = path_mappings or []
+
+    def _to_container_path(self, host_path: str) -> str:
+        """Reverse-translate a host path back to container path for API matching."""
+        for container_prefix, host_prefix in self.path_mappings:
+            if host_path.startswith(host_prefix):
+                return container_prefix + host_path[len(host_prefix):]
+        return host_path
     
     def detect_original_language(
         self,
@@ -286,7 +296,8 @@ class LanguageDetector:
             
             # Find series by path match
             # Path structure: /Shows/Series Name/Season XX/episode.mkv
-            show_dir = str(path.parent.parent)
+            # Sonarr stores container paths, so reverse-translate if mappings provided
+            show_dir = self._to_container_path(str(path.parent.parent))
             
             for series in series_list:
                 if show_dir.startswith(series.get('path', '')):
@@ -321,7 +332,8 @@ class LanguageDetector:
             movie_list = response.json()
             
             # Find movie by path match
-            movie_dir = str(path.parent)
+            # Radarr stores container paths, so reverse-translate if mappings provided
+            movie_dir = self._to_container_path(str(path.parent))
             
             for movie in movie_list:
                 if movie_dir.startswith(movie.get('path', '')):

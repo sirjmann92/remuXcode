@@ -382,6 +382,7 @@ def initialize_components():
         sonarr_api_key=os.getenv('SONARR_API_KEY', config.sonarr.api_key),
         radarr_url=os.getenv('RADARR_URL', config.radarr.url),
         radarr_api_key=os.getenv('RADARR_API_KEY', config.radarr.api_key),
+        path_mappings=PATH_MAPPINGS,
     )
     
     # Initialize workers
@@ -435,7 +436,10 @@ def get_volume_root(file_path: str) -> str:
     
     for _, host_prefix in PATH_MAPPINGS:
         if file_path.startswith(host_prefix):
-            return host_prefix
+            if os.access(host_prefix, os.W_OK):
+                return host_prefix
+            logger.warning(f"Volume root {host_prefix!r} is not writable, falling back to /tmp")
+            return '/tmp'
     
     return '/tmp'
 
@@ -1216,13 +1220,29 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
         """Handle Sonarr/Radarr webhook."""
         event_type = data.get('eventType', '')
         
+        logger.debug(f"Webhook payload keys: {list(data.keys())}")
+        logger.debug(f"Webhook payload: {json.dumps(data, indent=2)[:2000]}")
+        logger.info(f"Webhook received: eventType={event_type!r} keys={list(data.keys())}")
+        
+        # Test events are connectivity checks — no file to process
+        if event_type == 'Test':
+            self.send_json(200, {'message': 'Test event received'})
+            return
+        
         # Determine source
         if 'movie' in data:
             source = 'radarr'
             files = [data.get('movieFile', {}).get('path')]
         elif 'episodes' in data:
             source = 'sonarr'
-            files = [ep.get('episodeFile', {}).get('path') for ep in data.get('episodes', [])]
+            # Download events send episodeFiles (list); ImportComplete sends episodeFile (singular)
+            if data.get('episodeFiles'):
+                files = [ef.get('path') for ef in data['episodeFiles'] if ef.get('path')]
+            elif data.get('episodeFile', {}).get('path'):
+                files = [data['episodeFile']['path']]
+            else:
+                files = []
+            logger.info(f"Sonarr webhook: eventType={event_type!r} episodeFiles={data.get('episodeFiles')} episodeFile={data.get('episodeFile')} resolved={files!r}")
         else:
             self.send_json(400, {'error': 'Unknown webhook format'})
             return

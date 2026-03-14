@@ -204,6 +204,16 @@ class AudioConverter:
         temp_output = temp_dir / input_path.name
         
         try:
+            # Snapshot source file identity before encoding so we can detect
+            # mid-job replacements (e.g. Sonarr upgrades) before we overwrite.
+            try:
+                _src_stat = input_path.stat()
+                _src_mtime = _src_stat.st_mtime
+                _src_size  = _src_stat.st_size
+            except OSError:
+                _src_mtime = None
+                _src_size  = None
+
             # Build and run ffmpeg command
             cmd = self._build_ffmpeg_command(
                 str(input_path),
@@ -236,7 +246,35 @@ class AudioConverter:
             if temp_output.exists():
                 # Check if original still exists (could be deleted during conversion)
                 original_exists = output_path.exists()
-                
+
+                # Detect mid-job file replacement: if the source file still exists
+                # but its mtime or size changed, a newer version was placed there
+                # while we were encoding.  Discarding our output is safer than
+                # overwriting the replacement.
+                if replace_input and original_exists and _src_mtime is not None:
+                    try:
+                        cur_stat = output_path.stat()
+                        if cur_stat.st_mtime != _src_mtime or cur_stat.st_size != _src_size:
+                            logger.warning(
+                                f"Source file was replaced during audio conversion "
+                                f"(mtime/size changed) — discarding converted output "
+                                f"to avoid overwriting the new file: {output_path}"
+                            )
+                            temp_output.unlink(missing_ok=True)
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            return AudioConversionResult(
+                                success=False,
+                                input_file=input_file,
+                                output_file=output_file,
+                                streams_converted=0,
+                                streams_total=len(info.audio_streams),
+                                original_size=info.size,
+                                new_size=0,
+                                error="Source file replaced during conversion — output discarded"
+                            )
+                    except OSError:
+                        pass
+
                 if not original_exists and replace_input:
                     # Original was deleted during conversion (e.g., Radarr upgrade)
                     # Ensure parent directory exists
@@ -246,7 +284,7 @@ class AudioConverter:
                     # Normal case: remove original before move
                     if output_path.exists():
                         output_path.unlink()
-                
+
                 shutil.move(str(temp_output), str(output_path))
                 
                 # Clean up temp directory after successful move

@@ -227,6 +227,15 @@ class VideoConverter:
                 temp_file.unlink()
             
             # Build and run ffmpeg command
+            # Snapshot source file identity before encoding
+            try:
+                _src_stat = input_path.stat()
+                _src_mtime = _src_stat.st_mtime
+                _src_size  = _src_stat.st_size
+            except OSError:
+                _src_mtime = None
+                _src_size  = None
+
             cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type)
             logger.debug(f"Running: {' '.join(cmd)}")
             
@@ -254,7 +263,33 @@ class VideoConverter:
             if temp_file.exists():
                 # Check if original still exists (could be deleted during conversion)
                 original_exists = output_path.exists()
-                
+
+                # Detect mid-job file replacement
+                if replace_input and original_exists and _src_mtime is not None:
+                    try:
+                        cur_stat = output_path.stat()
+                        if cur_stat.st_mtime != _src_mtime or cur_stat.st_size != _src_size:
+                            logger.warning(
+                                f"Source file was replaced during video conversion "
+                                f"(mtime/size changed) — discarding converted output "
+                                f"to avoid overwriting the new file: {output_path}"
+                            )
+                            temp_file.unlink(missing_ok=True)
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            return VideoConversionResult(
+                                success=False,
+                                input_file=input_file,
+                                output_file=output_file,
+                                original_size=info.size,
+                                new_size=0,
+                                codec_from=video.codec_name,
+                                codec_to=codec_to,
+                                content_type=content_type.value,
+                                error="Source file replaced during conversion — output discarded"
+                            )
+                    except OSError:
+                        pass
+
                 if not original_exists and replace_input:
                     # Original was deleted during conversion (e.g., Radarr upgrade)
                     # Ensure parent directory exists
@@ -264,7 +299,7 @@ class VideoConverter:
                     # Normal case: remove original before move
                     if output_path.exists():
                         output_path.unlink()
-                
+
                 shutil.move(str(temp_file), str(output_path))
                 
                 # Clean up temp directory after successful move
