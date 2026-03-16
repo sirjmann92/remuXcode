@@ -96,6 +96,10 @@ class StreamCleanup:
                 if not self._should_keep_subtitle(stream, keep_languages):
                     return True
         
+        # Check if audio track order needs fixing (preferred language should be first)
+        if self.config.clean_audio and self._needs_reorder(info.audio_streams, original_lang):
+            return True
+
         return False
     
     def cleanup(
@@ -174,12 +178,20 @@ class StreamCleanup:
                 subtitle_keep.append(stream)
             else:
                 subtitle_remove.append(stream)
-        
+
+        # Sort audio so preferred language (English) is first
+        if self.config.clean_audio:
+            audio_keep = self._sort_audio_for_playback(audio_keep, original_lang)
+
         # If nothing to remove, skip processing
         audio_to_remove = len(audio_remove) if self.config.clean_audio else 0
         subs_to_remove = len(subtitle_remove) if self.config.clean_subtitles else 0
-        
-        if audio_to_remove == 0 and subs_to_remove == 0:
+        needs_reorder = (
+            self.config.clean_audio
+            and self._needs_reorder(info.audio_streams, original_lang)
+        )
+
+        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder:
             logger.info(f"No streams to remove from: {input_path.name}")
             return CleanupResult(
                 success=True,
@@ -193,10 +205,11 @@ class StreamCleanup:
                 new_size=info.size,
                 original_language=original_lang
             )
-        
+
+        reorder_note = ", reordering audio (English first)" if needs_reorder else ""
         logger.info(
             f"Cleaning {input_path.name}: keeping {len(audio_keep)} audio, "
-            f"{len(subtitle_keep)} subs (original: {original_lang})"
+            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}"
         )
         
         # Prepare paths
@@ -434,6 +447,40 @@ class StreamCleanup:
         
         return False
     
+    def _needs_reorder(self, audio_streams: List[AudioStream], original_lang: str) -> bool:
+        """Return True if the preferred language exists but isn't the first audio track."""
+        if len(audio_streams) < 2 or original_lang == 'eng':
+            return False
+        preferred_langs = [l for l in self.config.keep_languages if l != original_lang]
+        if not preferred_langs:
+            return False
+        first_lang = (audio_streams[0].language or '').lower()
+        has_preferred = any((s.language or '').lower() in preferred_langs for s in audio_streams)
+        return has_preferred and first_lang not in preferred_langs
+
+    def _sort_audio_for_playback(
+        self, audio_streams: List[AudioStream], original_lang: str
+    ) -> List[AudioStream]:
+        """
+        Sort audio streams so the preferred language plays by default.
+        Preferred languages (e.g. English) come first; original language follows.
+        Order within each group is preserved.
+        """
+        if not audio_streams or original_lang == 'eng':
+            return audio_streams
+        preferred_langs = [l for l in self.config.keep_languages if l != original_lang]
+        if not preferred_langs:
+            return audio_streams
+
+        def sort_key(stream: AudioStream) -> int:
+            lang = (stream.language or '').lower()
+            for i, pl in enumerate(preferred_langs):
+                if lang == pl:
+                    return i
+            return len(preferred_langs)  # original language / others sort last
+
+        return sorted(audio_streams, key=sort_key)
+
     def _build_ffmpeg_command(
         self,
         input_file: str,
@@ -451,10 +498,14 @@ class StreamCleanup:
             for stream in info.video_streams:
                 cmd.extend(['-map', f'0:{stream.index}'])
         
-        # Map kept audio streams
+        # Map kept audio streams (already sorted: preferred language first)
         for stream in audio_keep:
             cmd.extend(['-map', f'0:{stream.index}'])
-        
+
+        # Set default disposition on first audio track, clear from the rest
+        for i in range(len(audio_keep)):
+            cmd.extend([f'-disposition:a:{i}', 'default' if i == 0 else '0'])
+
         # Map kept subtitle streams
         for stream in subtitle_keep:
             cmd.extend(['-map', f'0:{stream.index}'])
