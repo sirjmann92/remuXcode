@@ -106,11 +106,6 @@ class StreamCleanup:
             if self._needs_language_tagging(kept_audio, original_lang):
                 return True
 
-        # Check if the container is missing the remuxcode marker tag.
-        # This tag causes a file-size change that tells Sonarr to re-read MediaInfo.
-        if self._needs_encoder_tag(info):
-            return True
-
         return False
     
     def cleanup(
@@ -218,9 +213,8 @@ class StreamCleanup:
             self.config.clean_audio
             and self._needs_language_tagging(audio_keep, original_lang)
         )
-        needs_encoder_tag = self._needs_encoder_tag(info)
 
-        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging and not needs_encoder_tag:
+        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging:
             logger.info(f"No streams to remove from: {input_path.name}")
             return CleanupResult(
                 success=True,
@@ -237,10 +231,9 @@ class StreamCleanup:
 
         reorder_note = ", reordering audio (English first)" if needs_reorder else ""
         tag_note = ", tagging untagged audio streams" if needs_tagging else ""
-        encoder_tag_note = ", writing encoder tag" if (needs_encoder_tag and not needs_reorder and not needs_tagging and audio_to_remove == 0 and subs_to_remove == 0) else ""
         logger.info(
             f"Cleaning {input_path.name}: keeping {len(audio_keep)} audio, "
-            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}{tag_note}{encoder_tag_note}"
+            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}{tag_note}"
         )
         
         # Prepare paths
