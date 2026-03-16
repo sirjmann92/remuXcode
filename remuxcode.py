@@ -22,7 +22,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, cast
 from enum import Enum
 
 import requests
@@ -305,17 +305,18 @@ class JobQueue:
                 self._save_job_to_store(job)
 
 
-# Global instances
+# Global instances — all assigned in initialize_components() before any use;
+# cast(X, None) tells the type checker they're always non-None after init.
 logger = logging.getLogger('media-converter')
-config: Optional[Config] = None
-job_queue: Optional[JobQueue] = None
-job_store: Optional[JobStore] = None
-ffprobe: Optional[FFProbe] = None
-anime_detector: Optional[AnimeDetector] = None
-language_detector: Optional[LanguageDetector] = None
-audio_converter: Optional[AudioConverter] = None
-video_converter: Optional[VideoConverter] = None
-stream_cleanup: Optional[StreamCleanup] = None
+config: Config = cast(Config, None)
+job_queue: JobQueue = cast(JobQueue, None)
+job_store: JobStore = cast(JobStore, None)
+ffprobe: FFProbe = cast(FFProbe, None)
+anime_detector: AnimeDetector = cast(AnimeDetector, None)
+language_detector: LanguageDetector = cast(LanguageDetector, None)
+audio_converter: AudioConverter = cast(AudioConverter, None)
+video_converter: VideoConverter = cast(VideoConverter, None)
+stream_cleanup: StreamCleanup = cast(StreamCleanup, None)
 
 
 def setup_logging():
@@ -335,7 +336,7 @@ def setup_logging():
                 record.name = 'main'
             return True
     
-    handlers = [logging.StreamHandler()]
+    handlers: List[logging.Handler] = [logging.StreamHandler()]
     
     log_file = os.getenv('LOG_FILE', '/var/log/remuxcode.log')
     try:
@@ -444,7 +445,7 @@ def get_volume_root(file_path: str) -> str:
     return '/tmp'
 
 
-def process_file(file_path: str, job_type: JobType, job_id: str = None) -> Dict[str, Any]:
+def process_file(file_path: str, job_type: JobType, job_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Process a single file with the specified conversion type.
     
@@ -1222,7 +1223,21 @@ class MediaWebhookHandler(BaseHTTPRequestHandler):
         
         logger.debug(f"Webhook payload keys: {list(data.keys())}")
         logger.debug(f"Webhook payload: {json.dumps(data, indent=2)[:2000]}")
-        logger.info(f"Webhook received: eventType={event_type!r} keys={list(data.keys())}")
+
+        # Log a meaningful summary at INFO level
+        if 'movie' in data:
+            title = data['movie'].get('title', '?')
+            year = data['movie'].get('year', '')
+            path = data.get('movieFile', {}).get('path') or data.get('destinationPath', '?')
+            logger.info(f"Webhook received: eventType={event_type!r} source=radarr movie={title!r} ({year}) path={path!r}")
+        elif 'series' in data:
+            title = data['series'].get('title', '?')
+            year = data['series'].get('year', '')
+            file_count = data.get('fileCount', '?')
+            dest = data.get('destinationPath', '?')
+            logger.info(f"Webhook received: eventType={event_type!r} source=sonarr series={title!r} ({year}) files={file_count} dest={dest!r}")
+        else:
+            logger.info(f"Webhook received: eventType={event_type!r} (unknown source)")
         
         # Test events are connectivity checks — no file to process
         if event_type == 'Test':
