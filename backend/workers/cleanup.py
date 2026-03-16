@@ -100,6 +100,12 @@ class StreamCleanup:
         if self.config.clean_audio and self._needs_reorder(info.audio_streams, original_lang):
             return True
 
+        # Check if audio streams are missing language tags (needed for Sonarr/Plex)
+        if self.config.clean_audio:
+            kept_audio = [s for s in info.audio_streams if self._should_keep_audio(s, keep_languages)]
+            if self._needs_language_tagging(kept_audio, original_lang):
+                return True
+
         return False
     
     def cleanup(
@@ -183,6 +189,19 @@ class StreamCleanup:
         if self.config.clean_audio:
             audio_keep = self._sort_audio_for_playback(audio_keep, original_lang)
 
+        # Build inferred language map for untagged streams based on sorted position.
+        # Position 0..N-1 → preferred language(s); remaining → original language.
+        preferred_langs_for_inference = [l for l in self.config.keep_languages if l != original_lang]
+        inferred_langs: Dict[int, str] = {}
+        if original_lang and original_lang not in ('und', ''):
+            for i, stream in enumerate(audio_keep):
+                if not (stream.language or '').strip():
+                    inferred_langs[stream.index] = (
+                        preferred_langs_for_inference[i]
+                        if i < len(preferred_langs_for_inference)
+                        else original_lang
+                    )
+
         # If nothing to remove, skip processing
         audio_to_remove = len(audio_remove) if self.config.clean_audio else 0
         subs_to_remove = len(subtitle_remove) if self.config.clean_subtitles else 0
@@ -190,8 +209,12 @@ class StreamCleanup:
             self.config.clean_audio
             and self._needs_reorder(info.audio_streams, original_lang)
         )
+        needs_tagging = (
+            self.config.clean_audio
+            and self._needs_language_tagging(audio_keep, original_lang)
+        )
 
-        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder:
+        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging:
             logger.info(f"No streams to remove from: {input_path.name}")
             return CleanupResult(
                 success=True,
@@ -207,9 +230,10 @@ class StreamCleanup:
             )
 
         reorder_note = ", reordering audio (English first)" if needs_reorder else ""
+        tag_note = ", tagging untagged audio streams" if needs_tagging else ""
         logger.info(
             f"Cleaning {input_path.name}: keeping {len(audio_keep)} audio, "
-            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}"
+            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}{tag_note}"
         )
         
         # Prepare paths
@@ -244,7 +268,8 @@ class StreamCleanup:
                 str(temp_output),
                 info,
                 audio_keep if self.config.clean_audio else info.audio_streams,
-                subtitle_keep if self.config.clean_subtitles else info.subtitle_streams
+                subtitle_keep if self.config.clean_subtitles else info.subtitle_streams,
+                inferred_langs=inferred_langs if inferred_langs else None
             )
             logger.debug(f"Running: {' '.join(cmd)}")
             
@@ -458,6 +483,12 @@ class StreamCleanup:
         has_preferred = any((s.language or '').lower() in preferred_langs for s in audio_streams)
         return has_preferred and first_lang not in preferred_langs
 
+    def _needs_language_tagging(self, audio_streams: List[AudioStream], original_lang: str) -> bool:
+        """Return True if any audio stream is missing a language tag and we can infer it."""
+        if not original_lang or original_lang == 'und':
+            return False
+        return any(not (s.language or '').strip() for s in audio_streams)
+
     def _sort_audio_for_playback(
         self, audio_streams: List[AudioStream], original_lang: str
     ) -> List[AudioStream]:
@@ -487,7 +518,8 @@ class StreamCleanup:
         output_file: str,
         info: MediaInfo,
         audio_keep: List[AudioStream],
-        subtitle_keep: List[SubtitleStream]
+        subtitle_keep: List[SubtitleStream],
+        inferred_langs: Optional[Dict[int, str]] = None
     ) -> List[str]:
         """Build ffmpeg command for stream removal."""
         
@@ -507,6 +539,8 @@ class StreamCleanup:
         # Plex, and any player can identify tracks regardless of stream order.
         for i, stream in enumerate(audio_keep):
             lang = (stream.language or '').strip()
+            if not lang and inferred_langs:
+                lang = inferred_langs.get(stream.index, '')
             if lang:
                 cmd.extend([f'-metadata:s:a:{i}', f'language={lang}'])
             cmd.extend([f'-disposition:a:{i}', 'default' if i == 0 else '0'])
