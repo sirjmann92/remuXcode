@@ -385,7 +385,6 @@ video:
 audio:
   enabled: true
   convert_dts: true           # DTS → AC3/AAC
-  convert_truehd: true        # TrueHD → AC3/AAC
   prefer_ac3: true            # AC3 for 5.1, AAC for stereo/7.1+
 
 cleanup:
@@ -406,7 +405,6 @@ cleanup:
 | Stereo DTS (2ch) | AAC | Max 320kbps |
 | 5.1 DTS (6ch) | AC3 | Max 640kbps |
 | 7.1+ DTS (8ch) | E-AC3 | Max 1536kbps |
-| TrueHD | AC3/E-AC3 | Based on channels |
 
 ### Video
 

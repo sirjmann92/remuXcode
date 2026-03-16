@@ -95,8 +95,7 @@ class AudioStream:
     @property
     def needs_conversion(self) -> bool:
         """Check if stream needs conversion for compatibility."""
-        # DTS variants that need conversion
-        return self.is_dts or self.is_truehd
+        return self.is_dts
 
 
 @dataclass

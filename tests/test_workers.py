@@ -159,7 +159,7 @@ def test_audio_worker(file_path: str):
     config = AudioConfig(
         enabled=True,
         convert_dts=True,
-        convert_truehd=True,
+        convert_truehd=False,
         keep_original=False,
         prefer_ac3=True,
     )
@@ -176,7 +176,7 @@ def test_audio_worker(file_path: str):
     print_result("TrueHD Streams", status.get('truehd_streams', 0))
     
     if should_convert:
-        print(f"\n  Would convert DTS/TrueHD → AC3/AAC")
+        print(f"\n  Would convert DTS → AC3/AAC")
         print(f"  Config: prefer_ac3={config.prefer_ac3}, keep_original={config.keep_original}")
 
 
