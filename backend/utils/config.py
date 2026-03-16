@@ -266,7 +266,7 @@ class Config:
         return AudioConfig(
             enabled=self._get('audio.enabled', True),
             convert_dts=self._get('audio.convert_dts', True),
-            convert_truehd=self._get('audio.convert_truehd', True),
+            convert_truehd=self._get('audio.convert_truehd', False),
             keep_original=self._get('audio.keep_original', False),
             prefer_ac3=self._get('audio.prefer_ac3', True),
             ac3_bitrate=self._get('audio.ac3_bitrate', 640),
