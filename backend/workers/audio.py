@@ -486,7 +486,10 @@ class AudioConverter:
         
         # Map all streams
         cmd.extend(['-map', '0', '-map_chapters', '0'])
-        
+
+        # Tag the container so Sonarr detects a size change and re-reads MediaInfo
+        cmd.extend(['-metadata:g', 'ENCODED_BY=remuxcode'])
+
         cmd.append(output_file)
         return cmd
     

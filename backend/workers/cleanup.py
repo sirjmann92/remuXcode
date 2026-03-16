@@ -106,6 +106,11 @@ class StreamCleanup:
             if self._needs_language_tagging(kept_audio, original_lang):
                 return True
 
+        # Check if the container is missing the remuxcode marker tag.
+        # This tag causes a file-size change that tells Sonarr to re-read MediaInfo.
+        if self._needs_encoder_tag(info):
+            return True
+
         return False
     
     def cleanup(
@@ -213,8 +218,9 @@ class StreamCleanup:
             self.config.clean_audio
             and self._needs_language_tagging(audio_keep, original_lang)
         )
+        needs_encoder_tag = self._needs_encoder_tag(info)
 
-        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging:
+        if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging and not needs_encoder_tag:
             logger.info(f"No streams to remove from: {input_path.name}")
             return CleanupResult(
                 success=True,
@@ -231,9 +237,10 @@ class StreamCleanup:
 
         reorder_note = ", reordering audio (English first)" if needs_reorder else ""
         tag_note = ", tagging untagged audio streams" if needs_tagging else ""
+        encoder_tag_note = ", writing encoder tag" if (needs_encoder_tag and not needs_reorder and not needs_tagging and audio_to_remove == 0 and subs_to_remove == 0) else ""
         logger.info(
             f"Cleaning {input_path.name}: keeping {len(audio_keep)} audio, "
-            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}{tag_note}"
+            f"{len(subtitle_keep)} subs (original: {original_lang}){reorder_note}{tag_note}{encoder_tag_note}"
         )
         
         # Prepare paths
@@ -489,6 +496,15 @@ class StreamCleanup:
             return False
         return any(not (s.language or '').strip() for s in audio_streams)
 
+    def _needs_encoder_tag(self, info: MediaInfo) -> bool:
+        """Return True if the container is missing the remuxcode marker tag.
+
+        Writing this tag changes the file size, which triggers Sonarr/Radarr to
+        re-read MediaInfo after a remux pass (they skip re-analysis when size is
+        unchanged).
+        """
+        return info.format_tags.get('ENCODED_BY', '').lower() != 'remuxcode'
+
     def _sort_audio_for_playback(
         self, audio_streams: List[AudioStream], original_lang: str
     ) -> List[AudioStream]:
@@ -559,7 +575,10 @@ class StreamCleanup:
         
         # Copy all streams (no re-encoding)
         cmd.extend(['-c', 'copy'])
-        
+
+        # Tag the container so Sonarr detects a size change and re-reads MediaInfo
+        cmd.extend(['-metadata:g', 'ENCODED_BY=remuxcode'])
+
         cmd.append(output_file)
         return cmd
     

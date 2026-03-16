@@ -147,6 +147,11 @@ class MediaInfo:
     subtitle_streams: List[SubtitleStream]
     attachment_streams: List[AttachmentStream]
     chapters: List[Dict]
+    format_tags: Dict[str, str] = None  # type: ignore[assignment]  # container-level metadata
+
+    def __post_init__(self) -> None:
+        if self.format_tags is None:
+            self.format_tags = {}
     
     @property
     def primary_video(self) -> Optional[VideoStream]:
@@ -282,7 +287,8 @@ class FFProbe:
             audio_streams=audio_streams,
             subtitle_streams=subtitle_streams,
             attachment_streams=attachment_streams,
-            chapters=chapters
+            chapters=chapters,
+            format_tags={k.upper(): v for k, v in format_info.get('tags', {}).items()}
         )
     
     def _parse_video_stream(self, stream: Dict) -> VideoStream:
