@@ -502,8 +502,13 @@ class StreamCleanup:
         for stream in audio_keep:
             cmd.extend(['-map', f'0:{stream.index}'])
 
-        # Set default disposition on first audio track, clear from the rest
-        for i in range(len(audio_keep)):
+        # Explicitly tag each audio stream with its language and set disposition.
+        # Many release groups omit language tags; we write them so that Sonarr,
+        # Plex, and any player can identify tracks regardless of stream order.
+        for i, stream in enumerate(audio_keep):
+            lang = (stream.language or '').strip()
+            if lang:
+                cmd.extend([f'-metadata:s:a:{i}', f'language={lang}'])
             cmd.extend([f'-disposition:a:{i}', 'default' if i == 0 else '0'])
 
         # Map kept subtitle streams

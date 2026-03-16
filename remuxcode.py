@@ -278,20 +278,22 @@ class JobQueue:
             
             job.result = result
             job.status = JobStatus.COMPLETED
-            logger.info(f"Job {job_id} completed successfully")
-            
+
             # Trigger Sonarr/Radarr refresh and rename if any conversion was successful
             any_success = (
                 (result.get('audio') and result['audio'].get('success')) or
                 (result.get('video') and result['video'].get('success')) or
                 (result.get('cleanup') and result['cleanup'].get('success'))
             )
-            
+
             if any_success:
+                logger.info(f"Job {job_id} completed: {Path(job.file_path).name}")
                 try:
                     trigger_rename(job.file_path)
                 except Exception as rename_err:
                     logger.warning(f"Rename trigger failed (job still completed): {rename_err}")
+            else:
+                logger.debug(f"Job {job_id} skipped: nothing to do for {Path(job.file_path).name}")
             
         except Exception as e:
             job.error = str(e)
@@ -663,16 +665,16 @@ def trigger_rename(file_path: str, media_type: str = 'auto'):
                 logger.warning(f"Series not found in Sonarr for path: {file_path}")
                 return
             
-            # Step 1: Trigger refresh to update media info
+            # Step 1: Trigger rescan to force MediaInfo re-analysis of changed files
             response = requests.post(
                 f"{sonarr_url}/api/v3/command",
                 headers={'X-Api-Key': sonarr_key},
-                json={'name': 'RefreshSeries', 'seriesId': series_id},
+                json={'name': 'RescanSeries', 'seriesId': series_id},
                 timeout=30
             )
             response.raise_for_status()
             refresh_command_id = response.json().get('id')
-            logger.info(f"Triggered Sonarr refresh for series ID {series_id}")
+            logger.info(f"Triggered Sonarr rescan for series ID {series_id}")
             
             # Step 2: Poll for refresh completion
             max_wait = 30  # seconds
@@ -690,10 +692,10 @@ def trigger_rename(file_path: str, media_type: str = 'auto'):
                 status = status_response.json().get('status')
                 
                 if status == 'completed':
-                    logger.info("Sonarr refresh completed")
+                    logger.info("Sonarr rescan completed")
                     break
                 elif status == 'failed':
-                    logger.error("Sonarr refresh failed")
+                    logger.error("Sonarr rescan failed")
                     return
             
             # Step 3: Get episode file ID
