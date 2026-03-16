@@ -30,7 +30,7 @@ class AudioConfig:
     """Audio conversion settings."""
     enabled: bool = True
     convert_dts: bool = True
-    convert_truehd: bool = True
+    convert_truehd: bool = False  # TrueHD is lossless Dolby — default is to leave it alone
     keep_original: bool = False
     prefer_ac3: bool = True
     ac3_bitrate: int = 640       # kbps for AC3 5.1

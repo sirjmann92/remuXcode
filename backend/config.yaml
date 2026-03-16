@@ -62,8 +62,8 @@ audio:
   enabled: ${AUDIO_CONVERSION_ENABLED:-true}
   
   # What to convert
-  convert_dts: true     # Convert DTS to AC3/AAC
-  convert_truehd: true  # Convert TrueHD to AC3/AAC
+  convert_dts: true      # Convert DTS to AC3/AAC
+  convert_truehd: false  # TrueHD is a Dolby lossless format — never downgrade it
   
   # Keep original track alongside converted?
   keep_original: false
