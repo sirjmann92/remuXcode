@@ -293,7 +293,7 @@ class JobQueue:
                 except Exception as rename_err:
                     logger.warning(f"Rename trigger failed (job still completed): {rename_err}")
             else:
-                logger.debug(f"Job {job_id} skipped: nothing to do for {Path(job.file_path).name}")
+                logger.info(f"Job {job_id} skipped: nothing to do for {Path(job.file_path).name}")
             
         except Exception as e:
             job.error = str(e)
