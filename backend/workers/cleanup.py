@@ -437,7 +437,12 @@ class StreamCleanup:
     def _should_keep_audio(self, stream: AudioStream, keep_languages: Set[str]) -> bool:
         """Determine if an audio stream should be kept."""
         lang = stream.language.lower() if stream.language else ''
-        
+
+        # Never remove untagged streams — we can't identify them as unwanted,
+        # and they may need a tagging pass first.
+        if not lang or lang == 'und':
+            return True
+
         # Keep if language matches
         if lang in keep_languages:
             return True
