@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, List, Callable
 
+from ._progress import run_ffmpeg_with_progress
 from ..utils.ffprobe import FFProbe, MediaInfo
 from ..utils.anime_detect import AnimeDetector, ContentType
 from ..utils.config import VideoConfig
@@ -134,7 +135,8 @@ class VideoConverter:
         input_file: str,
         output_file: Optional[str] = None,
         force_content_type: Optional[ContentType] = None,
-        job_id: Optional[str] = None
+        job_id: Optional[str] = None,
+        progress_callback: Optional[Callable[[float], None]] = None,
     ) -> VideoConversionResult:
         """
         Convert video to HEVC or AV1.
@@ -239,14 +241,14 @@ class VideoConverter:
             cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type)
             logger.debug(f"Running: {' '.join(cmd)}")
             
-            result = subprocess.run(
+            returncode, stderr_text = run_ffmpeg_with_progress(
                 cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.config.job_timeout or None  # 0 = no timeout
+                duration_secs=info.duration,
+                progress_cb=progress_callback,
+                timeout=self.config.job_timeout or None,  # 0 = no timeout
             )
-            
-            if result.returncode != 0:
+
+            if returncode != 0:
                 return VideoConversionResult(
                     success=False,
                     input_file=input_file,
@@ -256,7 +258,7 @@ class VideoConverter:
                     codec_from=video.codec_name,
                     codec_to=codec_to,
                     content_type=content_type.value,
-                    error=f"FFmpeg failed: {result.stderr[:500]}"
+                    error=f"FFmpeg failed: {stderr_text[:500]}"
                 )
             
             # Move temp file to output location

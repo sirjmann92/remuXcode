@@ -181,6 +181,7 @@ class Config:
         # Worker count with env override: REMUXCODE_WORKERS > processing.max_concurrent_jobs > default (1)
         self.workers = int(os.getenv('REMUXCODE_WORKERS', self._get('processing.max_concurrent_jobs', 1)))
         self.temp_dir = self._get('general.temp_dir', '/tmp')
+        self.job_history_days = int(os.getenv('JOB_HISTORY_DAYS', self._get('general.job_history_days', 30)))
     
     def _find_config_path(self, provided_path: Optional[str]) -> Optional[Path]:
         """Find configuration file from provided path or defaults."""

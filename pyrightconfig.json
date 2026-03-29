@@ -1,18 +1,13 @@
 {
   "include": [
-    "backend",
-    "remuxcode.py"
+    "backend"
   ],
   "exclude": [
     "**/__pycache__",
-    "**/*.pyc"
+    "**/*.pyc",
+    "legacy"
   ],
   "pythonVersion": "3.13",
   "pythonPlatform": "Linux",
-  "typeCheckingMode": "basic",
-  "reportMissingImports": true,
-  "reportMissingTypeStubs": false,
-  "stubPath": "",
-  "venvPath": ".",
-  "venv": ""
+  "typeCheckingMode": "basic"
 }

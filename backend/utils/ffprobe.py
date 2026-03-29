@@ -94,7 +94,7 @@ class AudioStream:
     
     @property
     def needs_conversion(self) -> bool:
-        """Check if stream needs conversion for compatibility."""
+        """Check if stream needs conversion for compatibility (DTS only, config-unaware)."""
         return self.is_dts
 
 
@@ -170,7 +170,7 @@ class MediaInfo:
     
     @property
     def needs_audio_conversion(self) -> bool:
-        """Check if file needs audio conversion."""
+        """Check if file needs audio conversion (DTS by default, config-unaware)."""
         return any(s.needs_conversion for s in self.audio_streams)
     
     @property

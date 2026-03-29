@@ -5,6 +5,7 @@ SQLite-based persistent job storage.
 Provides crash recovery and job history for long-running conversions.
 """
 
+import json
 import logging
 import sqlite3
 import threading
@@ -28,12 +29,6 @@ class JobStore:
     """
     
     def __init__(self, db_path: str = "jobs.db"):
-        """
-        Initialize job store.
-        
-        Args:
-            db_path: Path to SQLite database file
-        """
         self.db_path = Path(db_path)
         self._lock = threading.Lock()
         self._init_db()
@@ -54,7 +49,7 @@ class JobStore:
             conn.close()
     
     def _init_db(self):
-        """Create tables if they don't exist."""
+        """Create tables if they don't exist, migrate schema as needed."""
         with self._get_connection() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -72,34 +67,39 @@ class JobStore:
                     streams_cleaned INTEGER DEFAULT 0
                 )
             """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_status 
-                ON jobs(status)
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_created 
-                ON jobs(created_at DESC)
-            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON jobs(status)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON jobs(created_at DESC)")
+
+            # Migrate: add columns if missing
+            existing = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+            migrations = {
+                "job_type": "TEXT DEFAULT 'full'",
+                "source": "TEXT DEFAULT 'webhook'",
+                "result_json": "TEXT",
+            }
+            for col, typedef in migrations.items():
+                if col not in existing:
+                    conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typedef}")
+                    logger.info("Migrated jobs table: added column %s", col)
     
     def save_job(self, job_data: Dict[str, Any]) -> None:
-        """
-        Save or update a job.
-        
-        Args:
-            job_data: Job dictionary with at least id, file_path, status
-        """
+        """Save or update a job."""
         with self._lock:
             now = datetime.now().isoformat()
-            
+            result_json = None
+            if job_data.get("result"):
+                try:
+                    result_json = json.dumps(job_data["result"])
+                except (TypeError, ValueError):
+                    pass
+
             with self._get_connection() as conn:
-                # Check if job exists
                 existing = conn.execute(
                     "SELECT id FROM jobs WHERE id = ?", 
                     (job_data['id'],)
                 ).fetchone()
                 
                 if existing:
-                    # Update existing job
                     conn.execute("""
                         UPDATE jobs 
                         SET status = ?, 
@@ -110,7 +110,10 @@ class JobStore:
                             completed_at = ?,
                             video_converted = ?,
                             audio_converted = ?,
-                            streams_cleaned = ?
+                            streams_cleaned = ?,
+                            job_type = COALESCE(?, job_type),
+                            source = COALESCE(?, source),
+                            result_json = COALESCE(?, result_json)
                         WHERE id = ?
                     """, (
                         job_data.get('status'),
@@ -122,20 +125,23 @@ class JobStore:
                         job_data.get('video_converted', 0),
                         job_data.get('audio_converted', 0),
                         job_data.get('streams_cleaned', 0),
+                        job_data.get('job_type'),
+                        job_data.get('source'),
+                        result_json,
                         job_data['id']
                     ))
                 else:
-                    # Insert new job
                     conn.execute("""
                         INSERT INTO jobs (
                             id, file_path, status, progress, error,
                             created_at, updated_at, started_at, completed_at,
-                            video_converted, audio_converted, streams_cleaned
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            video_converted, audio_converted, streams_cleaned,
+                            job_type, source, result_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         job_data['id'],
                         job_data['file_path'],
-                        job_data.get('status', 'queued'),
+                        job_data.get('status', 'pending'),
                         job_data.get('progress', 0),
                         job_data.get('error'),
                         job_data.get('created_at', now),
@@ -144,7 +150,10 @@ class JobStore:
                         job_data.get('completed_at'),
                         job_data.get('video_converted', 0),
                         job_data.get('audio_converted', 0),
-                        job_data.get('streams_cleaned', 0)
+                        job_data.get('streams_cleaned', 0),
+                        job_data.get('job_type', 'full'),
+                        job_data.get('source', 'webhook'),
+                        result_json,
                     ))
     
     def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:

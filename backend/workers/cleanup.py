@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, List, Set, Callable
 
+from ._progress import run_ffmpeg_with_progress
 from ..utils.ffprobe import FFProbe, MediaInfo, AudioStream, SubtitleStream
 from ..utils.language import LanguageDetector
 from ..utils.config import CleanupConfig
@@ -113,7 +114,8 @@ class StreamCleanup:
         input_file: str,
         output_file: Optional[str] = None,
         job_id: Optional[str] = None,
-        force_original_language: Optional[str] = None
+        force_original_language: Optional[str] = None,
+        progress_callback: Optional[Callable[[float], None]] = None,
     ) -> CleanupResult:
         """
         Remove unwanted streams from a media file.
@@ -273,14 +275,14 @@ class StreamCleanup:
             )
             logger.debug(f"Running: {' '.join(cmd)}")
             
-            result = subprocess.run(
+            returncode, stderr_text = run_ffmpeg_with_progress(
                 cmd,
-                capture_output=True,
-                text=True,
-                timeout=3600
+                duration_secs=info.duration,
+                progress_cb=progress_callback,
+                timeout=3600,
             )
-            
-            if result.returncode != 0:
+
+            if returncode != 0:
                 return CleanupResult(
                     success=False,
                     input_file=input_file,
@@ -292,7 +294,7 @@ class StreamCleanup:
                     original_size=info.size,
                     new_size=0,
                     original_language=original_lang,
-                    error=f"FFmpeg failed: {result.stderr[:500]}"
+                    error=f"FFmpeg failed: {stderr_text[:500]}"
                 )
 
             # Move temp file to output location

@@ -1,0 +1,66 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '.*\.md$'
+      - id: end-of-file-fixer
+        exclude: '.*\.md$'
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-json
+      - id: detect-private-key
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        types: [shell]
+        args: ['-x']
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: svelte-check
+        name: svelte-check
+        entry: bash -c "cd frontend && npx svelte-check --tsconfig ./tsconfig.json"
+        language: system
+        types_or: [ts, svelte]
+        pass_filenames: false
+
+  - repo: https://github.com/biomejs/pre-commit
+    rev: 'v2.2.4'
+    hooks:
+      - id: biome-check
+        files: ^frontend/
+        additional_dependencies:
+          - '@biomejs/biome'
+
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+  autofix_prs: true
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [svelte-check]
+  submodules: false
