@@ -53,6 +53,10 @@ jobs:
         run: |
           npm ci || npm install --no-audit --no-fund
 
+      - name: Generate SvelteKit type declarations
+        working-directory: frontend
+        run: npx svelte-kit sync
+
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
