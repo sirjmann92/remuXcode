@@ -1,0 +1,7 @@
+-r requirements.txt
+mypy
+pre-commit
+ruff
+types-PyYAML
+types-requests
+types-setuptools

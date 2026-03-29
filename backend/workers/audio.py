@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Callable
 
+from ._progress import run_ffmpeg_with_progress
 from ..utils.ffprobe import FFProbe, MediaInfo, AudioStream
 from ..utils.config import AudioConfig
 
@@ -123,7 +124,8 @@ class AudioConverter:
         self,
         input_file: str,
         output_file: Optional[str] = None,
-        job_id: Optional[str] = None
+        job_id: Optional[str] = None,
+        progress_callback: Optional[Callable[[float], None]] = None,
     ) -> AudioConversionResult:
         """
         Convert incompatible audio in a media file.
@@ -223,14 +225,14 @@ class AudioConverter:
             )
             logger.debug(f"Running: {' '.join(cmd)}")
             
-            result = subprocess.run(
+            returncode, stderr_text = run_ffmpeg_with_progress(
                 cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.config.job_timeout or None  # 0 = no timeout
+                duration_secs=info.duration,
+                progress_cb=progress_callback,
+                timeout=self.config.job_timeout or None,  # 0 = no timeout
             )
-            
-            if result.returncode != 0:
+
+            if returncode != 0:
                 return AudioConversionResult(
                     success=False,
                     input_file=input_file,
@@ -239,7 +241,7 @@ class AudioConverter:
                     streams_total=len(info.audio_streams),
                     original_size=info.size,
                     new_size=0,
-                    error=f"FFmpeg failed: {result.stderr[:500]}"
+                    error=f"FFmpeg failed: {stderr_text[:500]}"
                 )
             
             # Move temp file to output location

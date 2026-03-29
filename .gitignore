@@ -28,3 +28,12 @@ Thumbs.db
 
 # Legacy/personal files
 legacy/
+
+# Docker config volume (runtime state and secrets)
+config/.api_key
+config/jobs.db
+
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/

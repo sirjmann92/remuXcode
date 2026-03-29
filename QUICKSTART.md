@@ -1,82 +1,126 @@
 # Quick Start Guide
 
-## Installation Steps
+## Prerequisites
 
-1. **Install the service**:
+- Docker + Docker Compose
+- Sonarr and/or Radarr running in Docker (or accessible over the network)
+- Media files on a shared NAS or local volume
+
+---
+
+## 1. Configure
+
+Copy the example environment file and fill in your Sonarr/Radarr details:
+
 ```bash
-cd ~/Projects/dts-conversion
-
-# Make service executable
-chmod +x dts_webhook_service.py
-
-# Copy systemd service file
-sudo cp dts-converter-webhook.service /etc/systemd/system/
-
-# Create log file
-sudo touch /var/log/dts-converter-webhook.log
-sudo chown $USER:$USER /var/log/dts-converter-webhook.log
-
-# Start and enable service
-sudo systemctl daemon-reload
-sudo systemctl enable dts-converter-webhook
-sudo systemctl start dts-converter-webhook
+cp .env.example .env
+nano .env
 ```
 
-2. **Verify it's running**:
-```bash
-# Check service status
-sudo systemctl status dts-converter-webhook
+Set at minimum:
 
-# Test health endpoint
+```ini
+SONARR_URL=http://your-sonarr-host:8989
+SONARR_API_KEY=your_sonarr_api_key
+
+RADARR_URL=http://your-radarr-host:7878
+RADARR_API_KEY=your_radarr_api_key
+```
+
+Leave `REMUXCODE_API_KEY` blank — a key is auto-generated on first run and saved to `config/.api_key`.
+
+---
+
+## 2. Configure Volume Mounts
+
+Edit `compose.yml` and update the volume mounts to match your NAS/storage paths.
+Mount them at the **same paths Sonarr/Radarr use internally** so webhook paths work without any translation:
+
+```yaml
+volumes:
+  - /mnt/yournas:/share:rw        # matches Sonarr/Radarr's /share
+  - /mnt/yournas2:/share-exp:rw   # matches /share-exp
+```
+
+---
+
+## 3. Start
+
+```bash
+docker compose up -d
+```
+
+On first run, `config/config.yaml` is created automatically from the built-in template.
+Edit it to adjust encoding quality, audio settings, language preferences, etc.
+
+---
+
+## 4. Verify
+
+```bash
+# Health check
 curl http://localhost:7889/health
 
-# Expected response:
-# {"status": "healthy", "service": "dts-converter-webhook"}
+# View your API key (auto-generated on first run)
+cat config/.api_key
 ```
 
-3. **Configure Sonarr**:
-   - Go to **Settings → Connect → Add → Webhook**
-   - Name: `DTS Audio Converter`
-   - On Import Complete: ✓
-   - URL: `http://YOUR_HOST_IP:7889/`
-   - Method: POST
-   - Click **Test** - should succeed
-   - Click **Save**
+---
 
-4. **Configure Radarr** (same as above but):
-   - On Import: ✓
-   - On Upgrade: ✓
-   - On Import Complete: (doesn't exist in Radarr)
+## 5. Configure Sonarr / Radarr Webhook
 
-5. **Watch it work**:
+In Sonarr/Radarr → **Settings → Connect → Add → Webhook**:
+
+| Field | Value |
+|-------|-------|
+| URL | `http://YOUR_HOST_IP:7889/api/webhook` |
+| Method | POST |
+| Triggers | On Import, On Upgrade |
+| Headers | `X-API-Key: <your key from config/.api_key>` |
+
+Click **Test** — you should see a `{"status":"ok"}` response.
+
+---
+
+## 6. Watch It Work
+
 ```bash
-# Monitor logs
-sudo journalctl -u dts-converter-webhook -f
+# Live logs
+docker compose logs -f
 
-# Trigger a test by importing a file with DTS audio
+# Check the job queue in the UI
+open http://localhost:7889
 ```
+
+---
 
 ## Troubleshooting
 
-**Service won't start?**
+**Container won't start?**
 ```bash
-# Check for errors
-sudo journalctl -u dts-converter-webhook -n 50
-
-# Make sure .env file exists
-ls -la ~/Projects/dts-conversion/.env
+docker compose logs --tail=50
 ```
 
 **Webhook test fails?**
 ```bash
-# Check if service is listening
-sudo netstat -tlnp | grep 7889
-
-# Test manually
+# Confirm service is up
 curl http://localhost:7889/health
+
+# Check your API key
+cat config/.api_key
+curl -H "X-API-Key: $(cat config/.api_key)" http://localhost:7889/api/jobs
 ```
 
-**Need to restart after changes?**
+**Files not being found?**
+- Verify your volume mounts in `compose.yml` match the paths Sonarr/Radarr report in the webhook payload
+- Check logs for "File not found" errors
+
+**Restart after config changes:**
 ```bash
-sudo systemctl restart dts-converter-webhook
+docker compose restart
+```
+
+**Rebuild after code changes:**
+```bash
+docker compose up -d --build
 ```

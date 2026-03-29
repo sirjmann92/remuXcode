@@ -1,0 +1,56 @@
+# Node and Python cache
+frontend/node_modules
+frontend/build
+__pycache__/
+*.pyc
+*.pyo
+backend/__pycache__/
+backend/utils/__pycache__/
+backend/workers/__pycache__/
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Environment
+.env
+
+# Misc
+*.bak
+*.tmp
+.git
+.gitignore
+
+# CI/CD and linting config (not needed in image)
+.github/
+.pre-commit-config.yaml
+biome.json
+pyproject.toml
+pyrightconfig.json
+requirements-lint.txt
+
+# Legacy files
+legacy/
+tests/
+
+# Documentation
+README.md
+QUICKSTART.md
+ROADMAP.md
+LICENSE

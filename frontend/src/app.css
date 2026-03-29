@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+@plugin "daisyui";
+
+@theme {
+  --color-base-100: #1d232a;
+  --color-base-200: #191e24;
+  --color-base-300: #15191e;
+  --color-base-content: #a6adbb;
+  --color-primary: #7c3aed;
+  --color-primary-content: #ffffff;
+  --color-secondary: #06b6d4;
+  --color-secondary-content: #ffffff;
+  --color-accent: #f59e0b;
+  --color-accent-content: #000000;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  --radius-box: 0.75rem;
+}
+
+html {
+  scrollbar-gutter: stable;
+  scrollbar-color: #555 transparent;
+  scrollbar-width: thin;
+}
+
+/* Glass-style cards */
+.card-glass {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+}
+
+/* Stat card hover lift */
+.stat-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Subtle glow for active nav items */
+.menu li > .active {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+/* Sidebar brand gradient */
+.brand-section {
+  background: linear-gradient(180deg, rgba(124,58,237,0.08) 0%, transparent 100%);
+}
