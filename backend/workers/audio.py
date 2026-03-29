@@ -204,7 +204,7 @@ class AudioConverter:
 
         # Prepare paths
         replace_input = output_file is None
-        if replace_input:
+        if output_file is None:
             output_file = input_file
 
         output_path = Path(output_file)

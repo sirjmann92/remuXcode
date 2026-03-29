@@ -17,7 +17,7 @@ logger = logging.getLogger("remuxcode")
 router = APIRouter(tags=["browse"])
 
 
-def _needs_audio_conversion(info) -> bool:
+def _needs_audio_conversion(info: Any) -> bool:
     """Config-aware check whether this file needs audio conversion."""
     cfg = core.config.audio if core.config else None
     if not cfg:
@@ -29,7 +29,7 @@ def _needs_audio_conversion(info) -> bool:
     return False
 
 
-def _needs_video_conversion(info, is_anime: bool) -> bool:
+def _needs_video_conversion(info: Any, is_anime: bool) -> bool:
     """Config-aware check whether this file needs video conversion."""
     cfg = core.config.video if core.config else None
     if not cfg:
