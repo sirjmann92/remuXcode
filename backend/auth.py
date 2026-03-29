@@ -1,15 +1,15 @@
 """Authentication helpers for API routes."""
 
 import os
-import uuid
 from pathlib import Path
+import uuid
 
 from fastapi import HTTPException, Request
 
 
 def get_api_key() -> str:
     """Get the active API key. Runtime value takes priority over env vars."""
-    import backend.core as core
+    from backend import core
 
     # Runtime value (set at startup, updated on regeneration)
     if core.api_key:
@@ -36,7 +36,7 @@ def get_api_key() -> str:
 
 def regenerate_api_key() -> str:
     """Generate a new API key and persist it. Returns the new key."""
-    import backend.core as core
+    from backend import core
 
     new_key = uuid.uuid4().hex + uuid.uuid4().hex  # 64-char hex
     config_path = os.getenv(

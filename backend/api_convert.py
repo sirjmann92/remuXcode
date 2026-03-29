@@ -2,12 +2,13 @@
 
 import logging
 import os
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
-import requests
 from fastapi import APIRouter, HTTPException
+import requests
 
-import backend.core as core
+from backend import core
 from backend.core import JobType, create_job, translate_path
 
 logger = logging.getLogger("remuxcode")
@@ -27,7 +28,7 @@ async def convert_file(data: dict[str, Any]) -> dict[str, Any]:
     try:
         job_type = JobType(job_type_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}")
+        raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}") from None
 
     job = create_job(file_path, job_type, source="api")
     return {
@@ -53,7 +54,7 @@ def batch_convert_movies(data: dict[str, Any]) -> dict[str, Any]:
     try:
         job_type = JobType(job_type_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}")
+        raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}") from None
 
     job_ids: list[str] = []
     for movie_id in movie_ids:
@@ -69,7 +70,7 @@ def batch_convert_movies(data: dict[str, Any]) -> dict[str, Any]:
             file_path = movie.get("movieFile", {}).get("path")
             if file_path:
                 file_path = translate_path(file_path)
-                if os.path.exists(file_path):
+                if Path(file_path).exists():
                     job = create_job(file_path, job_type, source="batch")
                     job_ids.append(job.id)
         except Exception as e:
@@ -97,7 +98,7 @@ def batch_convert_series(data: dict[str, Any]) -> dict[str, Any]:
     try:
         job_type = JobType(job_type_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}")
+        raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}") from None
 
     season_number = data.get("season_number")
 
@@ -120,7 +121,7 @@ def batch_convert_series(data: dict[str, Any]) -> dict[str, Any]:
                 file_path = ep_file.get("path")
                 if file_path:
                     file_path = translate_path(file_path)
-                    if os.path.exists(file_path):
+                    if Path(file_path).exists():
                         job = create_job(file_path, job_type, source="batch")
                         job_ids.append(job.id)
         except Exception as e:

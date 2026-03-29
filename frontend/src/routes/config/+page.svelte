@@ -1,55 +1,57 @@
 <script lang="ts">
-  import { getConfig, regenerateApiKey } from '$lib/api';
-  import type { ConfigSummary } from '$lib/types';
+import { getConfig, regenerateApiKey } from '$lib/api';
+import type { ConfigSummary } from '$lib/types';
 
-  let config: ConfigSummary | null = $state(null);
-  let loading = $state(true);
-  let error = $state('');
-  let keyCopied = $state(false);
-  let keyVisible = $state(false);
-  let regenerating = $state(false);
+let config: ConfigSummary | null = $state(null);
+let loading = $state(true);
+let error = $state('');
+let keyCopied = $state(false);
+let keyVisible = $state(false);
+let regenerating = $state(false);
 
-  async function fetchConfig() {
-    loading = true;
-    error = '';
-    try {
-      config = await getConfig();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load config';
-    } finally {
-      loading = false;
-    }
+async function fetchConfig() {
+  loading = true;
+  error = '';
+  try {
+    config = await getConfig();
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Failed to load config';
+  } finally {
+    loading = false;
   }
+}
 
-  async function copyKey() {
-    if (!config?.api_key) return;
-    await navigator.clipboard.writeText(config.api_key);
-    keyCopied = true;
-    setTimeout(() => (keyCopied = false), 2000);
+async function copyKey() {
+  if (!config?.api_key) return;
+  await navigator.clipboard.writeText(config.api_key);
+  keyCopied = true;
+  setTimeout(() => {
+    keyCopied = false;
+  }, 2000);
+}
+
+async function handleRegenerate() {
+  if (!confirm('Regenerate the API key? Existing Sonarr/Radarr webhooks will need the new key.'))
+    return;
+  regenerating = true;
+  try {
+    const res = await regenerateApiKey();
+    if (config) config.api_key = res.api_key;
+    keyVisible = true;
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Failed to regenerate key';
+  } finally {
+    regenerating = false;
   }
+}
 
-  async function handleRegenerate() {
-    if (!confirm('Regenerate the API key? Existing Sonarr/Radarr webhooks will need the new key.'))
-      return;
-    regenerating = true;
-    try {
-      const res = await regenerateApiKey();
-      if (config) config.api_key = res.api_key;
-      keyVisible = true;
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to regenerate key';
-    } finally {
-      regenerating = false;
-    }
-  }
+$effect(() => {
+  fetchConfig();
+});
 
-  $effect(() => {
-    fetchConfig();
-  });
-
-  function boolBadge(val: boolean): string {
-    return val ? 'badge-success' : 'badge-ghost';
-  }
+function boolBadge(val: boolean): string {
+  return val ? 'badge-success' : 'badge-ghost';
+}
 </script>
 
 <svelte:head>

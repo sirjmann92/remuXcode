@@ -1,37 +1,37 @@
 <script lang="ts">
-  import type { Job } from '$lib/types';
-  import StatusBadge from './StatusBadge.svelte';
-  import { deleteJob } from '$lib/api';
+import { deleteJob } from '$lib/api';
+import type { Job } from '$lib/types';
+import StatusBadge from './StatusBadge.svelte';
 
-  interface Props {
-    job: Job;
-    onRemoved?: () => void;
+interface Props {
+  job: Job;
+  onRemoved?: () => void;
+}
+
+const { job, onRemoved }: Props = $props();
+let deleting = $state(false);
+
+const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
+const elapsed = $derived.by(() => {
+  if (!job.started_at) return null;
+  const end = job.completed_at ?? Date.now() / 1000;
+  const secs = Math.floor(end - job.started_at);
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+});
+
+async function handleDelete() {
+  deleting = true;
+  try {
+    await deleteJob(job.id);
+    onRemoved?.();
+  } catch {
+    // ignore
+  } finally {
+    deleting = false;
   }
-
-  let { job, onRemoved }: Props = $props();
-  let deleting = $state(false);
-
-  const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
-  const elapsed = $derived.by(() => {
-    if (!job.started_at) return null;
-    const end = job.completed_at ?? Date.now() / 1000;
-    const secs = Math.floor(end - job.started_at);
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  });
-
-  async function handleDelete() {
-    deleting = true;
-    try {
-      await deleteJob(job.id);
-      onRemoved?.();
-    } catch {
-      // ignore
-    } finally {
-      deleting = false;
-    }
-  }
+}
 </script>
 
 <div class="card-glass rounded-box">

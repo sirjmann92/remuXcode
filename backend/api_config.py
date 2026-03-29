@@ -2,12 +2,11 @@
 
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-import backend.core as core
+from backend import core
 from backend.auth import get_api_key, regenerate_api_key
 
 logger = logging.getLogger("remuxcode")
@@ -60,9 +59,7 @@ async def get_config_summary() -> dict[str, Any]:
             ),
             "url": os.getenv("RADARR_URL", cfg.radarr.url),
         },
-        "path_mappings": [
-            {"container": c, "host": h} for c, h in core.PATH_MAPPINGS
-        ],
+        "path_mappings": [{"container": c, "host": h} for c, h in core.PATH_MAPPINGS],
         "workers": cfg.workers,
         "job_history_days": cfg.job_history_days,
         "api_key": get_api_key(),

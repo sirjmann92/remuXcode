@@ -1,10 +1,8 @@
-"""
-Backend utilities for media analysis, configuration, and detection.
-"""
+"""Backend utilities for media analysis, configuration, and detection."""
 
-from .ffprobe import FFProbe
-from .config import Config
-from .language import LanguageDetector
 from .anime_detect import AnimeDetector
+from .config import Config
+from .ffprobe import FFProbe
+from .language import LanguageDetector
 
-__all__ = ['FFProbe', 'Config', 'LanguageDetector', 'AnimeDetector']
+__all__ = ["FFProbe", "Config", "LanguageDetector", "AnimeDetector"]

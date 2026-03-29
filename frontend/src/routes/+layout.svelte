@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import Navbar from '$lib/components/Navbar.svelte';
-  import '../app.css';
+import { page } from '$app/stores';
+import Navbar from '$lib/components/Navbar.svelte';
+import '../app.css';
 
-  let { children } = $props();
+const { children } = $props();
 
-  const drawerId = 'app-drawer';
+const drawerId = 'app-drawer';
 
-  const pageTitle = $derived.by(() => {
-    const path = $page.url.pathname;
-    if (path === '/') return 'Dashboard';
-    if (path.startsWith('/jobs')) return 'Jobs';
-    if (path.startsWith('/config')) return 'Configuration';
-    return '';
-  });
+const pageTitle = $derived.by(() => {
+  const path = $page.url.pathname;
+  if (path === '/') return 'Dashboard';
+  if (path.startsWith('/jobs')) return 'Jobs';
+  if (path.startsWith('/config')) return 'Configuration';
+  return '';
+});
 </script>
 
 <div class="drawer lg:drawer-open min-h-screen">
