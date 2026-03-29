@@ -33,7 +33,8 @@ def run_ffmpeg_with_progress(
     )
 
     def _read_stderr() -> None:
-        stderr_lines.extend(proc.stderr)  # type: ignore[union-attr]
+        if proc.stderr is not None:
+            stderr_lines.extend(proc.stderr)
 
     stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
     stderr_thread.start()

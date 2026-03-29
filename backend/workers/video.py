@@ -213,7 +213,7 @@ class VideoConverter:
 
         # Prepare output path
         replace_input = output_file is None
-        if replace_input:
+        if output_file is None:
             output_file = input_file
 
         output_path = Path(output_file)
@@ -390,6 +390,7 @@ class VideoConverter:
         """Build ffmpeg command for HEVC (libx265) encoding."""
 
         # Select encoding parameters based on content type
+        tune: str | None
         if content_type == ContentType.ANIME:
             crf = self.config.anime_crf
             preset = self.config.anime_preset

@@ -4,6 +4,7 @@
 Provides crash recovery and job history for long-running conversions.
 """
 
+from collections.abc import Generator
 from contextlib import contextmanager, suppress
 from datetime import datetime, timedelta
 import json
@@ -34,7 +35,7 @@ class JobStore:
         logger.info("Job store initialized: %s", self.db_path)
 
     @contextmanager
-    def _get_connection(self):
+    def _get_connection(self) -> Generator[sqlite3.Connection]:
         """Get thread-safe database connection."""
         conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
@@ -47,7 +48,7 @@ class JobStore:
         finally:
             conn.close()
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         """Create tables if they don't exist, migrate schema as needed."""
         with self._get_connection() as conn:
             conn.execute("""

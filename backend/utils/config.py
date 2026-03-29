@@ -212,7 +212,7 @@ class Config:
         logger.warning("No configuration file found, using defaults")
         return None
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load configuration from YAML file."""
         if self.config_path is None:
             self._raw_config = {}
@@ -236,7 +236,7 @@ class Config:
         """Replace ${VAR_NAME} or ${VAR_NAME:-default} with environment variable values."""
         pattern = r"\$\{([^}]+)\}"
 
-        def replacer(match):
+        def replacer(match: re.Match[str]) -> str:
             expr = match.group(1)
 
             # Handle ${VAR:-default} syntax
@@ -390,7 +390,7 @@ class Config:
             slack_webhook=self._get("notifications.slack.webhook_url", ""),
         )
 
-    def reload(self):
+    def reload(self) -> None:
         """Reload configuration from file."""
         self._load_config()
         self.audio = self._parse_audio_config()

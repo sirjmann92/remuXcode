@@ -485,9 +485,10 @@ def process_file(
 
     if will_audio:
         logger.info("Converting audio: %s", Path(file_path).name)
+        assert audio_converter is not None
         audio_result = audio_converter.convert(
             file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
-        )  # type: ignore[union-attr]
+        )
         phase_idx += 1
         results["audio"] = {
             "success": audio_result.success,
@@ -499,9 +500,10 @@ def process_file(
 
     if will_video:
         logger.info("Converting video: %s", Path(file_path).name)
+        assert video_converter is not None
         video_result = video_converter.convert(
             file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
-        )  # type: ignore[union-attr]
+        )
         phase_idx += 1
         results["video"] = {
             "success": video_result.success,
@@ -516,9 +518,10 @@ def process_file(
 
     if will_cleanup:
         logger.info("Cleaning streams: %s", Path(file_path).name)
+        assert stream_cleanup is not None
         cleanup_result = stream_cleanup.cleanup(
             file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
-        )  # type: ignore[union-attr]
+        )
         results["cleanup"] = {
             "success": cleanup_result.success,
             "audio_removed": cleanup_result.audio_removed,

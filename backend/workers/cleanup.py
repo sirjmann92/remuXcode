@@ -92,8 +92,8 @@ class StreamCleanup:
 
         # Check if any subtitle streams should be removed
         if self.config.clean_subtitles:
-            for stream in info.subtitle_streams:
-                if not self._should_keep_subtitle(stream, keep_languages):
+            for sub_stream in info.subtitle_streams:
+                if not self._should_keep_subtitle(sub_stream, keep_languages):
                     return True
 
         # Check if audio track order needs fixing (preferred language should be first)
@@ -182,11 +182,11 @@ class StreamCleanup:
 
         subtitle_keep = []
         subtitle_remove = []
-        for stream in info.subtitle_streams:
-            if self._should_keep_subtitle(stream, keep_languages):
-                subtitle_keep.append(stream)
+        for sub_stream in info.subtitle_streams:
+            if self._should_keep_subtitle(sub_stream, keep_languages):
+                subtitle_keep.append(sub_stream)
             else:
-                subtitle_remove.append(stream)
+                subtitle_remove.append(sub_stream)
 
         # Sort audio so preferred language (English) is first
         if self.config.clean_audio:
@@ -246,7 +246,7 @@ class StreamCleanup:
 
         # Prepare paths
         replace_input = output_file is None
-        if replace_input:
+        if output_file is None:
             output_file = input_file
 
         output_path = Path(output_file)
@@ -560,32 +560,32 @@ class StreamCleanup:
 
         # Map video streams
         if info.video_streams:
-            for stream in info.video_streams:
-                cmd.extend(["-map", f"0:{stream.index}"])
+            for v_stream in info.video_streams:
+                cmd.extend(["-map", f"0:{v_stream.index}"])
 
         # Map kept audio streams (already sorted: preferred language first)
-        for stream in audio_keep:
-            cmd.extend(["-map", f"0:{stream.index}"])
+        for a_stream in audio_keep:
+            cmd.extend(["-map", f"0:{a_stream.index}"])
 
         # Explicitly tag each audio stream with its language and set disposition.
         # Many release groups omit language tags; we write them so that Sonarr,
         # Plex, and any player can identify tracks regardless of stream order.
-        for i, stream in enumerate(audio_keep):
-            lang = (stream.language or "").strip()
+        for i, a_stream in enumerate(audio_keep):
+            lang = (a_stream.language or "").strip()
             if not lang and inferred_langs:
-                lang = inferred_langs.get(stream.index, "")
+                lang = inferred_langs.get(a_stream.index, "")
             if lang:
                 cmd.extend([f"-metadata:s:a:{i}", f"language={lang}"])
             cmd.extend([f"-disposition:a:{i}", "default" if i == 0 else "0"])
 
         # Map kept subtitle streams
-        for stream in subtitle_keep:
-            cmd.extend(["-map", f"0:{stream.index}"])
+        for sub_stream in subtitle_keep:
+            cmd.extend(["-map", f"0:{sub_stream.index}"])
 
         # Map attachments (fonts, etc.)
         if info.attachment_streams:
-            for stream in info.attachment_streams:
-                cmd.extend(["-map", f"0:{stream.index}"])
+            for att_stream in info.attachment_streams:
+                cmd.extend(["-map", f"0:{att_stream.index}"])
 
         # Map chapters
         cmd.extend(["-map_chapters", "0"])
@@ -623,16 +623,16 @@ class StreamCleanup:
             )
 
         subtitle_status = []
-        for stream in info.subtitle_streams:
-            keep = self._should_keep_subtitle(stream, keep_languages)
+        for sub_stream in info.subtitle_streams:
+            keep = self._should_keep_subtitle(sub_stream, keep_languages)
             subtitle_status.append(
                 {
-                    "index": stream.index,
-                    "codec": stream.codec_name,
-                    "language": stream.language,
-                    "title": stream.title,
-                    "forced": stream.is_forced,
-                    "sdh": stream.is_sdh,
+                    "index": sub_stream.index,
+                    "codec": sub_stream.codec_name,
+                    "language": sub_stream.language,
+                    "title": sub_stream.title,
+                    "forced": sub_stream.is_forced,
+                    "sdh": sub_stream.is_sdh,
                     "keep": keep,
                 }
             )
