@@ -2,7 +2,8 @@
   "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
   "files": {
     "ignoreUnknown": true,
-    "maxSize": 4194304
+    "maxSize": 4194304,
+    "experimentalScannerIgnores": ["frontend/src/app.css"]
   },
   "formatter": {
     "enabled": true,
@@ -31,13 +32,12 @@
   },
   "overrides": [
     {
-      "includes": ["**/*.css"],
+      "includes": ["frontend/src/app.css"],
       "linter": {
-        "rules": {
-          "suspicious": {
-            "noUnknownAtRules": "off"
-          }
-        }
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
       }
     },
     {
