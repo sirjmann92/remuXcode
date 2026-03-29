@@ -54,7 +54,7 @@ repos:
       - id: biome-check
         files: ^frontend/
         additional_dependencies:
-          - '@biomejs/biome'
+          - '@biomejs/biome@2.2.4'
 
 ci:
   autofix_commit_msg: |
