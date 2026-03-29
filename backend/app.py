@@ -1,19 +1,18 @@
-"""
-remuXcode - Unified Media Transcoding Service
+"""remuXcode unified media transcoding service.
 
 FastAPI application serving the webhook API and SvelteKit frontend.
 """
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, suppress
 import logging
 import os
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from backend import __version__
 from backend.core import cleanup_temp_dirs, initialize_components, shutdown_components
@@ -24,7 +23,7 @@ FRONTEND_BUILD = Path(__file__).parent.parent / "frontend" / "build"
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Startup and shutdown lifecycle."""
     setup_logging()
     logger.info("=" * 60)
@@ -59,10 +58,8 @@ def setup_logging() -> None:
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
         handlers.append(logging.FileHandler(log_file))
     except (PermissionError, OSError):
-        try:
-            handlers.append(logging.FileHandler(os.path.expanduser("~/remuxcode.log")))
-        except (PermissionError, OSError):
-            pass
+        with suppress(PermissionError, OSError):
+            handlers.append(logging.FileHandler(Path("~/remuxcode.log").expanduser()))
 
     log_filter = ShortLoggerFilter()
     for handler in handlers:
@@ -121,10 +118,7 @@ def create_app() -> FastAPI:
         async def serve_frontend(full_path: str) -> FileResponse:
             """Serve static files or SPA fallback for client-side routes."""
             file_path = (FRONTEND_BUILD / full_path).resolve()
-            if (
-                file_path.is_file()
-                and file_path.is_relative_to(FRONTEND_BUILD.resolve())
-            ):
+            if file_path.is_file() and file_path.is_relative_to(FRONTEND_BUILD.resolve()):
                 return FileResponse(file_path)
             return FileResponse(FRONTEND_BUILD / "index.html")
     else:

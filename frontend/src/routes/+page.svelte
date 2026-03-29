@@ -1,40 +1,40 @@
 <script lang="ts">
-  import { getJobs, getConfig } from '$lib/api';
-  import type { Job, ConfigSummary } from '$lib/types';
-  import JobCard from '$lib/components/JobCard.svelte';
+import { getConfig, getJobs } from '$lib/api';
+import JobCard from '$lib/components/JobCard.svelte';
+import type { ConfigSummary, Job } from '$lib/types';
 
-  let jobs: Job[] = $state([]);
-  let config: ConfigSummary | null = $state(null);
-  let loading = $state(true);
+let jobs: Job[] = $state([]);
+let config: ConfigSummary | null = $state(null);
+let loading = $state(true);
 
-  const activeJobs = $derived(jobs.filter((j) => j.status === 'running'));
-  const pendingJobs = $derived(jobs.filter((j) => j.status === 'pending'));
-  const recentJobs = $derived(
-    jobs
-      .filter((j) => j.status === 'completed' || j.status === 'failed')
-      .toSorted((a, b) => (b.completed_at ?? 0) - (a.completed_at ?? 0))
-      .slice(0, 5),
-  );
-  const totalCompleted = $derived(jobs.filter((j) => j.status === 'completed').length);
-  const totalFailed = $derived(jobs.filter((j) => j.status === 'failed').length);
+const activeJobs = $derived(jobs.filter((j) => j.status === 'running'));
+const pendingJobs = $derived(jobs.filter((j) => j.status === 'pending'));
+const recentJobs = $derived(
+  jobs
+    .filter((j) => j.status === 'completed' || j.status === 'failed')
+    .toSorted((a, b) => (b.completed_at ?? 0) - (a.completed_at ?? 0))
+    .slice(0, 5),
+);
+const totalCompleted = $derived(jobs.filter((j) => j.status === 'completed').length);
+const totalFailed = $derived(jobs.filter((j) => j.status === 'failed').length);
 
-  async function fetchData() {
-    try {
-      const [jobsRes, configRes] = await Promise.all([getJobs(), getConfig()]);
-      jobs = jobsRes.jobs;
-      config = configRes;
-    } catch {
-      // keep stale data
-    } finally {
-      loading = false;
-    }
+async function fetchData() {
+  try {
+    const [jobsData, configData] = await Promise.all([getJobs(), getConfig()]);
+    jobs = jobsData.jobs;
+    config = configData;
+  } catch {
+    // keep stale data
+  } finally {
+    loading = false;
   }
+}
 
-  $effect(() => {
-    fetchData();
-    const id = setInterval(fetchData, 3000);
-    return () => clearInterval(id);
-  });
+$effect(() => {
+  fetchData();
+  const id = setInterval(fetchData, 3000);
+  return () => clearInterval(id);
+});
 </script>
 
 <svelte:head>

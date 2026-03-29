@@ -1,11 +1,11 @@
 """Job management API routes."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-import backend.core as core
+from backend import core
 
 logger = logging.getLogger("remuxcode")
 

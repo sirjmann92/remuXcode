@@ -1,12 +1,11 @@
 """Webhook endpoint for Sonarr/Radarr integration."""
 
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends
 
-import backend.core as core
 from backend.auth import require_auth
 from backend.core import JobType, create_job, translate_path
 
@@ -18,14 +17,10 @@ router = APIRouter(tags=["webhook"], dependencies=[Depends(require_auth)])
 @router.post("/webhook")
 async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
     """Handle Sonarr/Radarr webhook."""
-    event_type = data.get("eventType", "")
-
     # Determine source and extract file paths
     if "movie" in data:
-        source = "radarr"
         files = [data.get("movieFile", {}).get("path")]
     elif "episodes" in data:
-        source = "sonarr"
         files = [ep.get("episodeFile", {}).get("path") for ep in data.get("episodes", [])]
     else:
         return {"error": "Unknown webhook format"}
@@ -39,7 +34,7 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
     # Queue jobs
     job_ids = []
     for file_path in files:
-        if os.path.exists(file_path):
+        if Path(file_path).exists():
             job = create_job(file_path, JobType.FULL, source="webhook")
             job_ids.append(job.id)
 

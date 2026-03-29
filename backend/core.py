@@ -1,26 +1,27 @@
-"""
-Core processing logic for remuXcode.
+"""Core processing logic for remuXcode.
 
 Contains the job queue, file processing pipeline, path translation,
 component initialization, and Sonarr/Radarr integration.
 """
 
-import glob
-import logging
-import os
-import queue
-import shutil
-import threading
-import time
-import uuid
+from collections.abc import Callable
+import contextlib
 from dataclasses import dataclass
 from enum import Enum
+import logging
+import os
 from pathlib import Path
-from typing import Any, Callable, Optional
+import queue
+import shutil
+import tempfile
+import threading
+import time
+from typing import Any
+import uuid
 
 import requests
 
-from backend.utils.anime_detect import AnimeDetector, ContentType
+from backend.utils.anime_detect import AnimeDetector
 from backend.utils.config import Config, get_config
 from backend.utils.ffprobe import FFProbe
 from backend.utils.job_store import JobStore
@@ -66,6 +67,8 @@ def _load_path_mappings() -> list[tuple[str, str]]:
 
 
 class JobType(Enum):
+    """Job conversion type."""
+
     AUDIO = "audio"
     VIDEO = "video"
     CLEANUP = "cleanup"
@@ -73,6 +76,8 @@ class JobType(Enum):
 
 
 class JobStatus(Enum):
+    """Job execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -82,19 +87,22 @@ class JobStatus(Enum):
 
 @dataclass
 class ConversionJob:
+    """Represents a single transcoding job."""
+
     id: str
     job_type: JobType
     file_path: str
     status: JobStatus
     created_at: float
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    started_at: float | None = None
+    completed_at: float | None = None
     progress: float = 0.0
-    result: Optional[dict[str, Any]] = None
-    error: Optional[str] = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
     source: str = "webhook"
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize to dict for API responses."""
         return {
             "id": self.id,
             "job_type": self.job_type.value,
@@ -118,7 +126,8 @@ class ConversionJob:
 class JobQueue:
     """Thread-safe job queue with status tracking and persistent storage."""
 
-    def __init__(self, max_workers: int = 1, job_store: Optional[JobStore] = None) -> None:
+    def __init__(self, max_workers: int = 1, job_store: JobStore | None = None) -> None:
+        """Initialize the job queue with max_workers worker threads."""
         self.jobs: dict[str, ConversionJob] = {}
         self.pending_queue: queue.Queue[str] = queue.Queue()
         self.lock = threading.Lock()
@@ -128,6 +137,7 @@ class JobQueue:
         self.job_store = job_store
 
     def start(self) -> None:
+        """Start worker threads."""
         self.running = True
         for i in range(self.max_workers):
             worker = threading.Thread(target=self._worker_loop, name=f"Worker-{i}", daemon=True)
@@ -136,27 +146,34 @@ class JobQueue:
         logger.info("Started %d job worker(s)", self.max_workers)
 
     def stop(self) -> None:
+        """Stop all worker threads."""
         self.running = False
         for worker in self.workers:
             worker.join(timeout=5)
 
     def add_job(self, job: ConversionJob) -> str:
+        """Add a job to the queue and return its ID."""
         with self.lock:
             self.jobs[job.id] = job
         if self.job_store:
             self._save_job_to_store(job)
         self.pending_queue.put(job.id)
-        logger.info("Queued job %s: %s for %s", job.id, job.job_type.value, Path(job.file_path).name)
+        logger.info(
+            "Queued job %s: %s for %s", job.id, job.job_type.value, Path(job.file_path).name
+        )
         return job.id
 
-    def get_job(self, job_id: str) -> Optional[ConversionJob]:
+    def get_job(self, job_id: str) -> ConversionJob | None:
+        """Return a job by ID, or None if not found."""
         return self.jobs.get(job_id)
 
     def get_all_jobs(self) -> list[ConversionJob]:
+        """Return all jobs."""
         with self.lock:
             return list(self.jobs.values())
 
     def cancel_job(self, job_id: str) -> bool:
+        """Cancel a pending or running job."""
         job = self.jobs.get(job_id)
         if not job:
             return False
@@ -171,6 +188,7 @@ class JobQueue:
         return True
 
     def delete_job(self, job_id: str) -> bool:
+        """Delete a finished job."""
         job = self.jobs.get(job_id)
         if not job:
             return False
@@ -263,6 +281,7 @@ class JobQueue:
             return None
         try:
             from datetime import datetime
+
             dt = datetime.fromisoformat(iso_str)
             return dt.timestamp()
         except (ValueError, TypeError):
@@ -275,12 +294,12 @@ class JobQueue:
         result = None
         result_json = row.get("result_json")
         if result_json:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result = _json.loads(result_json)
-            except (ValueError, TypeError):
-                pass
         # Fall back to boolean flags if no JSON result
-        if result is None and any(row.get(k) for k in ("video_converted", "audio_converted", "streams_cleaned")):
+        if result is None and any(
+            row.get(k) for k in ("video_converted", "audio_converted", "streams_cleaned")
+        ):
             result = {}
             if row.get("video_converted"):
                 result["video"] = {"success": True}
@@ -344,7 +363,9 @@ class JobQueue:
             job.progress = pct
 
         try:
-            result = process_file(job.file_path, job.job_type, job.id, progress_callback=_update_progress)
+            result = process_file(
+                job.file_path, job.job_type, job.id, progress_callback=_update_progress
+            )
             if job.status == JobStatus.CANCELLED:
                 logger.info("Job %s was cancelled during processing", job_id)
                 return
@@ -376,15 +397,15 @@ class JobQueue:
 # Global singletons (initialised during startup)
 # ---------------------------------------------------------------------------
 
-config: Optional[Config] = None
-job_queue: Optional[JobQueue] = None
-job_store: Optional[JobStore] = None
-ffprobe: Optional[FFProbe] = None
-anime_detector: Optional[AnimeDetector] = None
-language_detector: Optional[LanguageDetector] = None
-audio_converter: Optional[AudioConverter] = None
-video_converter: Optional[VideoConverter] = None
-stream_cleanup: Optional[StreamCleanup] = None
+config: Config | None = None
+job_queue: JobQueue | None = None
+job_store: JobStore | None = None
+ffprobe: FFProbe | None = None
+anime_detector: AnimeDetector | None = None
+language_detector: LanguageDetector | None = None
+audio_converter: AudioConverter | None = None
+video_converter: VideoConverter | None = None
+stream_cleanup: StreamCleanup | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -409,9 +430,9 @@ def get_volume_root(file_path: str) -> str:
         if file_path.startswith(host_prefix):
             if os.access(host_prefix, os.W_OK):
                 return host_prefix
-            logger.warning("Volume root %r is not writable, falling back to /tmp", host_prefix)
-            return "/tmp"
-    return "/tmp"
+            logger.warning("Volume root %r is not writable, falling back to temp dir", host_prefix)
+            return tempfile.gettempdir()
+    return tempfile.gettempdir()
 
 
 # ---------------------------------------------------------------------------
@@ -422,13 +443,13 @@ def get_volume_root(file_path: str) -> str:
 def process_file(
     file_path: str,
     job_type: JobType,
-    job_id: Optional[str] = None,
-    progress_callback: Optional[Callable[[float], None]] = None,
+    job_id: str | None = None,
+    progress_callback: Callable[[float], None] | None = None,
 ) -> dict[str, Any]:
     """Process a single file with the specified conversion type."""
     results: dict[str, Any] = {"file": file_path, "audio": None, "video": None, "cleanup": None}
 
-    if not os.path.exists(file_path):
+    if not Path(file_path).exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
     do_audio = job_type in (JobType.AUDIO, JobType.FULL)
@@ -436,16 +457,22 @@ def process_file(
     do_cleanup = job_type in (JobType.CLEANUP, JobType.FULL)
 
     # Pre-determine which phases will actually run so we can divide progress equally.
-    will_audio = do_audio and audio_converter is not None and audio_converter.should_convert(file_path)
-    will_video = do_video and video_converter is not None and video_converter.should_convert(file_path)
-    will_cleanup = do_cleanup and stream_cleanup is not None and stream_cleanup.should_cleanup(file_path)
+    will_audio = (
+        do_audio and audio_converter is not None and audio_converter.should_convert(file_path)
+    )
+    will_video = (
+        do_video and video_converter is not None and video_converter.should_convert(file_path)
+    )
+    will_cleanup = (
+        do_cleanup and stream_cleanup is not None and stream_cleanup.should_cleanup(file_path)
+    )
 
     active_phases = [p for p in (will_audio, will_video, will_cleanup) if p]
     n_phases = len(active_phases) or 1
     phase_size = 100.0 / n_phases
     phase_idx = 0
 
-    def make_phase_cb(idx: int) -> Optional[Callable[[float], None]]:
+    def make_phase_cb(idx: int) -> Callable[[float], None] | None:
         if progress_callback is None:
             return None
         _cb = progress_callback  # capture non-None reference so Pyright can narrow it in closure
@@ -458,7 +485,9 @@ def process_file(
 
     if will_audio:
         logger.info("Converting audio: %s", Path(file_path).name)
-        audio_result = audio_converter.convert(file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx))  # type: ignore[union-attr]
+        audio_result = audio_converter.convert(
+            file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
+        )  # type: ignore[union-attr]
         phase_idx += 1
         results["audio"] = {
             "success": audio_result.success,
@@ -470,7 +499,9 @@ def process_file(
 
     if will_video:
         logger.info("Converting video: %s", Path(file_path).name)
-        video_result = video_converter.convert(file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx))  # type: ignore[union-attr]
+        video_result = video_converter.convert(
+            file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
+        )  # type: ignore[union-attr]
         phase_idx += 1
         results["video"] = {
             "success": video_result.success,
@@ -485,7 +516,9 @@ def process_file(
 
     if will_cleanup:
         logger.info("Cleaning streams: %s", Path(file_path).name)
-        cleanup_result = stream_cleanup.cleanup(file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx))  # type: ignore[union-attr]
+        cleanup_result = stream_cleanup.cleanup(
+            file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
+        )  # type: ignore[union-attr]
         results["cleanup"] = {
             "success": cleanup_result.success,
             "audio_removed": cleanup_result.audio_removed,
@@ -776,7 +809,7 @@ def initialize_components() -> None:
         get_volume_root=get_volume_root,
     )
 
-    db_path = os.getenv("REMUXCODE_DB_PATH", os.path.join(str(Path(__file__).parent), "jobs.db"))
+    db_path = os.getenv("REMUXCODE_DB_PATH", str(Path(__file__).parent / "jobs.db"))
     job_store = JobStore(db_path=db_path)
 
     # Clean up old finished jobs on startup
@@ -794,7 +827,11 @@ def initialize_components() -> None:
     if pending_count > 0:
         logger.info("Resumed %d pending job(s) from database", pending_count)
 
-    logger.info("Host: %s:%s", os.getenv("REMUXCODE_HOST", "0.0.0.0"), os.getenv("REMUXCODE_PORT", os.getenv("PORT", "7889")))
+    logger.info(
+        "Host: %s:%s",
+        os.getenv("REMUXCODE_HOST", "0.0.0.0"),
+        os.getenv("REMUXCODE_PORT", os.getenv("PORT", "7889")),
+    )
     logger.info("Config: %s", CONFIG_PATH)
     logger.info("Path mappings: %d", len(PATH_MAPPINGS))
     for container, host in PATH_MAPPINGS:
@@ -819,19 +856,19 @@ def cleanup_temp_dirs() -> None:
         ".remuxcode-temp-*",
     ]
     volumes = {host for _, host in PATH_MAPPINGS}
-    volumes.add(os.getenv("TEMP_DIR", "/tmp"))
+    volumes.add(os.getenv("TEMP_DIR", tempfile.gettempdir()))
 
     count = 0
     for volume in volumes:
-        if not os.path.exists(volume):
+        if not Path(volume).exists():
             continue
         for pattern in patterns:
-            for path in glob.glob(os.path.join(volume, pattern)):
+            for path in Path(volume).glob(pattern):
                 try:
-                    if os.path.isdir(path):
+                    if path.is_dir():
                         shutil.rmtree(path)
                     else:
-                        os.unlink(path)
+                        path.unlink()
                     count += 1
                 except Exception as e:
                     logger.warning("Failed to remove %s: %s", path, e)

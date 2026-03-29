@@ -1,72 +1,74 @@
 <script lang="ts">
-  import { getJobs, deleteJob } from '$lib/api';
-  import type { Job, JobStatus } from '$lib/types';
-  import JobCard from '$lib/components/JobCard.svelte';
+import { deleteJob, getJobs } from '$lib/api';
+import JobCard from '$lib/components/JobCard.svelte';
+import type { Job, JobStatus } from '$lib/types';
 
-  let jobs: Job[] = $state([]);
-  let loading = $state(true);
-  let filter: JobStatus | 'all' = $state('all');
-  let search = $state('');
+let jobs: Job[] = $state([]);
+let loading = $state(true);
+let filter: JobStatus | 'all' = $state('all');
+let search: string = $state('');
 
-  const filtered = $derived.by(() => {
-    let result = jobs;
-    if (filter !== 'all') {
-      result = result.filter((j) => j.status === filter);
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter((j) => j.file_path.toLowerCase().includes(q));
-    }
-    return result.toSorted((a, b) => b.created_at - a.created_at);
-  });
+const filtered = $derived.by(() => {
+  let result = jobs;
+  if (filter !== 'all') {
+    result = result.filter((j) => j.status === filter);
+  }
+  if (search) {
+    const q = search.toLowerCase();
+    result = result.filter((j) => j.file_path.toLowerCase().includes(q));
+  }
+  return result.toSorted((a, b) => b.created_at - a.created_at);
+});
 
-  const counts = $derived({
-    all: jobs.length,
-    pending: jobs.filter((j) => j.status === 'pending').length,
-    running: jobs.filter((j) => j.status === 'running').length,
-    completed: jobs.filter((j) => j.status === 'completed').length,
-    failed: jobs.filter((j) => j.status === 'failed').length,
-    cancelled: jobs.filter((j) => j.status === 'cancelled').length,
-  });
+const counts = $derived({
+  all: jobs.length,
+  pending: jobs.filter((j) => j.status === 'pending').length,
+  running: jobs.filter((j) => j.status === 'running').length,
+  completed: jobs.filter((j) => j.status === 'completed').length,
+  failed: jobs.filter((j) => j.status === 'failed').length,
+  cancelled: jobs.filter((j) => j.status === 'cancelled').length,
+});
 
-  let loadError = $state(false);
-  async function fetchJobs() {
+let loadError = $state(false);
+async function fetchJobs() {
+  try {
+    const res = await getJobs();
+    jobs = res.jobs;
+    loadError = false;
+  } catch {
+    loadError = true;
+  } finally {
+    loading = false;
+  }
+}
+
+$effect(() => {
+  fetchJobs();
+  const id = setInterval(fetchJobs, 3000);
+  return () => clearInterval(id);
+});
+
+async function clearCompleted() {
+  const completed = jobs.filter(
+    (j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled',
+  );
+  for (const job of completed) {
     try {
-      const res = await getJobs();
-      jobs = res.jobs;
-      loadError = false;
+      await deleteJob(job.id);
     } catch {
-      loadError = true;
-    } finally {
-      loading = false;
+      // ignore individual failures
     }
   }
+  await fetchJobs();
+}
 
-  $effect(() => {
-    fetchJobs();
-    const id = setInterval(fetchJobs, 3000);
-    return () => clearInterval(id);
-  });
-
-  async function clearCompleted() {
-    const completed = jobs.filter((j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled');
-    for (const job of completed) {
-      try {
-        await deleteJob(job.id);
-      } catch {
-        // ignore individual failures
-      }
-    }
-    await fetchJobs();
-  }
-
-  const filters: { value: JobStatus | 'all'; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'running', label: 'Running' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'failed', label: 'Failed' },
-  ];
+const filters: { value: JobStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'running', label: 'Running' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'failed', label: 'Failed' },
+];
 </script>
 
 <svelte:head>

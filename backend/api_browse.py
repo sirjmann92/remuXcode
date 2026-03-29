@@ -5,10 +5,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-import requests
 from fastapi import APIRouter, HTTPException, Query
+import requests
 
-import backend.core as core
+from backend import core
 from backend.core import translate_path
 from backend.utils.anime_detect import ContentType
 
@@ -18,7 +18,7 @@ router = APIRouter(tags=["browse"])
 
 
 def _needs_audio_conversion(info) -> bool:
-    """Config-aware check: does this file need audio conversion?"""
+    """Config-aware check whether this file needs audio conversion."""
     cfg = core.config.audio if core.config else None
     if not cfg:
         return False
@@ -30,7 +30,7 @@ def _needs_audio_conversion(info) -> bool:
 
 
 def _needs_video_conversion(info, is_anime: bool) -> bool:
-    """Config-aware check: does this file need video conversion?"""
+    """Config-aware check whether this file needs video conversion."""
     cfg = core.config.video if core.config else None
     if not cfg:
         return False
@@ -50,14 +50,18 @@ def _needs_video_conversion(info, is_anime: bool) -> bool:
 def analyze_file(path: str = Query(..., description="Path to media file")) -> dict[str, Any]:
     """Analyze a single file without converting."""
     file_path = translate_path(path)
-    if not os.path.exists(file_path):
+    if not Path(file_path).exists():
         raise HTTPException(status_code=404, detail="File not found")
 
     info = core.ffprobe.get_file_info(file_path) if core.ffprobe else None
     if not info:
         raise HTTPException(status_code=500, detail="Failed to analyze file")
 
-    content_type = core.anime_detector.detect(file_path, use_api=False) if core.anime_detector else ContentType.UNKNOWN
+    content_type = (
+        core.anime_detector.detect(file_path, use_api=False)
+        if core.anime_detector
+        else ContentType.UNKNOWN
+    )
     is_anime = content_type == ContentType.ANIME
 
     return {
@@ -95,7 +99,7 @@ def scan_directory(
 ) -> dict[str, Any]:
     """Scan a directory for files needing conversion."""
     dir_path = translate_path(path)
-    if not os.path.isdir(dir_path):
+    if not Path(dir_path).is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
 
     extensions = {".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".m4v"}
@@ -128,21 +132,27 @@ def scan_directory(
                 if filter == "anime" and not is_anime:
                     continue
 
-                results.append({
-                    "file": str(file_path),
-                    "size": info.size,
-                    "video": {
-                        "codec": info.primary_video.codec_name if info.primary_video else None,
-                        "bit_depth": info.primary_video.bit_depth if info.primary_video else None,
-                        "is_10bit_h264": info.primary_video.is_10bit_h264 if info.primary_video else False,
-                        "is_hevc": info.is_hevc,
-                    },
-                    "has_dts": info.has_dts,
-                    "has_truehd": info.has_truehd,
-                    "needs_audio_conversion": needs_audio,
-                    "needs_video_conversion": needs_video,
-                    "is_anime": is_anime,
-                })
+                results.append(
+                    {
+                        "file": str(file_path),
+                        "size": info.size,
+                        "video": {
+                            "codec": info.primary_video.codec_name if info.primary_video else None,
+                            "bit_depth": info.primary_video.bit_depth
+                            if info.primary_video
+                            else None,
+                            "is_10bit_h264": info.primary_video.is_10bit_h264
+                            if info.primary_video
+                            else False,
+                            "is_hevc": info.is_hevc,
+                        },
+                        "has_dts": info.has_dts,
+                        "has_truehd": info.has_truehd,
+                        "needs_audio_conversion": needs_audio,
+                        "needs_video_conversion": needs_video,
+                        "is_anime": is_anime,
+                    }
+                )
             except Exception as e:
                 logger.warning("Error scanning %s: %s", file_path, e)
 
@@ -181,7 +191,7 @@ def list_movies(
         response.raise_for_status()
         all_movies = response.json()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to query Radarr: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to query Radarr: {e}") from e
 
     if search:
         search_lower = search.lower()
@@ -210,7 +220,7 @@ def list_movies(
         item["has_dts"] = "DTS" in audio_codec
         item["video_codec"] = video_codec
 
-        if analyze and os.path.exists(host_path) and core.ffprobe:
+        if analyze and Path(host_path).exists() and core.ffprobe:
             try:
                 info = core.ffprobe.get_file_info(host_path)
                 if info:
@@ -222,21 +232,31 @@ def list_movies(
                     is_anime = content_type == ContentType.ANIME
                     needs_audio = _needs_audio_conversion(info)
                     needs_video = _needs_video_conversion(info, is_anime)
-                    item.update({
-                        "video": {
-                            "codec": info.primary_video.codec_name if info.primary_video else None,
-                            "bit_depth": info.primary_video.bit_depth if info.primary_video else None,
-                        },
-                        "has_dts": info.has_dts,
-                        "has_truehd": info.has_truehd,
-                        "needs_audio_conversion": needs_audio,
-                        "needs_video_conversion": needs_video,
-                        "is_anime": is_anime,
-                    })
+                    item.update(
+                        {
+                            "video": {
+                                "codec": info.primary_video.codec_name
+                                if info.primary_video
+                                else None,
+                                "bit_depth": info.primary_video.bit_depth
+                                if info.primary_video
+                                else None,
+                            },
+                            "has_dts": info.has_dts,
+                            "has_truehd": info.has_truehd,
+                            "needs_audio_conversion": needs_audio,
+                            "needs_video_conversion": needs_video,
+                            "is_anime": is_anime,
+                        }
+                    )
             except Exception as e:
                 logger.warning("Error analyzing %s: %s", host_path, e)
 
-        if filter == "needs_conversion" and not item.get("needs_audio_conversion", False) and not item.get("needs_video_conversion", False):
+        if (
+            filter == "needs_conversion"
+            and not item.get("needs_audio_conversion", False)
+            and not item.get("needs_video_conversion", False)
+        ):
             continue
         if filter == "video" and not item.get("needs_video_conversion", False):
             continue
@@ -250,7 +270,9 @@ def list_movies(
     return {
         "total": len(results),
         "summary": {
-            "needs_video_conversion": sum(1 for r in results if r.get("needs_video_conversion", False)),
+            "needs_video_conversion": sum(
+                1 for r in results if r.get("needs_video_conversion", False)
+            ),
             "needs_audio_conversion": sum(
                 1 for r in results if r.get("needs_audio_conversion", False)
             ),
@@ -281,7 +303,7 @@ def list_series(
         response.raise_for_status()
         all_series = response.json()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to query Sonarr: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to query Sonarr: {e}") from e
 
     if search:
         search_lower = search.lower()
@@ -328,7 +350,7 @@ def list_series(
                 for ep_file in episode_files:
                     ep_path = translate_path(ep_file.get("path", ""))
 
-                    if analyze and os.path.exists(ep_path) and core.ffprobe:
+                    if analyze and Path(ep_path).exists() and core.ffprobe:
                         try:
                             info = core.ffprobe.get_file_info(ep_path)
                             if info:
@@ -355,7 +377,11 @@ def list_series(
             else False
         )
 
-        if filter == "needs_conversion" and item["audio_convert_count"] == 0 and item["video_convert_count"] == 0:
+        if (
+            filter == "needs_conversion"
+            and item["audio_convert_count"] == 0
+            and item["video_convert_count"] == 0
+        ):
             continue
         if filter == "video" and item["video_convert_count"] == 0:
             continue

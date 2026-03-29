@@ -1,5 +1,4 @@
-"""
-remuXcode Backend
+"""remuXcode backend.
 
 Unified service for audio and video conversion with Sonarr/Radarr integration.
 """
