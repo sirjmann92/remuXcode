@@ -1,8 +1,15 @@
-import type { ConfigSummary, HealthStatus, Job } from './types';
+import type {
+  ConfigSummary,
+  HealthStatus,
+  Job,
+  MoviesResponse,
+  SeriesDetail,
+  SeriesResponse,
+} from './types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
   try {
     const res = await fetch(path, {
       ...init,
@@ -55,4 +62,33 @@ export async function getConfig(): Promise<ConfigSummary> {
 
 export async function regenerateApiKey(): Promise<{ api_key: string }> {
   return request('/api/config/api-key/regenerate', { method: 'POST' });
+}
+
+// Browse
+export async function getMovies(
+  search?: string,
+  filter?: string,
+): Promise<MoviesResponse> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (filter && filter !== 'any') params.set('filter', filter);
+  params.set('analyze', 'false');
+  const qs = params.toString();
+  return request(`/api/movies${qs ? `?${qs}` : ''}`);
+}
+
+export async function getSeries(
+  search?: string,
+  filter?: string,
+): Promise<SeriesResponse> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (filter && filter !== 'any') params.set('filter', filter);
+  params.set('analyze', 'false');
+  const qs = params.toString();
+  return request(`/api/series${qs ? `?${qs}` : ''}`);
+}
+
+export async function getSeriesDetail(id: number): Promise<SeriesDetail> {
+  return request(`/api/series/${id}`);
 }

@@ -10,6 +10,8 @@ const drawerId = 'app-drawer';
 const pageTitle = $derived.by(() => {
   const path = $page.url.pathname;
   if (path === '/') return 'Dashboard';
+  if (path.startsWith('/movies')) return 'Movies';
+  if (path.startsWith('/shows')) return 'Shows';
   if (path.startsWith('/jobs')) return 'Jobs';
   if (path.startsWith('/config')) return 'Configuration';
   return '';

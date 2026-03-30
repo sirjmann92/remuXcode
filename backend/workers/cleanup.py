@@ -483,11 +483,15 @@ class StreamCleanup:
         """Determine if a subtitle stream should be kept."""
         lang = stream.language.lower() if stream.language else ""
 
-        # Always keep forced subtitles
+        # Always keep forced subtitles in kept languages (or untagged)
         if stream.is_forced:
-            return True
+            return not lang or lang in keep_languages
 
-        # Keep SDH/CC if configured
+        # Language must match to keep (SDH/CC alone is not enough)
+        if lang and lang not in keep_languages:
+            return False
+
+        # Keep SDH/CC if configured and language is kept
         if self.config.keep_sdh and stream.is_sdh:
             return True
 

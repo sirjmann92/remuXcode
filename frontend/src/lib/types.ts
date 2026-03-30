@@ -88,3 +88,109 @@ export interface HealthStatus {
   service: string;
   version: string;
 }
+
+// Browse types
+
+export interface BrowseMovie {
+  id: number;
+  title: string;
+  year: number;
+  path: string;
+  size: number | null;
+  genres: string[];
+  poster: string;
+  has_dts: boolean;
+  has_truehd: boolean;
+  video_codec: string;
+  audio_codec: string;
+  audio_channels: number | null;
+  audio_languages: string[];
+  subtitles: string[];
+  resolution: string;
+  needs_cleanup: boolean;
+  needs_audio_conversion?: boolean;
+  needs_video_conversion?: boolean;
+  is_anime?: boolean;
+  video?: { codec: string | null; bit_depth: number | null };
+}
+
+export interface MoviesResponse {
+  total: number;
+  summary: {
+    needs_video_conversion: number;
+    needs_audio_conversion: number;
+    needs_cleanup: number;
+    anime: number;
+  };
+  movies: BrowseMovie[];
+}
+
+export interface BrowseSeries {
+  id: number;
+  title: string;
+  year: number;
+  path: string;
+  genres: string[];
+  poster: string;
+  season_count: number;
+  episode_file_count: number;
+  size_on_disk: number;
+  status: string;
+  series_type: string;
+  is_anime: boolean;
+  audio_convert_count?: number;
+  video_convert_count?: number;
+  cleanup_count?: number;
+}
+
+export interface SeriesResponse {
+  total: number;
+  summary: {
+    needs_audio_conversion: number;
+    needs_video_conversion: number;
+    needs_cleanup: number;
+    anime_series: number;
+  };
+  series: BrowseSeries[];
+}
+
+export interface EpisodeFile {
+  episode_number: number;
+  title: string;
+  path: string;
+  size: number | null;
+  video_codec: string;
+  audio_codec: string;
+  audio_channels: number | null;
+  audio_languages: string[];
+  subtitles: string[];
+  resolution: string;
+  needs_cleanup: boolean;
+  has_dts: boolean;
+  has_truehd: boolean;
+  needs_audio_conversion?: boolean;
+  needs_video_conversion?: boolean;
+  is_anime?: boolean;
+}
+
+export interface Season {
+  season_number: number;
+  episode_count: number;
+  needs_audio: number;
+  needs_cleanup: number;
+  needs_work: number;
+  size: number;
+  episodes: EpisodeFile[];
+}
+
+export interface SeriesDetail {
+  id: number;
+  title: string;
+  year: number;
+  path: string;
+  genres: string[];
+  poster: string;
+  status: string;
+  is_anime: boolean;
+  seasons: Season[];
+}
