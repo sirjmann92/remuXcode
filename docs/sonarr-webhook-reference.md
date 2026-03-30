@@ -97,7 +97,7 @@ All Sonarr download events share `eventType: "Download"`. Distinguish them by:
         "videoCodec": "x264",
         "videoDynamicRange": "",
         "videoDynamicRangeType": "",
-        "subtitles": ["eng", "ara", "chi", "fre", "ger", "ind", "ita", "may", "por", "rus", "spa", "tha", "vie"]
+        "subtitles": ["eng", "ara", "chi", "fre", "ger", "ind", "ita", "may", "por", "rus", "spa", "tha", "vie"]  # codespell:ignore tha,vie
       }
     }
   ],
