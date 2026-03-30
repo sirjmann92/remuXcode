@@ -61,12 +61,36 @@ function needsWork(m: BrowseMovie): boolean {
 }
 
 const langNames: Record<string, string> = {
-  eng: 'English', fre: 'French', spa: 'Spanish', ger: 'German', ita: 'Italian',
-  por: 'Portuguese', rus: 'Russian', chi: 'Chinese', jpn: 'Japanese', kor: 'Korean',
-  ara: 'Arabic', dut: 'Dutch', dan: 'Danish', fin: 'Finnish', nor: 'Norwegian',
-  swe: 'Swedish', pol: 'Polish', cze: 'Czech', hun: 'Hungarian', tur: 'Turkish',
-  gre: 'Greek', heb: 'Hebrew', hin: 'Hindi', tha: 'Thai', ind: 'Indonesian',
-  rum: 'Romanian', bul: 'Bulgarian', hrv: 'Croatian', ukr: 'Ukrainian', ice: 'Icelandic',
+  eng: 'English',
+  fre: 'French',
+  spa: 'Spanish',
+  ger: 'German',
+  ita: 'Italian',
+  por: 'Portuguese',
+  rus: 'Russian',
+  chi: 'Chinese',
+  jpn: 'Japanese',
+  kor: 'Korean',
+  ara: 'Arabic',
+  dut: 'Dutch',
+  dan: 'Danish',
+  fin: 'Finnish',
+  nor: 'Norwegian',
+  swe: 'Swedish',
+  pol: 'Polish',
+  cze: 'Czech',
+  hun: 'Hungarian',
+  tur: 'Turkish',
+  gre: 'Greek',
+  heb: 'Hebrew',
+  hin: 'Hindi',
+  tha: 'Thai',
+  ind: 'Indonesian',
+  rum: 'Romanian',
+  bul: 'Bulgarian',
+  hrv: 'Croatian',
+  ukr: 'Ukrainian',
+  ice: 'Icelandic',
 };
 
 function langName(code: string): string {
@@ -91,7 +115,9 @@ function trackSummary(tracks: string[]): string {
     const name = langName(t);
     counts[name] = (counts[name] ?? 0) + 1;
   }
-  return Object.entries(counts).map(([name, n]) => n > 1 ? `${name} (${n})` : name).join(', ');
+  return Object.entries(counts)
+    .map(([name, n]) => (n > 1 ? `${name} (${n})` : name))
+    .join(', ');
 }
 
 $effect(() => {
@@ -100,7 +126,11 @@ $effect(() => {
   fetchMovies();
 });
 
-getConfig().then((c) => (config = c)).catch(() => {});
+getConfig()
+  .then((c) => {
+    config = c;
+  })
+  .catch(() => {});
 
 const filters: { value: string; label: string }[] = [
   { value: 'any', label: 'All' },

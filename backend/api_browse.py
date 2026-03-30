@@ -652,9 +652,7 @@ def get_series_detail(
                 "needs_audio": sum(1 for e in eps if e.get("needs_audio_conversion")),
                 "needs_cleanup": sum(1 for e in eps if e.get("needs_cleanup")),
                 "needs_work": sum(
-                    1
-                    for e in eps
-                    if e.get("needs_audio_conversion") or e.get("needs_cleanup")
+                    1 for e in eps if e.get("needs_audio_conversion") or e.get("needs_cleanup")
                 ),
                 "size": sum(e.get("size", 0) or 0 for e in eps),
                 "episodes": eps,

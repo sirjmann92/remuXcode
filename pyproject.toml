@@ -55,6 +55,7 @@ packages = ["backend", "backend.utils", "backend.workers"]
 # ---------------------------------------------------------------------------
 [tool.codespell]
 skip = "*.py,*.toml,*.json"
+ignore-words-list = "tha"
 quiet-level = 3
 
 # ---------------------------------------------------------------------------
