@@ -28,19 +28,35 @@ See [QUICKSTART.md](QUICKSTART.md) for step-by-step setup.
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/yourusername/remuxcode.git
-cd remuxcode
+git clone https://github.com/sirjmann92/remuXcode.git
+cd remuXcode
 cp .env.example .env
 nano .env  # Set SONARR_URL, SONARR_API_KEY, RADARR_URL, RADARR_API_KEY
 ```
 
-### 2. Set volume mounts
+### 2. Create your `compose.yml`
 
-Edit `compose.yml` to mount your media at the same paths Sonarr/Radarr use internally:
+`compose.yml` is not included in the repo — create your own. Mount your media at the **same paths Sonarr/Radarr use internally** so webhook paths work without translation:
 
 ```yaml
-volumes:
-  - /mnt/yournas:/share:rw
+services:
+  remuxcode:
+    container_name: remuxcode
+    build: .
+    ports:
+      - "7889:7889"
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - /mnt/yournas:/share:rw       # match Sonarr/Radarr's internal path
+    environment:
+      - TZ=America/Chicago
+      - REMUXCODE_API_KEY=${REMUXCODE_API_KEY}
+      - SONARR_URL=${SONARR_URL}
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_URL=${RADARR_URL}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+    restart: unless-stopped
 ```
 
 ### 3. Start
