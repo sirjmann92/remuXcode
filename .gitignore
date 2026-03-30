@@ -11,6 +11,11 @@ build/
 .venv/
 venv/
 
+# Configurations
+compose.yml
+docker-compose.yml
+compose.yaml
+
 # Database
 jobs.db
 

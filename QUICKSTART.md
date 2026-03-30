@@ -31,15 +31,30 @@ Leave `REMUXCODE_API_KEY` blank — a key is auto-generated on first run and sav
 
 ---
 
-## 2. Configure Volume Mounts
+## 2. Create your `compose.yml`
 
-Edit `compose.yml` and update the volume mounts to match your NAS/storage paths.
-Mount them at the **same paths Sonarr/Radarr use internally** so webhook paths work without any translation:
+`compose.yml` is not included in the repo — create your own. Mount your media at the **same paths Sonarr/Radarr use internally** so webhook paths work without any translation:
 
 ```yaml
-volumes:
-  - /mnt/yournas:/share:rw        # matches Sonarr/Radarr's /share
-  - /mnt/yournas2:/share-exp:rw   # matches /share-exp
+services:
+  remuxcode:
+    container_name: remuxcode
+    build: .
+    ports:
+      - "7889:7889"
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - /mnt/yournas:/share:rw        # matches Sonarr/Radarr's /share
+      - /mnt/yournas2:/share-exp:rw   # add more mounts as needed
+    environment:
+      - TZ=America/Chicago
+      - REMUXCODE_API_KEY=${REMUXCODE_API_KEY}
+      - SONARR_URL=${SONARR_URL}
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_URL=${RADARR_URL}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+    restart: unless-stopped
 ```
 
 ---
