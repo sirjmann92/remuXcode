@@ -31,10 +31,15 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
         # Radarr: single movie file per event
         raw_paths = [data.get("movieFile", {}).get("path")]
     elif "episodes" in data:
-        # Sonarr: eventType "Download" for both single imports and batch
-        # (On Import Complete fires once for a full batch with all episodes together)
-        # Each episode in the array carries its own episodeFile
-        raw_paths = [ep.get("episodeFile", {}).get("path") for ep in data.get("episodes", [])]
+        # Sonarr: episodes[] carries only metadata (episode numbers, titles, air dates).
+        # File paths live in episodeFiles[] — a plural array at the top level — for all
+        # event types (On File Import, On Import Complete, On File Upgrade).
+        # See docs/sonarr-webhook-reference.md for confirmed payload structure.
+        if data.get("episodeFiles"):
+            raw_paths = [f.get("path") for f in data["episodeFiles"]]
+        else:
+            # Fallback: older Sonarr versions may use singular episodeFile
+            raw_paths = [data.get("episodeFile", {}).get("path")]
     else:
         logger.warning("Unrecognised webhook payload (eventType=%s): %s", event_type, data)
         return {"error": "Unknown webhook format"}
@@ -43,6 +48,7 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
     files = [translate_path(f) for f in raw_paths if f]
 
     if not files:
+        logger.warning("Webhook eventType=%s matched but no file paths extracted; raw_paths=%s", event_type, raw_paths)
         return {"message": "No files to process"}
 
     # Queue jobs
