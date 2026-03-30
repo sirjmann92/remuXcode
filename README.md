@@ -69,10 +69,17 @@ docker compose up -d
 
 ### 4. Configure Sonarr/Radarr Webhook
 
-In Sonarr/Radarr → Settings → Connect → Add Webhook:
+**Sonarr** → Settings → Connect → Add Webhook:
+- **URL**: `http://YOUR_HOST_IP:7889/api/webhook`
+- **Triggers**: On Import Complete
+- **Headers**: `X-API-Key: <value from config/.api_key>`
+
+**Radarr** → Settings → Connect → Add Webhook:
 - **URL**: `http://YOUR_HOST_IP:7889/api/webhook`
 - **Triggers**: On Import, On Upgrade
 - **Headers**: `X-API-Key: <value from config/.api_key>`
+
+> Sonarr's **On Import Complete** fires once after a full batch import (e.g. a whole season), sending all file paths together. Radarr uses the standard per-file events.
 
 ---
 

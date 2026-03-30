@@ -84,7 +84,22 @@ cat config/.api_key
 
 ## 5. Configure Sonarr / Radarr Webhook
 
-In Sonarr/Radarr → **Settings → Connect → Add → Webhook**:
+### Sonarr
+
+In Sonarr → **Settings → Connect → Add → Webhook**:
+
+| Field | Value |
+|-------|-------|
+| URL | `http://YOUR_HOST_IP:7889/api/webhook` |
+| Method | POST |
+| Triggers | **On Import Complete** |
+| Headers | `X-API-Key: <your key from config/.api_key>` |
+
+> **On Import Complete** fires once after a full batch of files are imported (e.g. an entire season), passing all episode file paths in a single payload. This is more efficient than `On Import` + `On Upgrade`, which fire individually per episode.
+
+### Radarr
+
+In Radarr → **Settings → Connect → Add → Webhook**:
 
 | Field | Value |
 |-------|-------|
@@ -93,7 +108,7 @@ In Sonarr/Radarr → **Settings → Connect → Add → Webhook**:
 | Triggers | On Import, On Upgrade |
 | Headers | `X-API-Key: <your key from config/.api_key>` |
 
-Click **Test** — you should see a `{"status":"ok"}` response.
+Click **Test** on either — you should see a `{"status":"ok"}` response.
 
 ---
 
