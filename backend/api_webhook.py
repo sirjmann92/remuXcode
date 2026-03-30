@@ -48,7 +48,11 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
     files = [translate_path(f) for f in raw_paths if f]
 
     if not files:
-        logger.warning("Webhook eventType=%s matched but no file paths extracted; raw_paths=%s", event_type, raw_paths)
+        logger.warning(
+            "Webhook eventType=%s matched but no file paths extracted; raw_paths=%s",
+            event_type,
+            raw_paths,
+        )
         return {"message": "No files to process"}
 
     # Queue jobs
