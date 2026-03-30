@@ -1,6 +1,6 @@
 <script lang="ts">
 import { convertFile, getConfig, getSeries, getSeriesDetail } from '$lib/api';
-import type { BrowseSeries, ConfigSummary, SeriesDetail, Season, EpisodeFile } from '$lib/types';
+import type { BrowseSeries, ConfigSummary, EpisodeFile, Season, SeriesDetail } from '$lib/types';
 
 let seriesList: BrowseSeries[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -91,7 +91,7 @@ async function queueSeason(season: Season) {
 
 async function queueAllSeries() {
   if (!selectedSeries) return;
-  queueing['all'] = true;
+  queueing.all = true;
   try {
     for (const season of selectedSeries.seasons) {
       for (const ep of season.episodes) {
@@ -101,7 +101,7 @@ async function queueAllSeries() {
   } catch {
     // ignore
   } finally {
-    queueing['all'] = false;
+    queueing.all = false;
   }
 }
 
@@ -121,10 +121,26 @@ function seasonNeedsWork(season: Season): number {
 }
 
 const langNames: Record<string, string> = {
-  eng: 'English', fre: 'French', spa: 'Spanish', ger: 'German', ita: 'Italian',
-  por: 'Portuguese', rus: 'Russian', chi: 'Chinese', jpn: 'Japanese', kor: 'Korean',
-  ara: 'Arabic', dut: 'Dutch', dan: 'Danish', fin: 'Finnish', nor: 'Norwegian',
-  swe: 'Swedish', pol: 'Polish', cze: 'Czech', hun: 'Hungarian', tur: 'Turkish',
+  eng: 'English',
+  fre: 'French',
+  spa: 'Spanish',
+  ger: 'German',
+  ita: 'Italian',
+  por: 'Portuguese',
+  rus: 'Russian',
+  chi: 'Chinese',
+  jpn: 'Japanese',
+  kor: 'Korean',
+  ara: 'Arabic',
+  dut: 'Dutch',
+  dan: 'Danish',
+  fin: 'Finnish',
+  nor: 'Norwegian',
+  swe: 'Swedish',
+  pol: 'Polish',
+  cze: 'Czech',
+  hun: 'Hungarian',
+  tur: 'Turkish',
 };
 
 function langName(code: string): string {
@@ -143,7 +159,9 @@ function trackSummary(tracks: string[]): string {
     const name = langName(t);
     counts[name] = (counts[name] ?? 0) + 1;
   }
-  return Object.entries(counts).map(([name, n]) => n > 1 ? `${name} (${n})` : name).join(', ');
+  return Object.entries(counts)
+    .map(([name, n]) => (n > 1 ? `${name} (${n})` : name))
+    .join(', ');
 }
 
 $effect(() => {
@@ -152,7 +170,11 @@ $effect(() => {
   fetchSeries();
 });
 
-getConfig().then((c) => (config = c)).catch(() => {});
+getConfig()
+  .then((c) => {
+    config = c;
+  })
+  .catch(() => {});
 
 const filters: { value: string; label: string }[] = [
   { value: 'any', label: 'All' },
