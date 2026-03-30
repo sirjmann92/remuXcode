@@ -1,10 +1,13 @@
 """Authentication helpers for API routes."""
 
+import logging
 import os
 from pathlib import Path
 import uuid
 
 from fastapi import HTTPException, Request
+
+logger = logging.getLogger("remuxcode")
 
 
 def get_api_key() -> str:
@@ -62,4 +65,8 @@ async def require_auth(request: Request) -> None:
     if request_key == api_key:
         return
 
+    logger.warning(
+        "Unauthorized request from %s — invalid or missing X-API-Key",
+        request.client.host if request.client else "unknown",
+    )
     raise HTTPException(status_code=401, detail="Unauthorized")
