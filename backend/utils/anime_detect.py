@@ -241,43 +241,25 @@ class AnimeDetector:
             if any("animation" in g for g in genres):
                 # "Animation" genre found — need additional signals to confirm anime.
                 # Collect all studios and countries from the NFO.
-                studios = [
-                    el.text.lower()
-                    for el in root.findall(".//studio")
-                    if el.text
-                ]
-                countries = [
-                    el.text.lower()
-                    for el in root.findall(".//country")
-                    if el.text
-                ]
+                studios = [el.text.lower() for el in root.findall(".//studio") if el.text]
+                countries = [el.text.lower() for el in root.findall(".//country") if el.text]
 
                 # If ANY studio is a known Western animation studio → not anime
-                if any(
-                    ws in studio
-                    for studio in studios
-                    for ws in WESTERN_ANIMATION_STUDIOS
-                ):
+                if any(ws in studio for studio in studios for ws in WESTERN_ANIMATION_STUDIOS):
                     return ContentType.LIVE_ACTION
 
                 # If a studio is a known anime studio → anime
-                if any(
-                    ans in studio
-                    for studio in studios
-                    for ans in ANIME_STUDIOS
-                ):
+                if any(ans in studio for studio in studios for ans in ANIME_STUDIOS):
                     return ContentType.ANIME
 
                 # Check countries: must be ONLY East Asian (co-productions
                 # with Western countries like "Japan" + "United States" are not anime)
                 if countries:
                     all_east_asian = all(
-                        any(ea in c for ea in EAST_ASIAN_COUNTRIES)
-                        for c in countries
+                        any(ea in c for ea in EAST_ASIAN_COUNTRIES) for c in countries
                     )
                     has_east_asian = any(
-                        any(ea in c for ea in EAST_ASIAN_COUNTRIES)
-                        for c in countries
+                        any(ea in c for ea in EAST_ASIAN_COUNTRIES) for c in countries
                     )
                     if all_east_asian:
                         return ContentType.ANIME

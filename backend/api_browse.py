@@ -152,9 +152,8 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
     )
     is_anime = content_type == ContentType.ANIME
 
-    video_streams = []
-    for v in info.video_streams:
-        video_streams.append({
+    video_streams = [
+        {
             "index": v.index,
             "codec": v.codec_name,
             "codec_long": v.codec_long_name,
@@ -168,11 +167,12 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
             "bitrate": v.bitrate,
             "is_hevc": v.is_hevc,
             "is_h264": v.is_h264,
-        })
+        }
+        for v in info.video_streams
+    ]
 
-    audio_streams = []
-    for a in info.audio_streams:
-        audio_streams.append({
+    audio_streams = [
+        {
             "index": a.index,
             "codec": a.codec_name,
             "codec_long": a.codec_long_name,
@@ -186,11 +186,12 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
             "is_dts": a.is_dts,
             "is_truehd": a.is_truehd,
             "is_lossless": a.is_lossless,
-        })
+        }
+        for a in info.audio_streams
+    ]
 
-    subtitle_streams = []
-    for s in info.subtitle_streams:
-        subtitle_streams.append({
+    subtitle_streams = [
+        {
             "index": s.index,
             "codec": s.codec_name,
             "language": s.language,
@@ -198,7 +199,9 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
             "is_default": s.is_default,
             "is_forced": s.is_forced,
             "is_sdh": s.is_sdh,
-        })
+        }
+        for s in info.subtitle_streams
+    ]
 
     return {
         "file": str(info.path),

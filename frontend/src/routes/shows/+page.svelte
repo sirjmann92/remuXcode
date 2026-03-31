@@ -1,7 +1,14 @@
 <script lang="ts">
 import { convertFile, getActiveJobs, getConfig, getSeries, getSeriesDetail } from '$lib/api';
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
-import type { ActiveJobsMap, BrowseSeries, ConfigSummary, EpisodeFile, Season, SeriesDetail } from '$lib/types';
+import type {
+  ActiveJobsMap,
+  BrowseSeries,
+  ConfigSummary,
+  EpisodeFile,
+  Season,
+  SeriesDetail,
+} from '$lib/types';
 
 let seriesList: BrowseSeries[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -39,10 +46,14 @@ async function refreshActiveJobs() {
       if (selectedSeries) {
         try {
           selectedSeries = await getSeriesDetail(selectedSeries.id);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function getJobStatus(path: string) {
@@ -51,7 +62,9 @@ function getJobStatus(path: string) {
 
 $effect(() => {
   startJobPolling();
-  return () => { if (jobPollTimer) clearInterval(jobPollTimer); };
+  return () => {
+    if (jobPollTimer) clearInterval(jobPollTimer);
+  };
 });
 
 const filtered = $derived.by(() => {
