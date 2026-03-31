@@ -84,7 +84,7 @@ function closeMobileDrawer() {
   </div>
 
   <!-- Nav links -->
-  <ul class="menu menu-md flex-1 px-3 gap-0.5">
+  <ul class="menu menu-md flex-1 px-2 gap-0.5">
     <li class="menu-title text-[10px] uppercase tracking-wider text-base-content/30 px-3 pt-2 pb-1">Navigation</li>
     {#each nav as item}
       {@const active = $page.url.pathname === item.href}

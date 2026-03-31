@@ -1,9 +1,10 @@
 # remuXcode
 
-Unified media converter service for Sonarr/Radarr that handles:
-- **DTS Audio** → AC3/AAC (device compatibility)
-- **10-bit H.264** → HEVC or AV1 (anime-only by default)
-- **Stream Cleanup** → Remove unwanted language tracks
+A self-hosted media library maintenance tool that keeps your Plex/Jellyfin library clean and compatible — automatically or on demand.
+
+When Sonarr or Radarr imports a file, remuXcode receives a webhook, analyzes the media, and converts what needs fixing: DTS audio becomes AC3/AAC for broad device support, 10-bit H.264 anime gets re-encoded to HEVC or AV1, and unwanted language tracks are stripped out. Everything happens in the background with no manual intervention required.
+
+But not every file comes through Sonarr/Radarr. The built-in web UI lets you browse your entire library — movies and shows — with poster grids, filters, and per-file analysis. See exactly which files have incompatible audio, which anime needs encoding, and kick off conversions for individual files or entire series with a click. It's both a fire-and-forget automation layer and a hands-on library management tool.
 
 ## Features
 
@@ -17,7 +18,9 @@ Unified media converter service for Sonarr/Radarr that handles:
 - 📋 **Job Queue**: Track conversion progress with persistent job status
 - 💾 **SQLite Persistence**: Jobs survive restarts, resume interrupted conversions
 - 🛑 **Job Cancellation**: Cancel pending or running jobs via API
-- 🖥️ **Web UI**: Built-in SvelteKit dashboard for browsing and managing jobs
+- 🖥️ **Web UI**: Built-in SvelteKit dashboard with library browsing, job management, and config
+- 🎞️ **Library Browse**: Movies & Shows pages with poster grids, filters, and processing previews
+- 🔍 **Detection Accuracy**: Config-aware audio detection, EAC3 Atmos vs TrueHD distinction
 
 ---
 
@@ -302,6 +305,17 @@ config/                   # Docker volume — created on first run
 └── .api_key              # Auto-generated API key
 
 frontend/                 # SvelteKit UI (built into Docker image)
+├── src/
+│   ├── lib/
+│   │   ├── api.ts        # API client
+│   │   ├── types.ts      # TypeScript interfaces
+│   │   └── components/   # JobCard, Navbar, StatusBadge
+│   └── routes/
+│       ├── +page.svelte   # Dashboard
+│       ├── movies/        # Library browse (poster grid + detail modal)
+│       ├── shows/         # Series browse (drill-down to episodes)
+│       ├── jobs/          # Job queue with processing details
+│       └── config/        # Configuration editor
 ```
 
 ### Job Persistence

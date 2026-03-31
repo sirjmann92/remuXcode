@@ -493,6 +493,7 @@ def process_file(
         results["audio"] = {
             "success": audio_result.success,
             "streams_converted": audio_result.streams_converted,
+            "converted_streams": audio_result.converted_streams,
             "error": audio_result.error,
         }
         if not audio_result.success:
@@ -525,7 +526,9 @@ def process_file(
         results["cleanup"] = {
             "success": cleanup_result.success,
             "audio_removed": cleanup_result.audio_removed,
+            "audio_kept": cleanup_result.audio_kept,
             "subtitle_removed": cleanup_result.subtitle_removed,
+            "subtitle_kept": cleanup_result.subtitle_kept,
             "original_language": cleanup_result.original_language,
             "error": cleanup_result.error,
         }

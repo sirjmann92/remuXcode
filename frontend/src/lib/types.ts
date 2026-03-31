@@ -25,7 +25,17 @@ export interface JobResult {
 export interface ConversionResult {
   success: boolean;
   streams_converted?: number;
+  converted_streams?: ConvertedStream[] | null;
   error: string | null;
+}
+
+export interface ConvertedStream {
+  index: number;
+  from_codec: string;
+  to_codec: string;
+  channels: number;
+  bitrate: number;
+  language: string | null;
 }
 
 export interface VideoResult {
@@ -40,7 +50,9 @@ export interface VideoResult {
 export interface CleanupResult {
   success: boolean;
   audio_removed: number;
+  audio_kept: number;
   subtitle_removed: number;
+  subtitle_kept: number;
   original_language: string | null;
   error: string | null;
 }
