@@ -68,6 +68,49 @@ ANIME_STUDIOS = [
     "bandai namco",
 ]
 
+# Known Western animation studios (to EXCLUDE from anime detection)
+WESTERN_ANIMATION_STUDIOS = [
+    "illumination",
+    "pixar",
+    "dreamworks",
+    "disney",
+    "walt disney",
+    "blue sky",
+    "laika",
+    "aardman",
+    "sony pictures animation",
+    "warner animation",
+    "warner bros. animation",
+    "cartoon network",
+    "nickelodeon",
+    "netflix animation",
+    "amazon studios",
+    "universal pictures",
+    "20th century",
+    "paramount animation",
+    "rooster teeth",
+    "nelvana",
+    "hasbro",
+    "mattel",
+]
+
+# East Asian origin languages that indicate anime/donghua/manhwa
+EAST_ASIAN_LANGUAGES = [
+    "japanese",
+    "chinese",
+    "mandarin",
+    "cantonese",
+    "korean",
+]
+
+# East Asian countries for NFO detection
+EAST_ASIAN_COUNTRIES = [
+    "japan",
+    "china",
+    "south korea",
+    "korea",
+]
+
 # Path patterns that indicate anime
 ANIME_PATH_PATTERNS = [
     "/anime/",
@@ -191,39 +234,68 @@ class AnimeDetector:
                 if genre_elem.text
             ]
 
-            if any("anime" in g or "animation" in g for g in genres):
-                # Animation genre found, but is it anime specifically?
-                # Check for Japanese origin indicators
+            # Exact "anime" genre is definitive
+            if any(g == "anime" for g in genres):
+                return ContentType.ANIME
 
-                # Check studio
-                studio_elem = root.find(".//studio")
-                if studio_elem is not None and studio_elem.text:
-                    studio = studio_elem.text.lower()
-                    if any(anime_studio in studio for anime_studio in ANIME_STUDIOS):
+            if any("animation" in g for g in genres):
+                # "Animation" genre found — need additional signals to confirm anime.
+                # Collect all studios and countries from the NFO.
+                studios = [
+                    el.text.lower()
+                    for el in root.findall(".//studio")
+                    if el.text
+                ]
+                countries = [
+                    el.text.lower()
+                    for el in root.findall(".//country")
+                    if el.text
+                ]
+
+                # If ANY studio is a known Western animation studio → not anime
+                if any(
+                    ws in studio
+                    for studio in studios
+                    for ws in WESTERN_ANIMATION_STUDIOS
+                ):
+                    return ContentType.LIVE_ACTION
+
+                # If a studio is a known anime studio → anime
+                if any(
+                    ans in studio
+                    for studio in studios
+                    for ans in ANIME_STUDIOS
+                ):
+                    return ContentType.ANIME
+
+                # Check countries: must be ONLY East Asian (co-productions
+                # with Western countries like "Japan" + "United States" are not anime)
+                if countries:
+                    all_east_asian = all(
+                        any(ea in c for ea in EAST_ASIAN_COUNTRIES)
+                        for c in countries
+                    )
+                    has_east_asian = any(
+                        any(ea in c for ea in EAST_ASIAN_COUNTRIES)
+                        for c in countries
+                    )
+                    if all_east_asian:
                         return ContentType.ANIME
+                    if not has_east_asian:
+                        return ContentType.LIVE_ACTION
+                    # Mixed countries (e.g. Japan + US) — not enough alone, check title
 
-                # Check country
-                country_elem = root.find(".//country")
-                if country_elem is not None and country_elem.text:
-                    country = country_elem.text.lower()
-                    if "japan" in country or "jp" in country:
-                        return ContentType.ANIME
-
-                # Check original title for Japanese characters
+                # Check original title for Japanese/CJK characters
                 orig_title = root.find(".//originaltitle")
                 if orig_title is not None and orig_title.text:
-                    # Check for Japanese characters (Hiragana, Katakana, Kanji)
                     if any(
                         "\u3040" <= c <= "\u309f"  # Hiragana
                         or "\u30a0" <= c <= "\u30ff"  # Katakana
-                        or "\u4e00" <= c <= "\u9fff"  # Kanji
+                        or "\u4e00" <= c <= "\u9fff"  # CJK Unified
+                        or "\uac00" <= c <= "\ud7af"  # Korean Hangul
                         for c in orig_title.text
                     ):
                         return ContentType.ANIME
-
-                # If genre is 'anime' specifically (not just 'animation')
-                if any(g == "anime" for g in genres):
-                    return ContentType.ANIME
 
             return ContentType.UNKNOWN
 
@@ -310,7 +382,7 @@ class AnimeDetector:
                     if "anime" in genres:
                         return ContentType.ANIME
 
-                    # Check if animation + Japanese origin
+                    # Check if animation + East Asian origin
                     if "animation" in genres:
                         orig_lang = movie.get("originalLanguage", {})
                         if isinstance(orig_lang, dict):
@@ -318,8 +390,12 @@ class AnimeDetector:
                         else:
                             lang_name = str(orig_lang).lower()
 
-                        if "japanese" in lang_name:
-                            return ContentType.ANIME
+                        if any(lang in lang_name for lang in EAST_ASIAN_LANGUAGES):
+                            # East Asian animation — but check studio to exclude
+                            # Western co-productions (e.g. Illumination + Nintendo)
+                            studio_name = movie.get("studio", "").lower()
+                            if not any(ws in studio_name for ws in WESTERN_ANIMATION_STUDIOS):
+                                return ContentType.ANIME
 
                     return ContentType.LIVE_ACTION
 

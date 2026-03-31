@@ -69,7 +69,7 @@ class StreamCleanup:
         self.language_detector = language_detector or LanguageDetector()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
 
-    def should_cleanup(self, file_path: str) -> bool:
+    def should_cleanup(self, file_path: str, *, is_anime: bool = False) -> bool:
         """Check if file has streams that should be removed."""
         if not self.config.enabled:
             return False
@@ -81,19 +81,20 @@ class StreamCleanup:
         # Detect original language
         original_lang = self._detect_original_language(file_path)
 
-        # Build set of languages to keep
-        keep_languages = self._get_languages_to_keep(original_lang)
+        # Build separate keep sets for audio vs subtitles
+        audio_keep_languages = self._get_audio_languages_to_keep(original_lang, is_anime=is_anime)
+        sub_keep_languages = self._get_languages_to_keep(original_lang)
 
         # Check if any audio streams should be removed
         if self.config.clean_audio:
             for stream in info.audio_streams:
-                if not self._should_keep_audio(stream, keep_languages):
+                if not self._should_keep_audio(stream, audio_keep_languages):
                     return True
 
         # Check if any subtitle streams should be removed
         if self.config.clean_subtitles:
             for sub_stream in info.subtitle_streams:
-                if not self._should_keep_subtitle(sub_stream, keep_languages):
+                if not self._should_keep_subtitle(sub_stream, sub_keep_languages):
                     return True
 
         # Check if audio track order needs fixing (preferred language should be first)
@@ -103,7 +104,7 @@ class StreamCleanup:
         # Check if audio streams are missing language tags (needed for Sonarr/Plex)
         if self.config.clean_audio:
             kept_audio = [
-                s for s in info.audio_streams if self._should_keep_audio(s, keep_languages)
+                s for s in info.audio_streams if self._should_keep_audio(s, audio_keep_languages)
             ]
             if self._needs_language_tagging(kept_audio, original_lang):
                 return True
@@ -117,6 +118,8 @@ class StreamCleanup:
         job_id: str | None = None,
         force_original_language: str | None = None,
         progress_callback: Callable[[float], None] | None = None,
+        *,
+        is_anime: bool = False,
     ) -> CleanupResult:
         """Remove unwanted streams from a media file.
 
@@ -168,22 +171,34 @@ class StreamCleanup:
         else:
             original_lang = self._detect_original_language(input_file)
 
-        # Build set of languages to keep
-        keep_languages = self._get_languages_to_keep(original_lang)
+        # Build separate keep sets for audio vs subtitles
+        audio_keep_languages = self._get_audio_languages_to_keep(original_lang, is_anime=is_anime)
+        sub_keep_languages = self._get_languages_to_keep(original_lang)
 
         # Determine which streams to keep
         audio_keep = []
         audio_remove = []
         for stream in info.audio_streams:
-            if self._should_keep_audio(stream, keep_languages):
+            if self._should_keep_audio(stream, audio_keep_languages):
                 audio_keep.append(stream)
             else:
                 audio_remove.append(stream)
 
+        # Safety net: never remove ALL audio streams — if nothing matched
+        # the keep set, keep everything to avoid a silent/broken file.
+        if info.audio_streams and not audio_keep:
+            logger.warning(
+                "No audio streams match keep_languages %s for %s — keeping all audio",
+                audio_keep_languages,
+                input_path.name,
+            )
+            audio_keep = list(info.audio_streams)
+            audio_remove = []
+
         subtitle_keep = []
         subtitle_remove = []
         for sub_stream in info.subtitle_streams:
-            if self._should_keep_subtitle(sub_stream, keep_languages):
+            if self._should_keep_subtitle(sub_stream, sub_keep_languages):
                 subtitle_keep.append(sub_stream)
             else:
                 subtitle_remove.append(sub_stream)
@@ -424,33 +439,46 @@ class StreamCleanup:
         return self.language_detector.detect_original_language(file_path)
 
     def _get_languages_to_keep(self, original_lang: str) -> set[str]:
-        """Build set of language codes to keep."""
-        # Start with configured languages
+        """Build base set of language codes to keep (used for subtitles and non-anime audio)."""
         keep = set(self.config.keep_languages)
 
-        # Always keep original language
-        if original_lang and original_lang != "und":
-            keep.add(original_lang)
-            # Add alternate codes for the same language
-            alternates = {
-                "fre": "fra",
-                "fra": "fre",
-                "ger": "deu",
-                "deu": "ger",
-                "chi": "zho",
-                "zho": "chi",
-                "dut": "nld",
-                "nld": "dut",
-                "gre": "ell",
-                "ell": "gre",
-            }
-            if original_lang in alternates:
-                keep.add(alternates[original_lang])
-
-        # Always keep undefined if configured
         if self.config.keep_undefined:
             keep.add("und")
             keep.add("")
+
+        return keep
+
+    def _get_audio_languages_to_keep(
+        self, original_lang: str, *, is_anime: bool = False
+    ) -> set[str]:
+        """Build set of language codes to keep for audio streams.
+
+        For anime content (when anime_keep_original_audio is enabled),
+        the original language is additionally kept for dual-audio support.
+        For live-action content, only configured keep_languages are kept.
+        """
+        keep = self._get_languages_to_keep(original_lang)
+
+        if is_anime and self.config.anime_keep_original_audio:
+            if original_lang and original_lang != "und":
+                keep.add(original_lang)
+                # Add alternate codes for the same language
+                alternates = {
+                    "fre": "fra",
+                    "fra": "fre",
+                    "ger": "deu",
+                    "deu": "ger",
+                    "chi": "zho",
+                    "zho": "chi",
+                    "dut": "nld",
+                    "nld": "dut",
+                    "gre": "ell",
+                    "ell": "gre",
+                    "jpn": "ja",
+                    "kor": "ko",
+                }
+                if original_lang in alternates:
+                    keep.add(alternates[original_lang])
 
         return keep
 

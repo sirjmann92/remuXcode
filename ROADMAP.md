@@ -274,6 +274,12 @@ services:
 - [x] **Library Browse: Movies** — poster grid, detail modal with track removal preview, config-aware filters (Audio, Cleanup, Anime)
 - [x] **Library Browse: Shows** — series list with drill-down to seasons/episodes, inline cleanup detail
 - [x] **Detection Accuracy** — EAC3 Atmos vs TrueHD distinction, slash-separated mediaInfo parsing, genre-based anime detection
+- [x] **File Analysis Modal** — full ffprobe/MediaInfo viewer with tabbed UI (General, Video, Audio, Subs) per file
+- [x] **Live Job Status** — pending/running indicators on movie posters and episode rows with 3-second polling
+- [x] **Auto-Refresh on Completion** — Movies/Shows pages automatically re-fetch data when a job finishes
+- [x] **Manual Library Refresh** — Config page buttons to force Sonarr/Radarr full metadata re-read
+- [x] **Anime Dual-Audio** — `anime_keep_original_audio` config to preserve original-language audio on anime content
+- [x] **Sonarr Integration Hardening** — RefreshSeries + RescanSeries (polled), polled rename commands, Specials folder support
 
 #### 2.3: Docker Integration
 - [x] Multi-stage Dockerfile (frontend build + Python backend)

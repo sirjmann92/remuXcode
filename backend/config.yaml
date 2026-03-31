@@ -89,7 +89,8 @@ cleanup:
   clean_subtitles: ${SUBTITLE_CLEANUP_ENABLED:-true}
 
   # Languages to always keep (ISO 639-2 codes)
-  # Original language is auto-detected and always kept
+  # For live action, only these languages are kept. For anime, the original
+  # language is also kept when anime_keep_original_audio is enabled below.
   keep_languages:
     - eng  # English
 
@@ -104,6 +105,11 @@ cleanup:
 
   # Keep SDH/CC subtitles
   keep_sdh: true
+
+  # Anime dual-audio: keep original language audio for anime content
+  # When true, anime files keep both their original language (Japanese, Chinese, etc.)
+  # AND English audio for dual-audio support. Live action only keeps keep_languages.
+  anime_keep_original_audio: true
 
 # Language detection settings
 language:

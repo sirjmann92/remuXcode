@@ -13,13 +13,17 @@ But not every file comes through Sonarr/Radarr. The built-in web UI lets you bro
 - 🌸 **Anime Detection**: Auto-detects anime for optimized encoding (`-tune animation`)
 - 🌍 **Language Cleanup**: Keep only original language + English tracks
 - 📊 **Bitrate Matching**: Preserves quality while respecting format limits
-- 🔄 **Automatic Renaming**: Triggers Sonarr/Radarr to update filenames
+- 🔄 **Automatic Renaming**: Triggers Sonarr/Radarr to update filenames after processing
 - 🌐 **Webhook-Based**: Triggered by containerized Sonarr/Radarr, runs against your mounts
 - 📋 **Job Queue**: Track conversion progress with persistent job status
 - 💾 **SQLite Persistence**: Jobs survive restarts, resume interrupted conversions
 - 🛑 **Job Cancellation**: Cancel pending or running jobs via API
 - 🖥️ **Web UI**: Built-in SvelteKit dashboard with library browsing, job management, and config
 - 🎞️ **Library Browse**: Movies & Shows pages with poster grids, filters, and processing previews
+- 🔎 **File Analysis**: Full ffprobe/MediaInfo modal — video, audio, and subtitle stream details per file
+- 📡 **Live Job Status**: Pending/running indicators on movie posters and episode rows, auto-refresh on completion
+- 🔃 **Manual Library Refresh**: Force Sonarr/Radarr metadata re-read from the Config page
+- 🎌 **Anime Dual-Audio**: Optionally keep original-language audio on anime while still cleaning subtitles
 - 🔍 **Detection Accuracy**: Config-aware audio detection, EAC3 Atmos vs TrueHD distinction
 
 ---
@@ -121,6 +125,7 @@ cleanup:
   keep_languages: [eng]       # Always keep English
   keep_commentary: true
   keep_sdh: true
+  anime_keep_original_audio: true  # Keep original-language audio on anime (e.g. Japanese)
 ```
 
 See [backend/config.yaml](backend/config.yaml) for the full reference with all options.
@@ -309,13 +314,13 @@ frontend/                 # SvelteKit UI (built into Docker image)
 │   ├── lib/
 │   │   ├── api.ts        # API client
 │   │   ├── types.ts      # TypeScript interfaces
-│   │   └── components/   # JobCard, Navbar, StatusBadge
+│   │   └── components/   # JobCard, Navbar, StatusBadge, AnalyzeModal
 │   └── routes/
 │       ├── +page.svelte   # Dashboard
-│       ├── movies/        # Library browse (poster grid + detail modal)
-│       ├── shows/         # Series browse (drill-down to episodes)
+│       ├── movies/        # Library browse (poster grid + detail modal + job status)
+│       ├── shows/         # Series browse (drill-down to episodes + job status)
 │       ├── jobs/          # Job queue with processing details
-│       └── config/        # Configuration editor
+│       └── config/        # Configuration, API key, Sonarr/Radarr refresh
 ```
 
 ### Job Persistence

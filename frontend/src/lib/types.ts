@@ -80,6 +80,7 @@ export interface ConfigSummary {
     clean_subtitles: boolean;
     keep_languages: string[];
     keep_commentary: boolean;
+    anime_keep_original_audio: boolean;
   };
   sonarr: {
     configured: boolean;
@@ -206,3 +207,72 @@ export interface SeriesDetail {
   is_anime: boolean;
   seasons: Season[];
 }
+
+// Analyze types (ffprobe detail)
+
+export interface AnalyzeVideoStream {
+  index: number;
+  codec: string;
+  codec_long: string;
+  profile: string | null;
+  width: number;
+  height: number;
+  resolution: string;
+  pix_fmt: string;
+  bit_depth: number;
+  frame_rate: string;
+  bitrate: number | null;
+  is_hevc: boolean;
+  is_h264: boolean;
+}
+
+export interface AnalyzeAudioStream {
+  index: number;
+  codec: string;
+  codec_long: string;
+  channels: number;
+  channel_layout: string | null;
+  sample_rate: number;
+  bitrate: number | null;
+  language: string | null;
+  title: string | null;
+  is_default: boolean;
+  is_dts: boolean;
+  is_truehd: boolean;
+  is_lossless: boolean;
+}
+
+export interface AnalyzeSubtitleStream {
+  index: number;
+  codec: string;
+  language: string | null;
+  title: string | null;
+  is_default: boolean;
+  is_forced: boolean;
+  is_sdh: boolean;
+}
+
+export interface AnalyzeResult {
+  file: string;
+  format: string;
+  duration: number;
+  size: number;
+  bitrate: number;
+  chapters: number;
+  is_anime: boolean;
+  content_type: string;
+  needs_audio_conversion: boolean;
+  needs_video_conversion: boolean;
+  video_streams: AnalyzeVideoStream[];
+  audio_streams: AnalyzeAudioStream[];
+  subtitle_streams: AnalyzeSubtitleStream[];
+  format_tags: Record<string, string>;
+}
+
+export interface ActiveJob {
+  job_id: string;
+  status: 'pending' | 'running';
+  progress: number;
+}
+
+export type ActiveJobsMap = Record<string, ActiveJob>;
