@@ -1,5 +1,5 @@
 <script lang="ts">
-import { getConfig, regenerateApiKey } from '$lib/api';
+import { getConfig, regenerateApiKey, refreshSonarr, refreshRadarr } from '$lib/api';
 import type { ConfigSummary } from '$lib/types';
 
 let config: ConfigSummary | null = $state(null);
@@ -8,6 +8,9 @@ let error = $state('');
 let keyCopied = $state(false);
 let keyVisible = $state(false);
 let regenerating = $state(false);
+let refreshingSonarr = $state(false);
+let refreshingRadarr = $state(false);
+let refreshMsg = $state('');
 
 async function fetchConfig() {
   loading = true;
@@ -48,6 +51,32 @@ async function handleRegenerate() {
 $effect(() => {
   fetchConfig();
 });
+
+  async function handleRefreshSonarr() {
+    refreshingSonarr = true;
+    refreshMsg = '';
+    try {
+      const res = await refreshSonarr();
+      refreshMsg = res.message;
+    } catch (e) {
+      refreshMsg = e instanceof Error ? e.message : 'Sonarr refresh failed';
+    } finally {
+      refreshingSonarr = false;
+    }
+  }
+
+  async function handleRefreshRadarr() {
+    refreshingRadarr = true;
+    refreshMsg = '';
+    try {
+      const res = await refreshRadarr();
+      refreshMsg = res.message;
+    } catch (e) {
+      refreshMsg = e instanceof Error ? e.message : 'Radarr refresh failed';
+    } finally {
+      refreshingRadarr = false;
+    }
+  }
 
 function boolBadge(val: boolean): string {
   return val ? 'badge-success' : 'badge-ghost';
@@ -268,6 +297,39 @@ function boolBadge(val: boolean): string {
               <span class="font-mono">{config.job_history_days} days</span>
             </div>
           </div>
+          {#if config.sonarr.configured || config.radarr.configured}
+            <div class="divider my-2"></div>
+            <p class="text-xs opacity-60 mb-2">Force a full library refresh (re-reads all metadata from disk).</p>
+            <div class="flex gap-2">
+              {#if config.sonarr.configured}
+                <button
+                  class="btn btn-sm btn-outline"
+                  onclick={handleRefreshSonarr}
+                  disabled={refreshingSonarr}
+                >
+                  {#if refreshingSonarr}
+                    <span class="loading loading-spinner loading-xs"></span>
+                  {/if}
+                  Refresh Sonarr
+                </button>
+              {/if}
+              {#if config.radarr.configured}
+                <button
+                  class="btn btn-sm btn-outline"
+                  onclick={handleRefreshRadarr}
+                  disabled={refreshingRadarr}
+                >
+                  {#if refreshingRadarr}
+                    <span class="loading loading-spinner loading-xs"></span>
+                  {/if}
+                  Refresh Radarr
+                </button>
+              {/if}
+            </div>
+            {#if refreshMsg}
+              <p class="text-xs mt-2 text-success">{refreshMsg}</p>
+            {/if}
+          {/if}
         </div>
       </div>
     </div>

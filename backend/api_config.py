@@ -44,6 +44,7 @@ async def get_config_summary() -> dict[str, Any]:
             "clean_subtitles": cfg.cleanup.clean_subtitles,
             "keep_languages": cfg.cleanup.keep_languages,
             "keep_commentary": cfg.cleanup.keep_commentary,
+            "anime_keep_original_audio": cfg.cleanup.anime_keep_original_audio,
         },
         "sonarr": {
             "configured": bool(
@@ -71,3 +72,27 @@ def regenerate_key() -> dict[str, str]:
     """Generate a new API key, persist it, and return the new value."""
     new_key = regenerate_api_key()
     return {"api_key": new_key}
+
+
+@router.post("/config/refresh/sonarr")
+def refresh_sonarr_library() -> dict[str, str]:
+    """Trigger a full Sonarr library refresh."""
+    try:
+        core.refresh_sonarr()
+        return {"message": "Sonarr library refresh completed"}
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Sonarr refresh failed: {e}") from e
+
+
+@router.post("/config/refresh/radarr")
+def refresh_radarr_library() -> dict[str, str]:
+    """Trigger a full Radarr library refresh."""
+    try:
+        core.refresh_radarr()
+        return {"message": "Radarr library refresh completed"}
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Radarr refresh failed: {e}") from e

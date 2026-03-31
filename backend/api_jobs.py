@@ -21,6 +21,22 @@ async def list_jobs() -> dict[str, Any]:
     return {"jobs": jobs}
 
 
+@router.get("/jobs/active")
+async def active_jobs() -> dict[str, Any]:
+    """Return a mapping of file_path → {status, progress, job_id} for pending/running jobs."""
+    if not core.job_queue:
+        return {"active": {}}
+    active: dict[str, dict[str, Any]] = {}
+    for job in core.job_queue.get_all_jobs():
+        if job.status.value in ("pending", "running"):
+            active[job.file_path] = {
+                "job_id": job.id,
+                "status": job.status.value,
+                "progress": job.progress,
+            }
+    return {"active": active}
+
+
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict[str, Any]:
     """Get job by ID."""

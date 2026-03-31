@@ -53,6 +53,7 @@ class CleanupConfig:
     keep_commentary: bool = True
     keep_audio_description: bool = True
     keep_sdh: bool = True
+    anime_keep_original_audio: bool = True
 
 
 @dataclass
@@ -300,6 +301,7 @@ class Config:
             keep_commentary=self._get("cleanup.keep_commentary", True),
             keep_audio_description=self._get("cleanup.keep_audio_description", True),
             keep_sdh=self._get("cleanup.keep_sdh", True),
+            anime_keep_original_audio=self._get("cleanup.anime_keep_original_audio", True),
         )
 
     def _parse_video_config(self) -> VideoConfig:

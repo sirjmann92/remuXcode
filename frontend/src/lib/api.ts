@@ -1,4 +1,6 @@
 import type {
+  ActiveJobsMap,
+  AnalyzeResult,
   ConfigSummary,
   HealthStatus,
   Job,
@@ -85,4 +87,24 @@ export async function getSeries(search?: string, filter?: string): Promise<Serie
 
 export async function getSeriesDetail(id: number): Promise<SeriesDetail> {
   return request(`/api/series/${id}`);
+}
+
+// Analyze
+export async function analyzeFile(path: string): Promise<AnalyzeResult> {
+  return request(`/api/analyze?path=${encodeURIComponent(path)}`);
+}
+
+// Active jobs (pending/running) keyed by file path
+export async function getActiveJobs(): Promise<ActiveJobsMap> {
+  const res = await request<{ active: ActiveJobsMap }>('/api/jobs/active');
+  return res.active;
+}
+
+// Library refresh
+export async function refreshSonarr(): Promise<{ message: string }> {
+  return request('/api/config/refresh/sonarr', { method: 'POST' });
+}
+
+export async function refreshRadarr(): Promise<{ message: string }> {
+  return request('/api/config/refresh/radarr', { method: 'POST' });
 }

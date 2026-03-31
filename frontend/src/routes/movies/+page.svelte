@@ -1,6 +1,7 @@
 <script lang="ts">
-import { convertFile, getConfig, getMovies } from '$lib/api';
-import type { BrowseMovie, ConfigSummary } from '$lib/types';
+import { convertFile, getActiveJobs, getConfig, getMovies } from '$lib/api';
+import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
+import type { ActiveJobsMap, BrowseMovie, ConfigSummary } from '$lib/types';
 
 let movies: BrowseMovie[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -10,6 +11,37 @@ let search = $state('');
 let filter: string = $state('any');
 let queueing: Record<number, boolean> = $state({});
 let detailMovie: BrowseMovie | null = $state(null);
+let analyzePath: string | null = $state(null);
+let activeJobs: ActiveJobsMap = $state({});
+let prevActiveKeys: Set<string> = new Set();
+let jobPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startJobPolling() {
+  if (jobPollTimer) return;
+  refreshActiveJobs();
+  jobPollTimer = setInterval(refreshActiveJobs, 3000);
+}
+
+async function refreshActiveJobs() {
+  try {
+    const next = await getActiveJobs();
+    const nextKeys = new Set(Object.keys(next));
+    // Detect jobs that just finished (were active, now gone)
+    const finished = [...prevActiveKeys].some((k) => !nextKeys.has(k));
+    prevActiveKeys = nextKeys;
+    activeJobs = next;
+    if (finished) fetchMovies();
+  } catch { /* ignore */ }
+}
+
+function getJobStatus(path: string) {
+  return activeJobs[path] ?? null;
+}
+
+$effect(() => {
+  startJobPolling();
+  return () => { if (jobPollTimer) clearInterval(jobPollTimer); };
+});
 
 const filtered = $derived.by(() => {
   if (!search) return movies;
@@ -97,8 +129,9 @@ function langName(code: string): string {
   return langNames[code.toLowerCase()] ?? code.toUpperCase();
 }
 
-function removableTracks(tracks: string[]): string[] {
+function removableTracks(tracks: string[], isAnimeAudio?: boolean): string[] {
   if (!config) return [];
+  if (isAnimeAudio && config.cleanup.anime_keep_original_audio) return [];
   const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
   return tracks.filter((t) => !keep.has(t.toLowerCase()));
 }
@@ -226,6 +259,27 @@ const filters: { value: string; label: string }[] = [
                 {/if}
               </div>
             </div>
+            <!-- Job status overlay -->
+            {#if getJobStatus(movie.path)}
+              {@const job = getJobStatus(movie.path)!}
+              <div class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
+                <span class="loading loading-spinner loading-md text-primary"></span>
+                <span class="text-xs font-medium mt-2 capitalize">{job.status}</span>
+                {#if job.status === 'running' && job.progress > 0}
+                  <span class="text-xs text-base-content/60 mt-0.5">{Math.round(job.progress)}%</span>
+                {/if}
+              </div>
+            {/if}
+            <!-- Analyze button -->
+            <button
+              class="absolute bottom-2 right-2 btn btn-circle btn-xs btn-ghost bg-black/40 hover:bg-black/70 text-white pointer-events-auto"
+              title="Analyze file"
+              onclick={(e) => { e.stopPropagation(); analyzePath = movie.path; }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+              </svg>
+            </button>
           </div>
           <!-- Info -->
           <div class="p-2.5 space-y-0.5">
@@ -292,7 +346,7 @@ const filters: { value: string; label: string }[] = [
           {#if detailMovie.needs_cleanup && config}
             {@const removeSubs = removableTracks(detailMovie.subtitles)}
             {@const keepSubs = keptTracks(detailMovie.subtitles)}
-            {@const removeAudio = removableTracks(detailMovie.audio_languages)}
+            {@const removeAudio = removableTracks(detailMovie.audio_languages, detailMovie.is_anime)}
             {@const keepAudio = keptTracks(detailMovie.audio_languages)}
 
             {#if removeSubs.length > 0}
@@ -339,6 +393,12 @@ const filters: { value: string; label: string }[] = [
 
         <div class="modal-action">
           <button
+            class="btn btn-ghost btn-sm"
+            onclick={() => { analyzePath = detailMovie!.path; }}
+          >
+            Analyze
+          </button>
+          <button
             class="btn btn-primary btn-sm"
             onclick={() => { queueMovie(detailMovie!); detailMovie = null; }}
             disabled={queueing[detailMovie.id]}
@@ -364,8 +424,20 @@ const filters: { value: string; label: string }[] = [
             <div class="text-base-content/40">Subtitles: {trackSummary(detailMovie.subtitles)}</div>
           {/if}
         </div>
+        <div class="modal-action">
+          <button
+            class="btn btn-ghost btn-sm"
+            onclick={() => { analyzePath = detailMovie!.path; }}
+          >
+            Analyze
+          </button>
+        </div>
       {/if}
     </div>
     <div class="modal-backdrop" onclick={() => (detailMovie = null)}></div>
   </div>
+{/if}
+
+{#if analyzePath}
+  <AnalyzeModal path={analyzePath} onclose={() => (analyzePath = null)} />
 {/if}

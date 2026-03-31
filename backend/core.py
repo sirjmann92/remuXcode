@@ -370,8 +370,6 @@ class JobQueue:
                 logger.info("Job %s was cancelled during processing", job_id)
                 return
             job.result = result
-            job.status = JobStatus.COMPLETED
-            logger.info("Job %s completed successfully", job_id)
 
             any_success = (
                 (result.get("audio") and result["audio"].get("success"))
@@ -383,6 +381,9 @@ class JobQueue:
                     trigger_rename(job.file_path)
                 except Exception as rename_err:
                     logger.warning("Rename trigger failed (job still completed): %s", rename_err)
+
+            job.status = JobStatus.COMPLETED
+            logger.info("Job %s completed successfully", job_id)
         except Exception as e:
             job.error = str(e)
             job.status = JobStatus.FAILED
@@ -456,6 +457,9 @@ def process_file(
     do_video = job_type in (JobType.VIDEO, JobType.FULL)
     do_cleanup = job_type in (JobType.CLEANUP, JobType.FULL)
 
+    # Detect content type once for use by cleanup (anime dual-audio logic)
+    file_is_anime = bool(anime_detector and anime_detector.is_anime(file_path))
+
     # Pre-determine which phases will actually run so we can divide progress equally.
     will_audio = (
         do_audio and audio_converter is not None and audio_converter.should_convert(file_path)
@@ -464,7 +468,9 @@ def process_file(
         do_video and video_converter is not None and video_converter.should_convert(file_path)
     )
     will_cleanup = (
-        do_cleanup and stream_cleanup is not None and stream_cleanup.should_cleanup(file_path)
+        do_cleanup
+        and stream_cleanup is not None
+        and stream_cleanup.should_cleanup(file_path, is_anime=file_is_anime)
     )
 
     active_phases = [p for p in (will_audio, will_video, will_cleanup) if p]
@@ -521,7 +527,10 @@ def process_file(
         logger.info("Cleaning streams: %s", Path(file_path).name)
         assert stream_cleanup is not None
         cleanup_result = stream_cleanup.cleanup(
-            file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
+            file_path,
+            job_id=job_id,
+            progress_callback=make_phase_cb(phase_idx),
+            is_anime=file_is_anime,
         )
         results["cleanup"] = {
             "success": cleanup_result.success,
@@ -558,9 +567,56 @@ def trigger_rename(file_path: str, media_type: str = "auto") -> None:
         logger.error("Failed to trigger rename: %s", e)
 
 
+def _get_radarr_config() -> tuple[str, str]:
+    """Return (url, api_key) for Radarr."""
+    url = os.getenv("RADARR_URL", config.radarr.url if config else "").rstrip("/")
+    key = os.getenv("RADARR_API_KEY", config.radarr.api_key if config else "")
+    return url, key
+
+
+def _get_sonarr_config() -> tuple[str, str]:
+    """Return (url, api_key) for Sonarr."""
+    url = os.getenv("SONARR_URL", config.sonarr.url if config else "").rstrip("/")
+    key = os.getenv("SONARR_API_KEY", config.sonarr.api_key if config else "")
+    return url, key
+
+
+def refresh_radarr() -> None:
+    """Trigger a full Radarr library refresh (all movies)."""
+    radarr_url, radarr_key = _get_radarr_config()
+    if not radarr_url or not radarr_key:
+        raise RuntimeError("Radarr not configured")
+    resp = requests.post(
+        f"{radarr_url}/api/v3/command",
+        headers={"X-Api-Key": radarr_key},
+        json={"name": "RefreshMovie"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    cmd_id = resp.json().get("id")
+    logger.info("Triggered full Radarr library refresh")
+    _poll_command(radarr_url, radarr_key, cmd_id, "Radarr library refresh", max_wait=120)
+
+
+def refresh_sonarr() -> None:
+    """Trigger a full Sonarr library refresh (all series)."""
+    sonarr_url, sonarr_key = _get_sonarr_config()
+    if not sonarr_url or not sonarr_key:
+        raise RuntimeError("Sonarr not configured")
+    resp = requests.post(
+        f"{sonarr_url}/api/v3/command",
+        headers={"X-Api-Key": sonarr_key},
+        json={"name": "RefreshSeries"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    cmd_id = resp.json().get("id")
+    logger.info("Triggered full Sonarr library refresh")
+    _poll_command(sonarr_url, sonarr_key, cmd_id, "Sonarr library refresh", max_wait=120)
+
+
 def _trigger_radarr_rename(file_path: str) -> None:
-    radarr_url = os.getenv("RADARR_URL", config.radarr.url if config else "").rstrip("/")
-    radarr_key = os.getenv("RADARR_API_KEY", config.radarr.api_key if config else "")
+    radarr_url, radarr_key = _get_radarr_config()
 
     if not radarr_url or not radarr_key:
         logger.warning("Radarr not configured, skipping rename")
@@ -574,10 +630,10 @@ def _trigger_radarr_rename(file_path: str) -> None:
     response.raise_for_status()
 
     movie_id = None
-    file_path_obj = Path(file_path).resolve()
+    file_path_obj = Path(file_path)
     for movie in response.json():
         movie_folder = Path(movie.get("path", "")).name
-        if movie_folder in file_path_obj.parts:
+        if movie_folder and movie_folder in file_path_obj.parts:
             movie_id = movie["id"]
             logger.info("Triggering Radarr refresh/rename for: %s", movie.get("title"))
             break
@@ -586,7 +642,7 @@ def _trigger_radarr_rename(file_path: str) -> None:
         logger.warning("Movie not found in Radarr for path: %s", file_path)
         return
 
-    # Refresh
+    # Refresh — forces Radarr to re-read mediainfo from disk
     resp = requests.post(
         f"{radarr_url}/api/v3/command",
         headers={"X-Api-Key": radarr_key},
@@ -612,22 +668,24 @@ def _trigger_radarr_rename(file_path: str) -> None:
                 movie_file_id = mf.get("id")
                 break
 
-    # Rename
+    # Rename — poll to completion before returning
     rename_payload: dict[str, Any] = {"name": "RenameMovie", "movieIds": [movie_id]}
     if movie_file_id:
         rename_payload["movieFileIds"] = [movie_file_id]
-    requests.post(
+    resp = requests.post(
         f"{radarr_url}/api/v3/command",
         headers={"X-Api-Key": radarr_key},
         json=rename_payload,
         timeout=30,
     )
-    logger.info("Radarr rename triggered successfully")
+    resp.raise_for_status()
+    rename_cmd_id = resp.json().get("id")
+    _poll_command(radarr_url, radarr_key, rename_cmd_id, "Radarr rename")
+    logger.info("Radarr rename completed for movie ID %s", movie_id)
 
 
 def _trigger_sonarr_rename(file_path: str) -> None:
-    sonarr_url = os.getenv("SONARR_URL", config.sonarr.url if config else "").rstrip("/")
-    sonarr_key = os.getenv("SONARR_API_KEY", config.sonarr.api_key if config else "")
+    sonarr_url, sonarr_key = _get_sonarr_config()
 
     if not sonarr_url or not sonarr_key:
         logger.warning("Sonarr not configured, skipping rename")
@@ -641,12 +699,10 @@ def _trigger_sonarr_rename(file_path: str) -> None:
     response.raise_for_status()
 
     series_id = None
-    file_path_obj = Path(file_path).resolve()
+    file_path_obj = Path(file_path)
     for series in response.json():
         series_folder = Path(series.get("path", "")).name
-        if series_folder in file_path_obj.parts and any(
-            "Season" in part for part in file_path_obj.parts
-        ):
+        if series_folder and series_folder in file_path_obj.parts:
             series_id = series["id"]
             logger.info("Triggering Sonarr refresh/rename for: %s", series.get("title"))
             break
@@ -655,7 +711,20 @@ def _trigger_sonarr_rename(file_path: str) -> None:
         logger.warning("Series not found in Sonarr for path: %s", file_path)
         return
 
-    # Rescan
+    # RefreshSeries — forces full metadata re-read including mediainfo
+    # (RescanSeries only detects new/removed files, not content changes)
+    resp = requests.post(
+        f"{sonarr_url}/api/v3/command",
+        headers={"X-Api-Key": sonarr_key},
+        json={"name": "RefreshSeries", "seriesId": series_id},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    cmd_id = resp.json().get("id")
+    logger.info("Triggered Sonarr refresh for series ID %s", series_id)
+    _poll_command(sonarr_url, sonarr_key, cmd_id, "Sonarr refresh")
+
+    # RescanSeries — picks up file changes on disk after refresh
     resp = requests.post(
         f"{sonarr_url}/api/v3/command",
         headers={"X-Api-Key": sonarr_key},
@@ -681,22 +750,26 @@ def _trigger_sonarr_rename(file_path: str) -> None:
                 episode_file_id = ef.get("id")
                 break
 
-    # Rename
+    # Rename — poll to completion before returning
     rename_payload: dict[str, Any] = {"name": "RenameFiles", "seriesId": series_id}
     if episode_file_id:
         rename_payload["files"] = [episode_file_id]
-    requests.post(
+    resp = requests.post(
         f"{sonarr_url}/api/v3/command",
         headers={"X-Api-Key": sonarr_key},
         json=rename_payload,
         timeout=30,
     )
-    logger.info("Sonarr rename triggered successfully")
+    resp.raise_for_status()
+    rename_cmd_id = resp.json().get("id")
+    _poll_command(sonarr_url, sonarr_key, rename_cmd_id, "Sonarr rename")
+    logger.info("Sonarr rename completed for series ID %s", series_id)
 
 
-def _poll_command(base_url: str, api_key: str, command_id: int, label: str) -> None:
+def _poll_command(
+    base_url: str, api_key: str, command_id: int, label: str, max_wait: int = 60
+) -> None:
     """Poll a Sonarr/Radarr command until completion."""
-    max_wait = 30
     waited = 0
     while waited < max_wait:
         time.sleep(2)

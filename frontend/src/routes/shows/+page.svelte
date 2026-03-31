@@ -1,6 +1,7 @@
 <script lang="ts">
-import { convertFile, getConfig, getSeries, getSeriesDetail } from '$lib/api';
-import type { BrowseSeries, ConfigSummary, EpisodeFile, Season, SeriesDetail } from '$lib/types';
+import { convertFile, getActiveJobs, getConfig, getSeries, getSeriesDetail } from '$lib/api';
+import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
+import type { ActiveJobsMap, BrowseSeries, ConfigSummary, EpisodeFile, Season, SeriesDetail } from '$lib/types';
 
 let seriesList: BrowseSeries[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -14,6 +15,44 @@ let selectedSeries: SeriesDetail | null = $state(null);
 let detailLoading = $state(false);
 let expandedSeasons: Record<number, boolean> = $state({});
 let queueing: Record<string, boolean> = $state({});
+let analyzePath: string | null = $state(null);
+let activeJobs: ActiveJobsMap = $state({});
+let prevActiveKeys: Set<string> = new Set();
+let jobPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startJobPolling() {
+  if (jobPollTimer) return;
+  refreshActiveJobs();
+  jobPollTimer = setInterval(refreshActiveJobs, 3000);
+}
+
+async function refreshActiveJobs() {
+  try {
+    const next = await getActiveJobs();
+    const nextKeys = new Set(Object.keys(next));
+    const finished = [...prevActiveKeys].some((k) => !nextKeys.has(k));
+    prevActiveKeys = nextKeys;
+    activeJobs = next;
+    if (finished) {
+      // Refresh list data; if viewing a series detail, refresh that too
+      fetchSeries();
+      if (selectedSeries) {
+        try {
+          selectedSeries = await getSeriesDetail(selectedSeries.id);
+        } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+function getJobStatus(path: string) {
+  return activeJobs[path] ?? null;
+}
+
+$effect(() => {
+  startJobPolling();
+  return () => { if (jobPollTimer) clearInterval(jobPollTimer); };
+});
 
 const filtered = $derived.by(() => {
   if (!search) return seriesList;
@@ -147,10 +186,17 @@ function langName(code: string): string {
   return langNames[code.toLowerCase()] ?? code.toUpperCase();
 }
 
-function removableTracks(tracks: string[]): string[] {
+function removableTracks(tracks: string[], isAnimeAudio?: boolean): string[] {
   if (!config) return [];
+  if (isAnimeAudio && config.cleanup.anime_keep_original_audio) return [];
   const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
   return tracks.filter((t) => !keep.has(t.toLowerCase()));
+}
+
+function keptTracks(tracks: string[]): string[] {
+  if (!config) return [];
+  const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
+  return tracks.filter((t) => keep.has(t.toLowerCase()));
 }
 
 function trackSummary(tracks: string[]): string {
@@ -314,20 +360,59 @@ const filters: { value: string; label: string }[] = [
                       <span class="badge badge-info badge-xs">Cleanup</span>
                     {/if}
                   </div>
-                  {#if ep.needs_cleanup && config}
+                  <!-- Language details -->
+                  {#if (ep.audio_languages.length > 0 || ep.subtitles.length > 0) && config}
+                    {@const isAnime = selectedSeries?.is_anime}
                     {@const removeSubs = removableTracks(ep.subtitles)}
-                    {@const removeAudio = removableTracks(ep.audio_languages)}
-                    {#if removeSubs.length > 0 || removeAudio.length > 0}
-                      <p class="text-xs text-base-content/40 mt-0.5">
-                        {#if removeSubs.length > 0}Subs to remove: {trackSummary(removeSubs)}{/if}
-                        {#if removeSubs.length > 0 && removeAudio.length > 0} · {/if}
-                        {#if removeAudio.length > 0}Audio to remove: {trackSummary(removeAudio)}{/if}
-                      </p>
-                    {/if}
+                    {@const keepSubs = keptTracks(ep.subtitles)}
+                    {@const removeAudio = removableTracks(ep.audio_languages, isAnime)}
+                    {@const keepAudio = keptTracks(ep.audio_languages)}
+                    <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      {#if ep.audio_languages.length > 0}
+                        <span class="text-xs text-base-content/30">
+                          Audio:
+                          {#if keepAudio.length > 0}<span class="text-success/70">{trackSummary(keepAudio)}</span>{/if}
+                          {#if keepAudio.length > 0 && removeAudio.length > 0}<span class="text-base-content/20"> · </span>{/if}
+                          {#if removeAudio.length > 0}<span class="text-error/60 line-through">{trackSummary(removeAudio)}</span>{/if}
+                          {#if isAnime && config.cleanup.anime_keep_original_audio && keepAudio.length === 0 && ep.audio_languages.length > 0}
+                            <span class="text-success/70">{trackSummary(ep.audio_languages)}</span>
+                          {/if}
+                        </span>
+                      {/if}
+                      {#if ep.subtitles.length > 0}
+                        <span class="text-xs text-base-content/30">
+                          Subs:
+                          {#if keepSubs.length > 0}<span class="text-success/70">{trackSummary(keepSubs)}</span>{/if}
+                          {#if keepSubs.length > 0 && removeSubs.length > 0}<span class="text-base-content/20"> · </span>{/if}
+                          {#if removeSubs.length > 0}<span class="text-error/60 line-through">{trackSummary(removeSubs)}</span>{/if}
+                        </span>
+                      {/if}
+                    </div>
                   {/if}
                 </div>
                 <!-- Size -->
                 <span class="text-xs text-base-content/30 shrink-0">{formatSize(ep.size)}</span>
+                <!-- Job status -->
+                {#if getJobStatus(ep.path)}
+                  {@const job = getJobStatus(ep.path)!}
+                  <span class="flex items-center gap-1 shrink-0">
+                    <span class="loading loading-spinner loading-xs text-primary"></span>
+                    <span class="text-xs capitalize text-primary">{job.status}</span>
+                    {#if job.status === 'running' && job.progress > 0}
+                      <span class="text-xs text-base-content/40">{Math.round(job.progress)}%</span>
+                    {/if}
+                  </span>
+                {/if}
+                <!-- Analyze button -->
+                <button
+                  class="btn btn-ghost btn-xs shrink-0"
+                  title="Analyze file"
+                  onclick={(e) => { e.stopPropagation(); analyzePath = ep.path; }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                  </svg>
+                </button>
                 <!-- Queue button -->
                 {#if episodeNeedsWork(ep)}
                   <button
@@ -453,4 +538,8 @@ const filters: { value: string; label: string }[] = [
       </div>
     {/if}
   </div>
+{/if}
+
+{#if analyzePath}
+  <AnalyzeModal path={analyzePath} onclose={() => (analyzePath = null)} />
 {/if}
