@@ -129,6 +129,7 @@ class StreamCleanup:
             job_id: Unique job ID for temp directory
             force_original_language: Override language detection
             progress_callback: Optional callback receiving progress 0-100.
+            is_anime: Whether the content is anime (affects audio language keep logic).
 
         Returns:
             CleanupResult with details of streams removed

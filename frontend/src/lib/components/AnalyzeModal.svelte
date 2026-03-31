@@ -18,9 +18,15 @@ $effect(() => {
   loading = true;
   error = '';
   analyzeFile(path)
-    .then((r) => { result = r; })
-    .catch((e) => { error = e.message || 'Analysis failed'; })
-    .finally(() => { loading = false; });
+    .then((r) => {
+      result = r;
+    })
+    .catch((e) => {
+      error = e.message || 'Analysis failed';
+    })
+    .finally(() => {
+      loading = false;
+    });
 });
 
 function formatDuration(seconds: number): string {
@@ -50,7 +56,7 @@ function formatFrameRate(rate: string): string {
   if (!rate || rate === '0/1') return '—';
   const parts = rate.split('/');
   if (parts.length === 2) {
-    const fps = parseInt(parts[0]) / parseInt(parts[1]);
+    const fps = parseInt(parts[0], 10) / parseInt(parts[1], 10);
     return `${fps.toFixed(3)} fps`;
   }
   return rate;
@@ -63,11 +69,28 @@ function channelLabel(ch: number, layout: string | null): string {
 }
 
 const langNames: Record<string, string> = {
-  eng: 'English', fre: 'French', spa: 'Spanish', ger: 'German', ita: 'Italian',
-  por: 'Portuguese', rus: 'Russian', chi: 'Chinese', jpn: 'Japanese', kor: 'Korean',
-  ara: 'Arabic', dut: 'Dutch', dan: 'Danish', fin: 'Finnish', nor: 'Norwegian',
-  swe: 'Swedish', pol: 'Polish', cze: 'Czech', hun: 'Hungarian', tur: 'Turkish',
-  hin: 'Hindi', tha: 'Thai',
+  eng: 'English',
+  fre: 'French',
+  spa: 'Spanish',
+  ger: 'German',
+  ita: 'Italian',
+  por: 'Portuguese',
+  rus: 'Russian',
+  chi: 'Chinese',
+  jpn: 'Japanese',
+  kor: 'Korean',
+  ara: 'Arabic',
+  dut: 'Dutch',
+  dan: 'Danish',
+  fin: 'Finnish',
+  nor: 'Norwegian',
+  swe: 'Swedish',
+  pol: 'Polish',
+  cze: 'Czech',
+  hun: 'Hungarian',
+  tur: 'Turkish',
+  hin: 'Hindi',
+  tha: 'Thai',
 };
 
 function langLabel(code: string | null): string {

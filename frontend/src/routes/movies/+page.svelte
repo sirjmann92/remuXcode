@@ -31,7 +31,9 @@ async function refreshActiveJobs() {
     prevActiveKeys = nextKeys;
     activeJobs = next;
     if (finished) fetchMovies();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function getJobStatus(path: string) {
@@ -40,7 +42,9 @@ function getJobStatus(path: string) {
 
 $effect(() => {
   startJobPolling();
-  return () => { if (jobPollTimer) clearInterval(jobPollTimer); };
+  return () => {
+    if (jobPollTimer) clearInterval(jobPollTimer);
+  };
 });
 
 const filtered = $derived.by(() => {

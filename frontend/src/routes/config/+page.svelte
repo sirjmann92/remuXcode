@@ -1,5 +1,5 @@
 <script lang="ts">
-import { getConfig, regenerateApiKey, refreshSonarr, refreshRadarr } from '$lib/api';
+import { getConfig, refreshRadarr, refreshSonarr, regenerateApiKey } from '$lib/api';
 import type { ConfigSummary } from '$lib/types';
 
 let config: ConfigSummary | null = $state(null);
@@ -52,31 +52,31 @@ $effect(() => {
   fetchConfig();
 });
 
-  async function handleRefreshSonarr() {
-    refreshingSonarr = true;
-    refreshMsg = '';
-    try {
-      const res = await refreshSonarr();
-      refreshMsg = res.message;
-    } catch (e) {
-      refreshMsg = e instanceof Error ? e.message : 'Sonarr refresh failed';
-    } finally {
-      refreshingSonarr = false;
-    }
+async function handleRefreshSonarr() {
+  refreshingSonarr = true;
+  refreshMsg = '';
+  try {
+    const res = await refreshSonarr();
+    refreshMsg = res.message;
+  } catch (e) {
+    refreshMsg = e instanceof Error ? e.message : 'Sonarr refresh failed';
+  } finally {
+    refreshingSonarr = false;
   }
+}
 
-  async function handleRefreshRadarr() {
-    refreshingRadarr = true;
-    refreshMsg = '';
-    try {
-      const res = await refreshRadarr();
-      refreshMsg = res.message;
-    } catch (e) {
-      refreshMsg = e instanceof Error ? e.message : 'Radarr refresh failed';
-    } finally {
-      refreshingRadarr = false;
-    }
+async function handleRefreshRadarr() {
+  refreshingRadarr = true;
+  refreshMsg = '';
+  try {
+    const res = await refreshRadarr();
+    refreshMsg = res.message;
+  } catch (e) {
+    refreshMsg = e instanceof Error ? e.message : 'Radarr refresh failed';
+  } finally {
+    refreshingRadarr = false;
   }
+}
 
 function boolBadge(val: boolean): string {
   return val ? 'badge-success' : 'badge-ghost';
