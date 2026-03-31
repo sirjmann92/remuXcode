@@ -266,11 +266,14 @@ services:
 
 #### 2.2: Frontend UI
 - [x] SvelteKit project setup
-- [x] Dashboard layout
-- [x] Queue management interface
+- [x] Dashboard layout with real-time job status
+- [x] Queue management interface with detailed processing results
 - [x] Settings configuration page
 - [x] Real-time progress updates
 - [x] Responsive design
+- [x] **Library Browse: Movies** — poster grid, detail modal with track removal preview, config-aware filters (Audio, Cleanup, Anime)
+- [x] **Library Browse: Shows** — series list with drill-down to seasons/episodes, inline cleanup detail
+- [x] **Detection Accuracy** — EAC3 Atmos vs TrueHD distinction, slash-separated mediaInfo parsing, genre-based anime detection
 
 #### 2.3: Docker Integration
 - [x] Multi-stage Dockerfile (frontend build + Python backend)

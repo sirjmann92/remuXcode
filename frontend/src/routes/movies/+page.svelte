@@ -210,20 +210,22 @@ const filters: { value: string; label: string }[] = [
               loading="lazy"
               onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
-            <!-- Warning badges -->
-            <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
-              {#if movie.needs_audio_conversion}
-                <span class="badge badge-warning badge-xs">Audio</span>
-              {/if}
-              {#if movie.needs_cleanup}
-                <span class="badge badge-info badge-xs">Cleanup</span>
-              {/if}
-            </div>
-            {#if movie.is_anime}
-              <div class="absolute top-1.5 left-1.5">
-                <span class="badge badge-secondary badge-xs">Anime</span>
+            <!-- Badges -->
+            <div class="absolute top-2 left-2 right-2 flex justify-between items-start pointer-events-none">
+              <div class="flex flex-col gap-1 items-start">
+                {#if movie.is_anime}
+                  <span class="badge badge-secondary badge-xs">Anime</span>
+                {/if}
               </div>
-            {/if}
+              <div class="flex flex-col gap-1 items-end">
+                {#if movie.needs_audio_conversion}
+                  <span class="badge badge-warning badge-xs">Audio</span>
+                {/if}
+                {#if movie.needs_cleanup}
+                  <span class="badge badge-info badge-xs">Cleanup</span>
+                {/if}
+              </div>
+            </div>
           </div>
           <!-- Info -->
           <div class="p-2.5 space-y-0.5">
