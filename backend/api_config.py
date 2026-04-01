@@ -1,7 +1,6 @@
 """Configuration API routes - view and update settings."""
 
 import logging
-import os
 import re
 from typing import Any, Literal
 
@@ -77,20 +76,14 @@ async def get_config_summary() -> dict[str, Any]:
             "keep_sdh": cfg.cleanup.keep_sdh,
         },
         "sonarr": {
-            "configured": bool(
-                os.getenv("SONARR_URL", cfg.sonarr.url)
-                and os.getenv("SONARR_API_KEY", cfg.sonarr.api_key)
-            ),
-            "url": os.getenv("SONARR_URL", cfg.sonarr.url),
-            "api_key": os.getenv("SONARR_API_KEY", cfg.sonarr.api_key),
+            "configured": bool(cfg.sonarr.url and cfg.sonarr.api_key),
+            "url": cfg.sonarr.url,
+            "api_key": cfg.sonarr.api_key,
         },
         "radarr": {
-            "configured": bool(
-                os.getenv("RADARR_URL", cfg.radarr.url)
-                and os.getenv("RADARR_API_KEY", cfg.radarr.api_key)
-            ),
-            "url": os.getenv("RADARR_URL", cfg.radarr.url),
-            "api_key": os.getenv("RADARR_API_KEY", cfg.radarr.api_key),
+            "configured": bool(cfg.radarr.url and cfg.radarr.api_key),
+            "url": cfg.radarr.url,
+            "api_key": cfg.radarr.api_key,
         },
         "path_mappings": [{"container": c, "host": h} for c, h in core.PATH_MAPPINGS],
         "workers": cfg.workers,
@@ -271,5 +264,9 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
     except Exception as e:
         logger.error("Failed to save config: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to persist config: {e}") from e
+
+    # Update detector instances with new Sonarr/Radarr config
+    if body.sonarr or body.radarr:
+        core.update_integration_config()
 
     return {"message": "Configuration updated"}

@@ -154,7 +154,11 @@ class Config:
             path = Path(provided_path)
             if path.exists():
                 return path
-            logger.warning("Provided config path not found: %s", provided_path)
+            # File doesn't exist yet — keep the path so save() can create it
+            logger.info(
+                "Config not found at %s — using defaults (created on first save)", provided_path
+            )
+            return path
 
         for path in DEFAULT_CONFIG_PATHS:
             if path.exists():
@@ -166,7 +170,7 @@ class Config:
 
     def _load_config(self) -> None:
         """Load configuration from YAML file."""
-        if self.config_path is None:
+        if self.config_path is None or not self.config_path.exists():
             self._raw_config = {}
             return
 
@@ -292,7 +296,7 @@ class Config:
         return SonarrConfig(
             enabled=self._get("sonarr.enabled", True),
             url=self._get("sonarr.url", "http://localhost:8989"),
-            api_key=self._get("sonarr.api_key", os.getenv("SONARR_API_KEY", "")),
+            api_key=self._get("sonarr.api_key", ""),
         )
 
     def _parse_radarr_config(self) -> RadarrConfig:
@@ -300,7 +304,7 @@ class Config:
         return RadarrConfig(
             enabled=self._get("radarr.enabled", True),
             url=self._get("radarr.url", "http://localhost:7878"),
-            api_key=self._get("radarr.api_key", os.getenv("RADARR_API_KEY", "")),
+            api_key=self._get("radarr.api_key", ""),
         )
 
     def reload(self) -> None:
@@ -317,6 +321,8 @@ class Config:
         """Persist current in-memory config back to the YAML file."""
         if not self.config_path:
             raise RuntimeError("No config file path available")
+
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Merge updated sections into raw config
         self._raw_config.setdefault("audio", {})

@@ -405,6 +405,10 @@ class JobQueue:
             job.completed_at = time.time()
             if self.job_store:
                 self._save_job_to_store(job)
+            # Invalidate browse cache so next request fetches fresh data
+            from backend.api_browse import invalidate_cache
+
+            invalidate_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -590,15 +594,15 @@ def trigger_rename(file_path: str, media_type: str = "auto") -> None:
 
 def _get_radarr_config() -> tuple[str, str]:
     """Return (url, api_key) for Radarr."""
-    url = os.getenv("RADARR_URL", config.radarr.url if config else "").rstrip("/")
-    key = os.getenv("RADARR_API_KEY", config.radarr.api_key if config else "")
+    url = (config.radarr.url if config else "").rstrip("/")
+    key = config.radarr.api_key if config else ""
     return url, key
 
 
 def _get_sonarr_config() -> tuple[str, str]:
     """Return (url, api_key) for Sonarr."""
-    url = os.getenv("SONARR_URL", config.sonarr.url if config else "").rstrip("/")
-    key = os.getenv("SONARR_API_KEY", config.sonarr.api_key if config else "")
+    url = (config.sonarr.url if config else "").rstrip("/")
+    key = config.sonarr.api_key if config else ""
     return url, key
 
 
@@ -838,17 +842,18 @@ def create_job(file_path: str, job_type: JobType, source: str = "api") -> Conver
 
 def _ensure_api_key() -> str:
     """Return the configured API key, generating one if needed."""
-    key = os.getenv(
-        "REMUXCODE_API_KEY",
-        os.getenv("MEDIA_API_KEY", os.getenv("DTS_WEBHOOK_API_KEY", "")),
-    ).strip()
-    if key:
-        return key
+    config_dir = Path(CONFIG_PATH).parent
+    key_file = config_dir / ".api_key"
+
+    # Read existing key from file
+    if key_file.is_file():
+        key = key_file.read_text().strip()
+        if key:
+            return key
 
     # Auto-generate a key and persist to config directory
+    config_dir.mkdir(parents=True, exist_ok=True)
     key = uuid.uuid4().hex + uuid.uuid4().hex  # 64-char hex key
-    config_dir = Path(os.getenv("REMUXCODE_CONFIG_PATH", CONFIG_PATH)).parent
-    key_file = config_dir / ".api_key"
     try:
         key_file.write_text(key)
         key_file.chmod(0o600)
@@ -860,7 +865,6 @@ def _ensure_api_key() -> str:
     logger.info("  API Key: %s", key)
     logger.info("  Paste this into the Config page of the web UI.")
     logger.info("  For webhooks, set X-API-Key header to this value.")
-    logger.info("  To set your own, use the REMUXCODE_API_KEY env var.")
     logger.info("=" * 60)
     return key
 
@@ -879,16 +883,16 @@ def initialize_components() -> None:
 
     ffprobe = FFProbe()
     anime_detector = AnimeDetector(
-        sonarr_url=os.getenv("SONARR_URL", config.sonarr.url),
-        sonarr_api_key=os.getenv("SONARR_API_KEY", config.sonarr.api_key),
-        radarr_url=os.getenv("RADARR_URL", config.radarr.url),
-        radarr_api_key=os.getenv("RADARR_API_KEY", config.radarr.api_key),
+        sonarr_url=config.sonarr.url,
+        sonarr_api_key=config.sonarr.api_key,
+        radarr_url=config.radarr.url,
+        radarr_api_key=config.radarr.api_key,
     )
     language_detector = LanguageDetector(
-        sonarr_url=os.getenv("SONARR_URL", config.sonarr.url),
-        sonarr_api_key=os.getenv("SONARR_API_KEY", config.sonarr.api_key),
-        radarr_url=os.getenv("RADARR_URL", config.radarr.url),
-        radarr_api_key=os.getenv("RADARR_API_KEY", config.radarr.api_key),
+        sonarr_url=config.sonarr.url,
+        sonarr_api_key=config.sonarr.api_key,
+        radarr_url=config.radarr.url,
+        radarr_api_key=config.radarr.api_key,
     )
 
     audio_converter = AudioConverter(
@@ -943,6 +947,22 @@ def shutdown_components() -> None:
     """Gracefully stop workers."""
     if job_queue:
         job_queue.stop()
+
+
+def update_integration_config() -> None:
+    """Update detector instances with current Sonarr/Radarr config after settings change."""
+    if not config:
+        return
+    if anime_detector:
+        anime_detector.sonarr_url = config.sonarr.url.rstrip("/")
+        anime_detector.sonarr_api_key = config.sonarr.api_key
+        anime_detector.radarr_url = config.radarr.url.rstrip("/")
+        anime_detector.radarr_api_key = config.radarr.api_key
+    if language_detector:
+        language_detector.sonarr_url = config.sonarr.url.rstrip("/")
+        language_detector.sonarr_api_key = config.sonarr.api_key
+        language_detector.radarr_url = config.radarr.url.rstrip("/")
+        language_detector.radarr_api_key = config.radarr.api_key
 
 
 def cleanup_temp_dirs() -> None:

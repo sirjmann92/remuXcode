@@ -3,6 +3,12 @@ import { convertFile, getActiveJobs, getConfig, getMovies, refreshRadarr } from 
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
 import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
 import { langName } from '$lib/languages';
+import {
+  deduplicatedMoviesFetch,
+  getCachedMovies,
+  invalidateMovies,
+  setCachedMovies,
+} from '$lib/stores';
 import type { ActiveJobsMap, BrowseMovie, ConfigSummary } from '$lib/types';
 
 let movies: BrowseMovie[] = $state([]);
@@ -22,6 +28,7 @@ let activeJobs: ActiveJobsMap = $state({});
 let showRefreshConfirm = $state(false);
 let refreshingLibrary = $state(false);
 let refreshMsg = $state('');
+let reloading = $state(false);
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -39,7 +46,10 @@ async function refreshActiveJobs() {
     const finished = [...prevActiveKeys].some((k) => !nextKeys.has(k));
     prevActiveKeys = nextKeys;
     activeJobs = next;
-    if (finished) fetchMovies();
+    if (finished) {
+      invalidateMovies();
+      fetchMovies(); // Background refresh — stale data stays visible
+    }
   } catch {
     /* ignore */
   }
@@ -58,6 +68,27 @@ $effect(() => {
 
 const filtered = $derived.by(() => {
   let result = movies;
+
+  // Client-side filter
+  if (filter && filter !== 'any') {
+    result = result.filter((m) => {
+      switch (filter) {
+        case 'needs_conversion':
+          return m.needs_audio_conversion || m.needs_video_conversion || m.needs_cleanup;
+        case 'video':
+          return m.needs_video_conversion;
+        case 'audio':
+          return m.needs_audio_conversion;
+        case 'anime':
+          return m.is_anime;
+        case 'cleanup':
+          return m.needs_cleanup;
+        default:
+          return true;
+      }
+    });
+  }
+
   if (search) {
     const q = search.toLowerCase();
     result = result.filter(
@@ -92,15 +123,36 @@ const summary = $derived({
   ).length,
 });
 
-async function fetchMovies() {
+async function doFetchMovies() {
   try {
-    const res = await getMovies(undefined, filter);
+    const res = await getMovies();
     movies = res.movies;
+    setCachedMovies(res.movies);
     loadError = false;
   } catch {
-    loadError = true;
+    // Only show error if we have no data at all
+    if (movies.length === 0) loadError = true;
   } finally {
     loading = false;
+  }
+}
+
+function fetchMovies() {
+  deduplicatedMoviesFetch(doFetchMovies);
+}
+
+async function reloadMovies() {
+  reloading = true;
+  invalidateMovies();
+  try {
+    const res = await getMovies(undefined, undefined, true);
+    movies = res.movies;
+    setCachedMovies(res.movies);
+    loadError = false;
+  } catch {
+    if (movies.length === 0) loadError = true;
+  } finally {
+    reloading = false;
   }
 }
 
@@ -182,11 +234,15 @@ async function handleRefreshLibrary() {
   }
 }
 
-$effect(() => {
-  filter;
-  loading = true;
+// Stale-while-revalidate: show cached data instantly, refresh in background if stale
+const cached = getCachedMovies();
+if (cached) {
+  movies = cached.data;
+  loading = false;
+  if (!cached.fresh) fetchMovies(); // Background refresh
+} else {
   fetchMovies();
-});
+}
 
 getConfig()
   .then((c) => {
@@ -256,6 +312,19 @@ const sortOptions: { value: string; label: string }[] = [
       {#if refreshMsg}
         <span class="text-xs text-success">{refreshMsg}</span>
       {/if}
+      <button
+        class="btn btn-ghost btn-xs text-base-content/40"
+        onclick={reloadMovies}
+        disabled={reloading}
+        title="Clear cache and reload movie data from Radarr"
+      >
+        {#if reloading}
+          <span class="loading loading-spinner loading-xs"></span>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+        {/if}
+        Reload
+      </button>
       <button
         class="btn btn-ghost btn-xs text-base-content/40"
         onclick={() => (showRefreshConfirm = true)}
