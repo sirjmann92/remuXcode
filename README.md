@@ -4,7 +4,7 @@ A self-hosted media library maintenance tool that keeps your Plex/Jellyfin libra
 
 When Sonarr or Radarr imports a file, remuXcode receives a webhook, analyzes the media, and converts what needs fixing: DTS audio becomes AC3/AAC for broad device support, 10-bit H.264 anime gets re-encoded to HEVC or AV1, and unwanted language tracks are stripped out. Everything happens in the background with no manual intervention required.
 
-But not every file comes through Sonarr/Radarr. The built-in web UI lets you browse your entire library — movies and shows — with poster grids, filters, and per-file analysis. See exactly which files have incompatible audio, which anime needs encoding, and kick off conversions for individual files or entire series with a click. It's both a fire-and-forget automation layer and a hands-on library management tool.
+The application also supports manually updating and maintaining existing Sonarr/Radarr libraries. The built-in web UI lets you browse your entire library — movies and shows — with poster grids, filters, and per-file analysis. See exactly which files have incompatible audio, which anime needs encoding, and kick off conversions for individual files or entire series with a click. It's both a fire-and-forget automation layer and a hands-on library management tool.
 
 ## Features
 
@@ -30,26 +30,17 @@ But not every file comes through Sonarr/Radarr. The built-in web UI lets you bro
 
 ## Quick Start
 
-See [QUICKSTART.md](QUICKSTART.md) for step-by-step setup.
+**Preferred: Use the Prebuilt Image**
 
-### 1. Clone and configure
+The remuXcode image is published to Docker Hub and GitHub Container Registry. You do **not** need to build the image yourself unless you want to run the latest development version.
 
-```bash
-git clone https://github.com/sirjmann92/remuXcode.git
-cd remuXcode
-cp .env.example .env
-nano .env  # Set SONARR_URL, SONARR_API_KEY, RADARR_URL, RADARR_API_KEY
-```
-
-### 2. Create your `compose.yml`
-
-`compose.yml` is not included in the repo — create your own. Mount your media at the **same paths Sonarr/Radarr use internally** so webhook paths work without translation:
+### 1. Create your `compose.yml`
 
 ```yaml
 services:
   remuxcode:
     container_name: remuxcode
-    build: .
+    image: ghcr.io/sirjmann92/remuxcode:latest # or sirjmann92/remuxcode:latest
     ports:
       - "7889:7889"
     volumes:
@@ -66,25 +57,26 @@ services:
     restart: unless-stopped
 ```
 
-### 3. Start
+### 2. Start
 
 ```bash
+docker compose pull  # get the latest image
 docker compose up -d
 ```
 
 `config/config.yaml` is created automatically on first run. Edit it to tune encoding settings.
 
-### 4. Configure Sonarr/Radarr Webhook
+### 3. Configure Sonarr/Radarr Webhook
 
 **Sonarr** → Settings → Connect → Add Webhook:
 - **URL**: `http://YOUR_HOST_IP:7889/api/webhook`
-- **Triggers**: On Import Complete
-- **Headers**: `X-API-Key: <value from config/.api_key>`
+- **Triggers**: On Import Complete (Alternatively On File Import and/or On File Upgrade)
+- **Headers**: `X-API-Key: <API Key from remuXcode Config page>`
 
 **Radarr** → Settings → Connect → Add Webhook:
 - **URL**: `http://YOUR_HOST_IP:7889/api/webhook`
-- **Triggers**: On Import, On Upgrade
-- **Headers**: `X-API-Key: <value from config/.api_key>`
+- **Triggers**: On File Import, On File Upgrade
+- **Headers**: `X-API-Key: <API Key from remuXcode Config page>`
 
 > Sonarr's **On Import Complete** fires once after a full batch import (e.g. a whole season), sending all file paths together. Radarr uses the standard per-file events.
 
@@ -351,3 +343,40 @@ curl "http://localhost:7889/api/analyze?path=/share/your/file.mkv" \
 
 **"Failed to trigger rename"**
 - Verify Sonarr/Radarr URLs and API keys in `.env`
+
+---
+
+## Build from Source (Optional)
+
+If you want to run the latest development version or make local changes, you can build the image yourself:
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/sirjmann92/remuXcode.git
+cd remuXcode
+cp .env.example .env
+nano .env  # Set SONARR_URL, SONARR_API_KEY, RADARR_URL, RADARR_API_KEY
+```
+
+### 2. Create and update compose.yml
+Follow the instructions above to create your `compose.yml` file
+Replace
+```yaml
+image: ghcr.io/sirjmann92/remuxcode:latest
+```
+with
+```yaml
+build: .
+```
+
+### 3. Build and start
+
+```bash
+docker compose up -d --build
+```
+
+The rest of the setup (webhook, config, etc) is the same as above.
+
+---
+````
