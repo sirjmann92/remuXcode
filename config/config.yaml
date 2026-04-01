@@ -27,7 +27,7 @@ video:
 audio:
   enabled: true
   convert_dts: true
-  convert_truehd: false
+  convert_truehd: true
   keep_original: false
   prefer_ac3: true
   ac3_bitrate: 640
@@ -102,3 +102,5 @@ notifications:
     password: ''
     from_address: ''
     to_addresses: []
+general:
+  job_history_days: 30
