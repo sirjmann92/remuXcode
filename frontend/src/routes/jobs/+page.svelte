@@ -17,7 +17,20 @@ const filtered = $derived.by(() => {
     const q = search.toLowerCase();
     result = result.filter((j) => j.file_path.toLowerCase().includes(q));
   }
-  return result.toSorted((a, b) => b.created_at - a.created_at);
+  // Running jobs first, then pending, then the rest by creation time
+  const statusOrder: Record<string, number> = {
+    running: 0,
+    pending: 1,
+    completed: 2,
+    failed: 3,
+    cancelled: 4,
+  };
+  return result.toSorted((a, b) => {
+    const sa = statusOrder[a.status] ?? 9;
+    const sb = statusOrder[b.status] ?? 9;
+    if (sa !== sb) return sa - sb;
+    return b.created_at - a.created_at;
+  });
 });
 
 const counts = $derived({

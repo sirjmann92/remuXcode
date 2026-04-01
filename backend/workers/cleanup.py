@@ -75,6 +75,10 @@ class StreamCleanup:
         if not self.config.enabled:
             return False
 
+        # Skip non-anime content when anime_only is enabled
+        if self.config.anime_only and not is_anime:
+            return False
+
         info = self.ffprobe.get_file_info(file_path)
         if info is None:
             return False
