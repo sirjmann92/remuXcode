@@ -149,6 +149,7 @@ export interface BrowseMovie {
   poster: string;
   has_dts: boolean;
   has_truehd: boolean;
+  has_dts_x: boolean;
   video_codec: string;
   audio_codec: string;
   audio_channels: number | null;
@@ -159,6 +160,7 @@ export interface BrowseMovie {
   needs_audio_conversion?: boolean;
   needs_video_conversion?: boolean;
   is_anime?: boolean;
+  analyzed?: boolean;
   video?: { codec: string | null; bit_depth: number | null };
 }
 
@@ -189,6 +191,9 @@ export interface BrowseSeries {
   audio_convert_count?: number;
   video_convert_count?: number;
   cleanup_count?: number;
+  dts_x_count?: number;
+  audio_codecs: string[];
+  video_codecs: string[];
 }
 
 export interface SeriesResponse {
@@ -216,6 +221,8 @@ export interface EpisodeFile {
   needs_cleanup: boolean;
   has_dts: boolean;
   has_truehd: boolean;
+  has_dts_x?: boolean;
+  analyzed?: boolean;
   needs_audio_conversion?: boolean;
   needs_video_conversion?: boolean;
   is_anime?: boolean;
@@ -311,3 +318,19 @@ export interface ActiveJob {
 }
 
 export type ActiveJobsMap = Record<string, ActiveJob>;
+
+export interface ScanProgress {
+  running: boolean;
+  type: string | null;
+  total: number;
+  analyzed: number;
+  skipped: number;
+  failed: number;
+  current_file: string | null;
+}
+
+export interface AnalysisStats {
+  total_analyzed: number;
+  radarr_files: number;
+  sonarr_files: number;
+}

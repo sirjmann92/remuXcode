@@ -500,21 +500,18 @@ class StreamCleanup:
         if not lang or lang == "und":
             return True
 
-        # Keep if language matches
-        if lang in keep_languages:
-            return True
+        # Foreign language → always remove (commentary/AD titles don't override this)
+        if lang not in keep_languages:
+            return False
 
-        # Keep commentary tracks if configured
+        # Language matches — apply commentary/AD filters for kept-language tracks
         title_lower = (stream.title or "").lower()
-        if self.config.keep_commentary and "commentary" in title_lower:
-            return True
+        if "commentary" in title_lower:
+            return bool(self.config.keep_commentary)
+        if "description" in title_lower or "descriptive" in title_lower:
+            return bool(self.config.keep_audio_description)
 
-        # Keep audio description if configured
-        if self.config.keep_audio_description:
-            if "description" in title_lower or "descriptive" in title_lower:
-                return True
-
-        return False
+        return True
 
     def _should_keep_subtitle(self, stream: SubtitleStream, keep_languages: set[str]) -> bool:
         """Determine if a subtitle stream should be kept."""

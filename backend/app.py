@@ -6,6 +6,7 @@ FastAPI application serving the webhook API and SvelteKit frontend.
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 from typing import Any
@@ -54,12 +55,26 @@ def setup_logging() -> None:
     handlers: list[logging.Handler] = [logging.StreamHandler()]
 
     log_file = os.getenv("LOG_FILE", "/app/logs/remuxcode.log")
+    max_bytes = int(os.getenv("LOG_MAX_BYTES", str(10 * 1024 * 1024)))  # 10 MB
+    backup_count = int(os.getenv("LOG_BACKUP_COUNT", "5"))
     try:
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(log_file))
+        handlers.append(
+            RotatingFileHandler(
+                log_file,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+            )
+        )
     except (PermissionError, OSError):
         with suppress(PermissionError, OSError):
-            handlers.append(logging.FileHandler(Path("~/remuxcode.log").expanduser()))
+            handlers.append(
+                RotatingFileHandler(
+                    str(Path("~/remuxcode.log").expanduser()),
+                    maxBytes=max_bytes,
+                    backupCount=backup_count,
+                )
+            )
 
     log_filter = ShortLoggerFilter()
     for handler in handlers:
@@ -91,12 +106,14 @@ def create_app() -> FastAPI:
     )
 
     # Import and include API routers
+    from backend.api_analyze import router as analyze_router
     from backend.api_browse import router as browse_router
     from backend.api_config import router as config_router
     from backend.api_convert import router as convert_router
     from backend.api_jobs import router as jobs_router
     from backend.api_webhook import router as webhook_router
 
+    app.include_router(analyze_router, prefix="/api")
     app.include_router(browse_router, prefix="/api")
     app.include_router(config_router, prefix="/api")
     app.include_router(convert_router, prefix="/api")

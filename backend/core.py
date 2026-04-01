@@ -28,6 +28,7 @@ from backend.utils.config import Config, get_config
 from backend.utils.ffprobe import FFProbe
 from backend.utils.job_store import JobStore
 from backend.utils.language import LanguageDetector
+from backend.utils.media_store import MediaStore
 from backend.workers.audio import AudioConverter
 from backend.workers.cleanup import StreamCleanup
 from backend.workers.video import VideoConverter
@@ -391,6 +392,14 @@ class JobQueue:
                 except Exception as rename_err:
                     logger.warning("Rename trigger failed (job still completed): %s", rename_err)
 
+                # Auto-analyze the (potentially renamed) output file
+                try:
+                    from backend.api_analyze import analyze_and_store
+
+                    analyze_and_store(job.file_path)
+                except Exception as analyze_err:
+                    logger.debug("Post-job analysis skipped: %s", analyze_err)
+
             job.status = JobStatus.COMPLETED
             logger.info("Job %s completed successfully", job_id)
         except Exception as e:
@@ -418,6 +427,7 @@ class JobQueue:
 config: Config | None = None
 job_queue: JobQueue | None = None
 job_store: JobStore | None = None
+media_store: MediaStore | None = None
 ffprobe: FFProbe | None = None
 anime_detector: AnimeDetector | None = None
 language_detector: LanguageDetector | None = None
@@ -873,7 +883,7 @@ def _ensure_api_key() -> str:
 
 def initialize_components() -> None:
     """Initialize all converter components."""
-    global config, job_queue, job_store, ffprobe, anime_detector, language_detector
+    global config, job_queue, job_store, media_store, ffprobe, anime_detector, language_detector
     global audio_converter, video_converter, stream_cleanup, PATH_MAPPINGS, api_key
 
     logger.info("Initializing remuXcode components...")
@@ -917,6 +927,14 @@ def initialize_components() -> None:
 
     db_path = os.getenv("REMUXCODE_DB_PATH", str(Path(__file__).parent / "jobs.db"))
     job_store = JobStore(db_path=db_path)
+
+    # Media analysis cache (persistent ffprobe results) — same directory as jobs.db
+    media_db_default = str(Path(db_path).parent / "media.db")
+    media_db_path = os.getenv("REMUXCODE_MEDIA_DB_PATH", media_db_default)
+    media_store = MediaStore(db_path=media_db_path)
+
+    # Purge orphaned rows in background (stat-checking thousands of NAS files is slow)
+    threading.Thread(target=media_store.purge_missing, name="purge-missing", daemon=True).start()
 
     # Clean up old finished jobs on startup
     job_store.cleanup_old_jobs(days=config.job_history_days)

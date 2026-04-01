@@ -1,10 +1,12 @@
 import type {
   ActiveJobsMap,
+  AnalysisStats,
   AnalyzeResult,
   ConfigSummary,
   HealthStatus,
   Job,
   MoviesResponse,
+  ScanProgress,
   SeriesDetail,
   SeriesResponse,
 } from './types';
@@ -132,4 +134,25 @@ export async function refreshSonarr(): Promise<{ message: string }> {
 
 export async function refreshRadarr(): Promise<{ message: string }> {
   return request('/api/config/refresh/radarr', { method: 'POST' });
+}
+
+// Library analysis scan
+export async function startMovieScan(): Promise<{ message: string }> {
+  return request('/api/analyze/scan/movies', { method: 'POST' });
+}
+
+export async function startSeriesScan(): Promise<{ message: string }> {
+  return request('/api/analyze/scan/series', { method: 'POST' });
+}
+
+export async function getScanProgress(): Promise<ScanProgress> {
+  return request('/api/analyze/scan/progress');
+}
+
+export async function stopScan(): Promise<{ message: string }> {
+  return request('/api/analyze/scan/stop', { method: 'POST' });
+}
+
+export async function getAnalysisStats(): Promise<AnalysisStats> {
+  return request('/api/analyze/stats');
 }

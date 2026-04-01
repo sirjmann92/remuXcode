@@ -52,3 +52,4 @@ config/jobs.db
 frontend/node_modules/
 frontend/.svelte-kit/
 frontend/build/
+media.db

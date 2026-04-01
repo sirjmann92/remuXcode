@@ -1,5 +1,20 @@
 <script lang="ts">
-import { convertFile, getActiveJobs, getConfig, getMovies, refreshRadarr } from '$lib/api';
+import {
+  convertFile,
+  getActiveJobs,
+  getConfig,
+  getMovies,
+  getScanProgress,
+  refreshRadarr,
+  startMovieScan,
+  stopScan,
+} from '$lib/api';
+import {
+  audioCodecMatches,
+  buildAudioOptions,
+  buildVideoOptions,
+  videoCodecMatches,
+} from '$lib/codecs';
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
 import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
 import { langName } from '$lib/languages';
@@ -9,7 +24,7 @@ import {
   invalidateMovies,
   setCachedMovies,
 } from '$lib/stores';
-import type { ActiveJobsMap, BrowseMovie, ConfigSummary } from '$lib/types';
+import type { ActiveJobsMap, BrowseMovie, ConfigSummary, ScanProgress } from '$lib/types';
 
 let movies: BrowseMovie[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -17,6 +32,8 @@ let loading = $state(true);
 let loadError = $state(false);
 let search = $state('');
 let filter: string = $state('any');
+let audioFormat: string = $state('any');
+let videoFormat: string = $state('any');
 let sortBy: string = $state('needsWork');
 let queueing: Record<number, boolean> = $state({});
 let queueingAll = $state(false);
@@ -29,8 +46,55 @@ let showRefreshConfirm = $state(false);
 let refreshingLibrary = $state(false);
 let refreshMsg = $state('');
 let reloading = $state(false);
+let scanProgress: ScanProgress | null = $state(null);
+let scanPollTimer: ReturnType<typeof setInterval> | null = null;
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
+
+async function handleStartScan() {
+  try {
+    await startMovieScan();
+    pollScanProgress();
+  } catch (e) {
+    // may already be running
+  }
+}
+
+async function handleStopScan() {
+  try {
+    await stopScan();
+  } catch {
+    /* ignore */
+  }
+}
+
+function pollScanProgress() {
+  if (scanPollTimer) return;
+  const tick = async () => {
+    try {
+      scanProgress = await getScanProgress();
+      if (!scanProgress.running) {
+        if (scanPollTimer) clearInterval(scanPollTimer);
+        scanPollTimer = null;
+        // Refresh movie data after scan completes
+        invalidateMovies();
+        fetchMovies();
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+  tick();
+  scanPollTimer = setInterval(tick, 2000);
+}
+
+// Check if a scan is already running on mount
+getScanProgress()
+  .then((p) => {
+    scanProgress = p;
+    if (p.running && p.type === 'movies') pollScanProgress();
+  })
+  .catch(() => {});
 
 function startJobPolling() {
   if (jobPollTimer) return;
@@ -63,13 +127,16 @@ $effect(() => {
   startJobPolling();
   return () => {
     if (jobPollTimer) clearInterval(jobPollTimer);
+    if (scanPollTimer) clearInterval(scanPollTimer);
   };
 });
+
+const analysisFiltersActive = $derived(audioFormat !== 'any' || videoFormat !== 'any');
 
 const filtered = $derived.by(() => {
   let result = movies;
 
-  // Client-side filter
+  // Primary filter
   if (filter && filter !== 'any') {
     result = result.filter((m) => {
       switch (filter) {
@@ -87,6 +154,16 @@ const filtered = $derived.by(() => {
           return true;
       }
     });
+  }
+
+  // Audio format filter
+  if (audioFormat !== 'any') {
+    result = result.filter((m) => audioCodecMatches(m.audio_codec ?? '', audioFormat, m.has_dts_x));
+  }
+
+  // Video format filter
+  if (videoFormat !== 'any') {
+    result = result.filter((m) => videoCodecMatches(m.video_codec ?? '', videoFormat));
   }
 
   if (search) {
@@ -143,6 +220,8 @@ function fetchMovies() {
 
 async function reloadMovies() {
   reloading = true;
+  loading = true;
+  movies = [];
   invalidateMovies();
   try {
     const res = await getMovies(undefined, undefined, true);
@@ -153,6 +232,7 @@ async function reloadMovies() {
     if (movies.length === 0) loadError = true;
   } finally {
     reloading = false;
+    loading = false;
   }
 }
 
@@ -258,8 +338,28 @@ const filters: { value: string; label: string }[] = [
   { value: 'anime', label: 'Anime' },
 ];
 
+const audioOptions = $derived(
+  buildAudioOptions(
+    movies.map((m) => m.audio_codec),
+    movies.some((m) => m.has_dts_x),
+  ),
+);
+const videoOptions = $derived(buildVideoOptions(movies.map((m) => m.video_codec)));
+
+// Reset filter if selected value is no longer in contextual options
+$effect(() => {
+  if (audioFormat !== 'any' && !audioOptions.some((o) => o.value === audioFormat)) {
+    audioFormat = 'any';
+  }
+});
+$effect(() => {
+  if (videoFormat !== 'any' && !videoOptions.some((o) => o.value === videoFormat)) {
+    videoFormat = 'any';
+  }
+});
+
 const sortOptions: { value: string; label: string }[] = [
-  { value: 'needsWork', label: 'Needs Work First' },
+  { value: 'needsWork', label: 'Needs Work' },
   { value: 'title', label: 'Title' },
   { value: 'year', label: 'Year' },
   { value: 'size', label: 'Size' },
@@ -272,23 +372,35 @@ const sortOptions: { value: string; label: string }[] = [
 
 <div class="space-y-4">
   <!-- Filters + Search -->
-  <div class="flex flex-col sm:flex-row gap-3">
-    <div class="join">
-      {#each filters as f}
-        <button
-          class="join-item btn btn-sm {filter === f.value ? 'btn-primary' : 'btn-ghost border-base-content/10'}"
-          onclick={() => (filter = f.value)}
-        >
-          {f.label}
-        </button>
-      {/each}
+  <div class="flex flex-col gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="join">
+        {#each filters as f}
+          <button
+            class="join-item btn btn-sm {filter === f.value ? 'btn-primary' : 'btn-ghost border-base-content/10'}"
+            onclick={() => (filter = f.value)}
+          >
+            {f.label}
+          </button>
+        {/each}
+      </div>
+      <select class="select select-sm select-bordered" bind:value={audioFormat}>
+        {#each audioOptions as af}
+          <option value={af.value}>{af.label}</option>
+        {/each}
+      </select>
+      <select class="select select-sm select-bordered" bind:value={videoFormat}>
+        {#each videoOptions as vf}
+          <option value={vf.value}>{vf.label}</option>
+        {/each}
+      </select>
+      <select class="select select-sm select-bordered w-auto" bind:value={sortBy}>
+        {#each sortOptions as s}
+          <option value={s.value}>{s.label}</option>
+        {/each}
+      </select>
     </div>
-    <select class="select select-sm select-bordered" bind:value={sortBy}>
-      {#each sortOptions as s}
-        <option value={s.value}>{s.label}</option>
-      {/each}
-    </select>
-    <div class="relative flex-1">
+    <div class="relative">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
       </svg>
@@ -338,6 +450,26 @@ const sortOptions: { value: string; label: string }[] = [
         {/if}
         Refresh Library
       </button>
+      {#if scanProgress?.running && scanProgress.type === 'movies'}
+        <button
+          class="btn btn-ghost btn-xs text-error/70"
+          onclick={handleStopScan}
+          title="Stop library analysis"
+        >
+          <span class="loading loading-spinner loading-xs"></span>
+          Analyzing {scanProgress.analyzed + scanProgress.skipped}/{scanProgress.total}
+        </button>
+      {:else}
+        <button
+          class="btn btn-ghost btn-xs text-base-content/40"
+          onclick={handleStartScan}
+          disabled={!config?.radarr?.configured}
+          title="Analyze all movie files with ffprobe for detailed codec info"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+          Analyze Library
+        </button>
+      {/if}
     </div>
     <div class="flex items-center gap-2">
       {#if selected.size > 0}
@@ -374,6 +506,17 @@ const sortOptions: { value: string; label: string }[] = [
     </div>
   </div>
 
+  <!-- Scan progress bar -->
+  {#if scanProgress?.running && scanProgress.type === 'movies' && scanProgress.total > 0}
+    <div class="card-glass rounded-box p-3">
+      <div class="flex items-center justify-between text-xs text-base-content/50 mb-1">
+        <span>Analyzing library… {scanProgress.analyzed + scanProgress.skipped}/{scanProgress.total}</span>
+        <span class="truncate ml-2 max-w-[200px]">{scanProgress.current_file ?? ''}</span>
+      </div>
+      <progress class="progress progress-primary w-full" value={scanProgress.analyzed + scanProgress.skipped} max={scanProgress.total}></progress>
+    </div>
+  {/if}
+
   <!-- Movie grid -->
   {#if loading}
     <div class="flex justify-center py-12">
@@ -386,7 +529,12 @@ const sortOptions: { value: string; label: string }[] = [
     </div>
   {:else if filtered.length === 0}
     <div class="card-glass rounded-box p-12 text-center">
-      <p class="text-base text-base-content/40">No movies found</p>
+      {#if analysisFiltersActive}
+        <p class="text-base text-base-content/40">No movies match this filter</p>
+        <p class="text-sm text-base-content/30 mt-1">Some filters (DTS:X, Atmos, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
+      {:else}
+        <p class="text-base text-base-content/40">No movies found</p>
+      {/if}
     </div>
   {:else}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
@@ -411,6 +559,9 @@ const sortOptions: { value: string; label: string }[] = [
               <div class="flex flex-col gap-1 items-start">
                 {#if movie.is_anime}
                   <span class="badge badge-secondary badge-xs">Anime</span>
+                {/if}
+                {#if movie.has_dts_x}
+                  <span class="badge badge-error badge-xs">DTS:X</span>
                 {/if}
               </div>
               <div class="flex flex-col gap-1 items-end">

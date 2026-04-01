@@ -208,7 +208,7 @@ class Config:
                 var_name = expr
                 value = os.environ.get(var_name, "")
                 if not value:
-                    logger.warning("Environment variable %s not set", var_name)
+                    logger.debug("Environment variable %s not set", var_name)
 
             return value
 
