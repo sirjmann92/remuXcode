@@ -10,6 +10,12 @@ import {
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
 import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
 import { langName } from '$lib/languages';
+import {
+  deduplicatedSeriesFetch,
+  getCachedSeries,
+  invalidateSeries,
+  setCachedSeries,
+} from '$lib/stores';
 import type {
   ActiveJobsMap,
   BrowseSeries,
@@ -40,6 +46,7 @@ let activeJobs: ActiveJobsMap = $state({});
 let showRefreshConfirm = $state(false);
 let refreshingLibrary = $state(false);
 let refreshMsg = $state('');
+let reloading = $state(false);
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -58,7 +65,8 @@ async function refreshActiveJobs() {
     activeJobs = next;
     if (finished) {
       // Refresh list data; if viewing a series detail, refresh that too
-      fetchSeries();
+      invalidateSeries();
+      fetchSeries(); // Background refresh — stale data stays visible
       if (selectedSeries) {
         try {
           selectedSeries = await getSeriesDetail(selectedSeries.id);
@@ -110,6 +118,31 @@ async function handleRefreshLibrary() {
 
 const filtered = $derived.by(() => {
   let result = seriesList;
+
+  // Client-side filter
+  if (filter && filter !== 'any') {
+    result = result.filter((s) => {
+      switch (filter) {
+        case 'needs_conversion':
+          return (
+            (s.audio_convert_count ?? 0) > 0 ||
+            (s.video_convert_count ?? 0) > 0 ||
+            (s.cleanup_count ?? 0) > 0
+          );
+        case 'video':
+          return (s.video_convert_count ?? 0) > 0;
+        case 'audio':
+          return (s.audio_convert_count ?? 0) > 0;
+        case 'anime':
+          return s.is_anime;
+        case 'cleanup':
+          return (s.cleanup_count ?? 0) > 0;
+        default:
+          return true;
+      }
+    });
+  }
+
   if (search) {
     const q = search.toLowerCase();
     result = result.filter(
@@ -145,15 +178,35 @@ const listSummary = $derived.by(() => {
   return { total, audioEps, cleanupEps, needsWorkEps };
 });
 
-async function fetchSeries() {
+async function doFetchSeries() {
   try {
-    const res = await getSeries(undefined, filter);
+    const res = await getSeries();
     seriesList = res.series;
+    setCachedSeries(res.series);
     loadError = false;
   } catch {
-    loadError = true;
+    if (seriesList.length === 0) loadError = true;
   } finally {
     loading = false;
+  }
+}
+
+function fetchSeries() {
+  deduplicatedSeriesFetch(doFetchSeries);
+}
+
+async function reloadSeries() {
+  reloading = true;
+  invalidateSeries();
+  try {
+    const res = await getSeries(undefined, undefined, true);
+    seriesList = res.series;
+    setCachedSeries(res.series);
+    loadError = false;
+  } catch {
+    if (seriesList.length === 0) loadError = true;
+  } finally {
+    reloading = false;
   }
 }
 
@@ -291,11 +344,15 @@ function seasonNeedsWork(season: Season): number {
   return season.needs_work;
 }
 
-$effect(() => {
-  filter;
-  loading = true;
+// Stale-while-revalidate: show cached data instantly, refresh in background if stale
+const cached = getCachedSeries();
+if (cached) {
+  seriesList = cached.data;
+  loading = false;
+  if (!cached.fresh) fetchSeries();
+} else {
   fetchSeries();
-});
+}
 
 getConfig()
   .then((c) => {
@@ -607,6 +664,19 @@ const sortOptions: { value: string; label: string }[] = [
       {#if refreshMsg}
         <span class="text-xs text-success">{refreshMsg}</span>
       {/if}
+      <button
+        class="btn btn-ghost btn-xs text-base-content/40"
+        onclick={reloadSeries}
+        disabled={reloading}
+        title="Clear cache and reload series data from Sonarr"
+      >
+        {#if reloading}
+          <span class="loading loading-spinner loading-xs"></span>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+        {/if}
+        Reload
+      </button>
       <button
         class="btn btn-ghost btn-xs text-base-content/40"
         onclick={() => (showRefreshConfirm = true)}
