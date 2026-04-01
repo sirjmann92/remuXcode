@@ -29,9 +29,13 @@ class AudioConfig:
     """Audio conversion settings."""
 
     enabled: bool = True
+    anime_only: bool = False  # When True, only convert audio in anime content
     convert_dts: bool = True
+    convert_dts_x: bool = False  # DTS:X is object-based — skip by default
     convert_truehd: bool = False  # TrueHD is lossless Dolby — default is to leave it alone
     keep_original: bool = False
+    keep_original_dts_x: bool = False
+    original_as_secondary: bool = True  # Converted track first (plays by default)
     prefer_ac3: bool = True
     ac3_bitrate: int = 640  # kbps for AC3 5.1
     eac3_bitrate: int = 1536  # kbps for E-AC3
@@ -45,6 +49,7 @@ class CleanupConfig:
     """Stream cleanup settings."""
 
     enabled: bool = True
+    anime_only: bool = False  # When True, only clean streams in anime content
     clean_audio: bool = True
     clean_subtitles: bool = True
     keep_languages: list[str] = field(default_factory=lambda: ["eng"])
@@ -234,9 +239,13 @@ class Config:
         """Parse audio configuration section."""
         return AudioConfig(
             enabled=self._get("audio.enabled", True),
+            anime_only=self._get("audio.anime_only", False),
             convert_dts=self._get("audio.convert_dts", True),
+            convert_dts_x=self._get("audio.convert_dts_x", False),
             convert_truehd=self._get("audio.convert_truehd", False),
             keep_original=self._get("audio.keep_original", False),
+            keep_original_dts_x=self._get("audio.keep_original_dts_x", False),
+            original_as_secondary=self._get("audio.original_as_secondary", True),
             prefer_ac3=self._get("audio.prefer_ac3", True),
             ac3_bitrate=self._get("audio.ac3_bitrate", 640),
             eac3_bitrate=self._get("audio.eac3_bitrate", 1536),
@@ -249,6 +258,7 @@ class Config:
         """Parse stream cleanup configuration."""
         return CleanupConfig(
             enabled=self._get("cleanup.enabled", True),
+            anime_only=self._get("cleanup.anime_only", False),
             clean_audio=self._get("cleanup.clean_audio", True),
             clean_subtitles=self._get("cleanup.clean_subtitles", True),
             keep_languages=self._get("cleanup.keep_languages", ["eng"]),
@@ -328,9 +338,13 @@ class Config:
         self._raw_config.setdefault("audio", {})
         for key in (
             "enabled",
+            "anime_only",
             "convert_dts",
+            "convert_dts_x",
             "convert_truehd",
             "keep_original",
+            "keep_original_dts_x",
+            "original_as_secondary",
             "prefer_ac3",
             "ac3_bitrate",
             "eac3_bitrate",
@@ -372,6 +386,7 @@ class Config:
         self._raw_config.setdefault("cleanup", {})
         for key in (
             "enabled",
+            "anime_only",
             "clean_audio",
             "clean_subtitles",
             "keep_languages",

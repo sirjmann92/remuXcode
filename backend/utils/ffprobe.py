@@ -63,6 +63,7 @@ class AudioStream:
     index: int
     codec_name: str
     codec_long_name: str
+    profile: str | None
     channels: int
     channel_layout: str | None
     sample_rate: int
@@ -74,8 +75,20 @@ class AudioStream:
 
     @property
     def is_dts(self) -> bool:
-        """Check if stream is DTS (any variant)."""
+        """Check if stream is DTS (any variant including DTS:X)."""
         return self.codec_name.lower().startswith("dts")
+
+    @property
+    def is_dts_x(self) -> bool:
+        """Check if stream is DTS:X (object-based DTS)."""
+        if not self.is_dts:
+            return False
+        if self.profile:
+            # Normalise to uppercase, strip punctuation for matching
+            normalised = self.profile.upper().replace("-", "").replace(":", "").replace(" ", "")
+            if "DTSX" in normalised:
+                return True
+        return False
 
     @property
     def is_truehd(self) -> bool:
@@ -151,6 +164,11 @@ class MediaInfo:
     def has_dts(self) -> bool:
         """Check if file has any DTS audio streams."""
         return any(s.is_dts for s in self.audio_streams)
+
+    @property
+    def has_dts_x(self) -> bool:
+        """Check if file has any DTS:X audio streams."""
+        return any(s.is_dts_x for s in self.audio_streams)
 
     @property
     def has_truehd(self) -> bool:
@@ -302,6 +320,7 @@ class FFProbe:
             index=stream.get("index", 0),
             codec_name=stream.get("codec_name", ""),
             codec_long_name=stream.get("codec_long_name", ""),
+            profile=stream.get("profile"),
             channels=stream.get("channels", 0),
             channel_layout=stream.get("channel_layout"),
             sample_rate=int(stream.get("sample_rate", 0)),

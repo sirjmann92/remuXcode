@@ -2,15 +2,17 @@
 
 A self-hosted media library maintenance tool that keeps your Plex/Jellyfin library clean and compatible — automatically or on demand.
 
-When Sonarr or Radarr imports a file, remuXcode receives a webhook, analyzes the media, and converts what needs fixing: DTS audio becomes AC3/AAC for broad device support, 10-bit H.264 anime gets re-encoded to HEVC or AV1, and unwanted language tracks are stripped out. Everything happens in the background with no manual intervention required.
+When Sonarr or Radarr imports a file, remuXcode receives a webhook, analyzes the media, and converts what needs fixing: DTS/DTS:X audio becomes AC3/AAC for broad device support, 10-bit H.264 anime gets re-encoded to HEVC or AV1, and unwanted language tracks are stripped out. Everything happens in the background with no manual intervention required.
 
 The application also supports manually updating and maintaining existing Sonarr/Radarr libraries. The built-in web UI lets you browse your entire library — movies and shows — with poster grids, filters, and per-file analysis. See exactly which files have incompatible audio, which anime needs encoding, and kick off conversions for individual files or entire series with a click. It's both a fire-and-forget automation layer and a hands-on library management tool.
 
 ## Features
 
 - 🎯 **Smart Format Selection**: AC3 for surround (5.1+), AAC for stereo/7.1+
+- 🔊 **DTS:X Awareness**: Separate controls for regular DTS vs object-based DTS:X
 - 🎬 **HEVC/AV1 Encoding**: Convert 10-bit H.264 to HEVC or AV1 (configurable)
 - 🌸 **Anime Detection**: Auto-detects anime for optimized encoding (`-tune animation`)
+- 🎌 **Per-Worker Anime Only**: Independent anime-only toggle for video, audio, and cleanup
 - 🌍 **Language Cleanup**: Keep only original language + English tracks
 - 📊 **Bitrate Matching**: Preserves quality while respecting format limits
 - 🔄 **Automatic Renaming**: Triggers Sonarr/Radarr to update filenames after processing
@@ -108,7 +110,7 @@ On first run, a default `config/config.yaml` is created automatically. You can a
 
 AV1 mode is also available (set codec to `av1` in Settings) — ~30% better compression, slower encoding, less hardware decoder support.
 
-> Video conversion is **anime-only** by default. Audio conversion and stream cleanup apply to all content. All of these defaults can be changed from the Settings page.
+> Video conversion is **anime-only** by default. Audio conversion and stream cleanup process all content by default. Each worker has its own Anime Only toggle in the Settings page.
 
 ### Job Persistence
 

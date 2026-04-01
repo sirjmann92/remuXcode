@@ -212,22 +212,48 @@ $effect(() => {
               <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.enabled} onchange={() => toggleBool('audio', 'enabled')} />
             </label>
             <div class="{config.audio.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
-            {#each [
-              { field: 'convert_dts', label: 'Convert DTS', hint: 'Re-encode DTS/DTS-HD audio to EAC3 or AC3' },
-              { field: 'convert_truehd', label: 'Convert TrueHD', hint: 'Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)' },
-              { field: 'keep_original', label: 'Keep Original', hint: 'Retain the original audio track alongside the converted one' },
-              { field: 'prefer_ac3', label: 'Prefer AC3', hint: 'Use AC3 (Dolby Digital) instead of EAC3 for wider device support' },
-            ] as item}
-              <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
-                <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-sm toggle-primary"
-                  checked={(config.audio as Record<string, unknown>)[item.field] as boolean}
-                  onchange={() => toggleBool('audio', item.field)}
-                />
+            <!-- Anime Only -->
+            <label class="flex items-center justify-between cursor-pointer" title="Only convert audio in anime content, skip live action">
+              <span>Anime Only<span class="block text-xs text-base-content/30 font-normal">Only convert audio in anime content, skip live action</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.anime_only} onchange={() => toggleBool('audio', 'anime_only')} />
+            </label>
+            <!-- Convert DTS -->
+            <label class="flex items-center justify-between cursor-pointer" title="Re-encode DTS/DTS-HD audio to EAC3 or AC3">
+              <span>Convert DTS<span class="block text-xs text-base-content/30 font-normal">Re-encode DTS/DTS-HD audio to EAC3 or AC3</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.convert_dts} onchange={() => toggleBool('audio', 'convert_dts')} />
+            </label>
+            <div class="pl-4 {config.audio.convert_dts ? '' : 'opacity-40 pointer-events-none'} transition-opacity">
+              <label class="flex items-center justify-between cursor-pointer" title="Retain the original DTS track alongside the converted one">
+                <span>Keep Original<span class="block text-xs text-base-content/30 font-normal">Retain the original DTS track alongside the converted one</span></span>
+                <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.keep_original} onchange={() => toggleBool('audio', 'keep_original')} />
               </label>
-            {/each}
+            </div>
+            <!-- Convert DTS:X -->
+            <label class="flex items-center justify-between cursor-pointer" title="Re-encode DTS:X (object-based) audio to EAC3 or AC3">
+              <span>Convert DTS:X<span class="block text-xs text-base-content/30 font-normal">Re-encode DTS:X (object-based) audio to EAC3 or AC3</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.convert_dts_x} onchange={() => toggleBool('audio', 'convert_dts_x')} />
+            </label>
+            <div class="pl-4 {config.audio.convert_dts_x ? '' : 'opacity-40 pointer-events-none'} transition-opacity">
+              <label class="flex items-center justify-between cursor-pointer" title="Retain the original DTS:X track alongside the converted one">
+                <span>Keep Original DTS:X<span class="block text-xs text-base-content/30 font-normal">Retain the original DTS:X track alongside the converted one</span></span>
+                <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.keep_original_dts_x} onchange={() => toggleBool('audio', 'keep_original_dts_x')} />
+              </label>
+            </div>
+            <!-- Convert TrueHD -->
+            <label class="flex items-center justify-between cursor-pointer" title="Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)">
+              <span>Convert TrueHD<span class="block text-xs text-base-content/30 font-normal">Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.convert_truehd} onchange={() => toggleBool('audio', 'convert_truehd')} />
+            </label>
+            <!-- Original as Secondary -->
+            <label class="flex items-center justify-between cursor-pointer" title="Place the converted track before the original so players use it by default">
+              <span>Original as Secondary<span class="block text-xs text-base-content/30 font-normal">Place the converted track first so players use it by default</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.original_as_secondary} onchange={() => toggleBool('audio', 'original_as_secondary')} />
+            </label>
+            <!-- Prefer AC3 -->
+            <label class="flex items-center justify-between cursor-pointer" title="Use AC3 (Dolby Digital) instead of EAC3 for wider device support">
+              <span>Prefer AC3<span class="block text-xs text-base-content/30 font-normal">Use AC3 (Dolby Digital) instead of EAC3 for wider device support</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.prefer_ac3} onchange={() => toggleBool('audio', 'prefer_ac3')} />
+            </label>
             <!-- Advanced -->
             <details class="border-t border-base-content/10 pt-2 mt-3">
               <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
@@ -441,6 +467,11 @@ $effect(() => {
               <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.cleanup.enabled} onchange={() => toggleBool('cleanup', 'enabled')} />
             </label>
             <div class="{config.cleanup.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
+            <!-- Anime Only -->
+            <label class="flex items-center justify-between cursor-pointer" title="Only clean streams in anime content, skip live action">
+              <span>Anime Only<span class="block text-xs text-base-content/30 font-normal">Only clean streams in anime content, skip live action</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.cleanup.anime_only} onchange={() => toggleBool('cleanup', 'anime_only')} />
+            </label>
             <div class="flex items-center justify-between">
               <span>Languages<span class="block text-xs text-base-content/30 font-normal">Audio and subtitle languages to keep</span></span>
               <LanguageSelect

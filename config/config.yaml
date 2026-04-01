@@ -26,16 +26,21 @@ video:
   vbv_bufsize: 10000
 audio:
   enabled: true
+  anime_only: false
   convert_dts: true
-  convert_truehd: true
+  convert_dts_x: true
+  convert_truehd: false
   keep_original: false
-  prefer_ac3: true
+  keep_original_dts_x: true
+  original_as_secondary: true
+  prefer_ac3: false
   ac3_bitrate: 640
   eac3_bitrate: 1536
   aac_surround_bitrate: 512
   aac_stereo_bitrate: 320
 cleanup:
   enabled: true
+  anime_only: false
   clean_audio: true
   clean_subtitles: true
   keep_languages:
