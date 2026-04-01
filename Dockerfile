@@ -24,7 +24,11 @@ RUN apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev \
     && adduser -u 1000 -G appgroup -D -s /bin/sh appuser \
     && pip install --no-cache-dir -r /app/requirements.txt \
     && apk del .build-deps \
-    && rm -rf /root/.cache/pip /tmp/* /var/cache/apk/*
+    && pip cache purge 2>/dev/null || true \
+    && rm -rf /usr/local/lib/python3.13/site-packages/pip* \
+    && find /usr/local -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local -name '*.pyc' -delete 2>/dev/null || true \
+    && rm -rf /root/.cache /tmp/* /var/cache/apk/*
 
 ARG APP_VERSION=dev
 ENV PYTHONUNBUFFERED=1 \
