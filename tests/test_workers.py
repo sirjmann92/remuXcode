@@ -72,7 +72,7 @@ def test_ffprobe(file_path: str) -> bool:
             f"    [{audio.index}] {audio.codec_name} {audio.channels}ch {bitrate} ({lang}) {title}"
         )
         print(
-            f"         DTS: {audio.is_dts}, TrueHD: {audio.is_truehd}, Lossless: {audio.is_lossless}"
+            f"         DTS: {audio.is_dts}, DTS:X: {audio.is_dts_x}, TrueHD: {audio.is_truehd}, Lossless: {audio.is_lossless}"
         )
 
     # Subtitle streams

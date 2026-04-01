@@ -61,12 +61,20 @@ video:
 audio:
   enabled: ${AUDIO_CONVERSION_ENABLED:-true}
 
+  # Only process anime content (skip live action)
+  anime_only: false
+
   # What to convert
-  convert_dts: true      # Convert DTS to AC3/AAC
+  convert_dts: true      # Convert DTS/DTS-HD to AC3/AAC
+  convert_dts_x: false   # Convert DTS:X (object-based) — skip by default
   convert_truehd: false  # TrueHD is a Dolby lossless format — never downgrade it
 
   # Keep original track alongside converted?
-  keep_original: false
+  keep_original: false       # For regular DTS streams
+  keep_original_dts_x: false # For DTS:X streams
+
+  # Track ordering when keeping originals
+  original_as_secondary: true  # Converted track first (players use it by default)
 
   # Target format preferences
   prefer_ac3: true      # Use AC3 for 5.1 (better device compatibility)
@@ -81,6 +89,9 @@ audio:
 # Stream cleanup settings
 cleanup:
   enabled: ${STREAM_CLEANUP_ENABLED:-true}
+
+  # Only clean streams in anime content (skip live action)
+  anime_only: false
 
   # Clean audio streams based on language
   clean_audio: ${AUDIO_CLEANUP_ENABLED:-true}

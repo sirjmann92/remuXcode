@@ -99,17 +99,25 @@ class AudioConverter:
         self.ffprobe = ffprobe or FFProbe()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
 
-    def should_convert(self, file_path: str) -> bool:
+    def should_convert(self, file_path: str, *, is_anime: bool = False) -> bool:
         """Check if a file has audio that needs conversion."""
         if not self.config.enabled:
+            return False
+
+        # Skip non-anime content when anime_only is enabled
+        if self.config.anime_only and not is_anime:
             return False
 
         info = self.ffprobe.get_file_info(file_path)
         if info is None:
             return False
 
-        # Check for DTS streams
-        if self.config.convert_dts and info.has_dts:
+        # Check for regular DTS streams (excluding DTS:X)
+        if self.config.convert_dts and any(s.is_dts and not s.is_dts_x for s in info.audio_streams):
+            return True
+
+        # Check for DTS:X streams
+        if self.config.convert_dts_x and info.has_dts_x:
             return True
 
         # Check for TrueHD streams
@@ -119,11 +127,18 @@ class AudioConverter:
         return False
 
     def get_dts_streams(self, info: MediaInfo) -> list[AudioStream]:
-        """Get all DTS audio streams from media info."""
+        """Get regular DTS audio streams (excluding DTS:X)."""
         if not info.audio_streams:
             return []
 
-        return [stream for stream in info.audio_streams if stream.is_dts]
+        return [stream for stream in info.audio_streams if stream.is_dts and not stream.is_dts_x]
+
+    def get_dts_x_streams(self, info: MediaInfo) -> list[AudioStream]:
+        """Get DTS:X (object-based) audio streams."""
+        if not info.audio_streams:
+            return []
+
+        return [stream for stream in info.audio_streams if stream.is_dts_x]
 
     def get_truehd_streams(self, info: MediaInfo) -> list[AudioStream]:
         """Get all TrueHD audio streams from media info."""
@@ -185,6 +200,9 @@ class AudioConverter:
 
         if self.config.convert_dts:
             streams_to_convert.extend(self.get_dts_streams(info))
+
+        if self.config.convert_dts_x:
+            streams_to_convert.extend(self.get_dts_x_streams(info))
 
         if self.config.convert_truehd:
             streams_to_convert.extend(self.get_truehd_streams(info))
@@ -500,55 +518,121 @@ class AudioConverter:
         info: MediaInfo,
         streams_to_convert: list[AudioStream],
     ) -> list[str]:
-        """Build ffmpeg command for audio conversion."""
+        """Build ffmpeg command for audio conversion.
+
+        Uses explicit stream mapping (instead of -map 0) so dual-track mode
+        can map the same input stream twice and control track ordering.
+        """
 
         cmd = ["ffmpeg", "-i", input_file, "-y"]
 
-        # Video: copy
-        cmd.extend(["-c:v", "copy"])
-
-        # Subtitles: copy
-        cmd.extend(["-c:s", "copy"])
-
-        # Build stream indices to convert
         convert_indices = {s.index for s in streams_to_convert}
 
-        # Process each audio stream
+        # Build explicit stream maps and per-stream codec args
+        map_args: list[str] = []
+        codec_args: list[str] = []
+
+        # Map video streams
+        for vs in info.video_streams:
+            map_args.extend(["-map", f"0:{vs.index}"])
+
+        # Process audio streams
         audio_output_index = 0
         for stream in info.audio_streams:
             if stream.index in convert_indices:
-                # Convert this stream
+                # Determine keep_original per stream type
+                keep_orig = (
+                    self.config.keep_original_dts_x
+                    if stream.is_dts_x
+                    else self.config.keep_original
+                )
+
                 target_codec, target_bitrate, target_layout = self._determine_target_format(
                     stream.channels, stream.bitrate // 1000 if stream.bitrate else 0
                 )
 
-                if self.config.keep_original:
-                    # Dual track mode: copy original first
-                    cmd.extend([f"-c:a:{audio_output_index}", "copy"])
+                title = self._generate_track_title(stream.language or "", stream.title or "")
+
+                if keep_orig and self.config.original_as_secondary:
+                    # Converted first (players use it by default), original second
+                    map_args.extend(["-map", f"0:{stream.index}"])
+                    codec_args.extend([f"-c:a:{audio_output_index}", target_codec])
+                    codec_args.extend([f"-b:a:{audio_output_index}", f"{target_bitrate}k"])
+                    if target_layout:
+                        codec_args.extend(
+                            [
+                                f"-ac:a:{audio_output_index}",
+                                str(8),
+                                "-channel_layout:a",
+                                target_layout,
+                            ]
+                        )
+                    if title:
+                        codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
                     audio_output_index += 1
 
-                # Add converted stream
-                cmd.extend([f"-c:a:{audio_output_index}", target_codec])
-                cmd.extend([f"-b:a:{audio_output_index}", f"{target_bitrate}k"])
+                    map_args.extend(["-map", f"0:{stream.index}"])
+                    codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
+                    audio_output_index += 1
 
-                if target_layout:
-                    cmd.extend(
-                        [f"-ac:a:{audio_output_index}", str(8), "-channel_layout:a", target_layout]
-                    )
+                elif keep_orig:
+                    # Original first, converted second
+                    map_args.extend(["-map", f"0:{stream.index}"])
+                    codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
+                    audio_output_index += 1
 
-                # Set title
-                title = self._generate_track_title(stream.language or "", stream.title or "")
-                if title:
-                    cmd.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
+                    map_args.extend(["-map", f"0:{stream.index}"])
+                    codec_args.extend([f"-c:a:{audio_output_index}", target_codec])
+                    codec_args.extend([f"-b:a:{audio_output_index}", f"{target_bitrate}k"])
+                    if target_layout:
+                        codec_args.extend(
+                            [
+                                f"-ac:a:{audio_output_index}",
+                                str(8),
+                                "-channel_layout:a",
+                                target_layout,
+                            ]
+                        )
+                    if title:
+                        codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
+                    audio_output_index += 1
 
-                audio_output_index += 1
+                else:
+                    # Convert only, drop original
+                    map_args.extend(["-map", f"0:{stream.index}"])
+                    codec_args.extend([f"-c:a:{audio_output_index}", target_codec])
+                    codec_args.extend([f"-b:a:{audio_output_index}", f"{target_bitrate}k"])
+                    if target_layout:
+                        codec_args.extend(
+                            [
+                                f"-ac:a:{audio_output_index}",
+                                str(8),
+                                "-channel_layout:a",
+                                target_layout,
+                            ]
+                        )
+                    if title:
+                        codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
+                    audio_output_index += 1
             else:
-                # Copy non-DTS streams
-                cmd.extend([f"-c:a:{audio_output_index}", "copy"])
+                # Copy non-converted streams as-is
+                map_args.extend(["-map", f"0:{stream.index}"])
+                codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
                 audio_output_index += 1
 
-        # Map all streams
-        cmd.extend(["-map", "0", "-map_chapters", "0"])
+        # Map subtitle and attachment streams
+        for ss in info.subtitle_streams:
+            map_args.extend(["-map", f"0:{ss.index}"])
+        for att in info.attachment_streams:
+            map_args.extend(["-map", f"0:{att.index}"])
+
+        # Assemble final command
+        cmd.extend(map_args)
+        cmd.extend(["-c:v", "copy"])
+        if info.subtitle_streams:
+            cmd.extend(["-c:s", "copy"])
+        cmd.extend(codec_args)
+        cmd.extend(["-map_chapters", "0"])
 
         # Tag the container so Sonarr detects a size change and re-reads MediaInfo
         cmd.extend(["-metadata:g", "ENCODED_BY=remuxcode"])

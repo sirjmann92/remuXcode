@@ -480,7 +480,9 @@ def process_file(
 
     # Pre-determine which phases will actually run so we can divide progress equally.
     will_audio = (
-        do_audio and audio_converter is not None and audio_converter.should_convert(file_path)
+        do_audio
+        and audio_converter is not None
+        and audio_converter.should_convert(file_path, is_anime=file_is_anime)
     )
     will_video = (
         do_video and video_converter is not None and video_converter.should_convert(file_path)

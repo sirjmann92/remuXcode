@@ -88,9 +88,13 @@ export interface ConfigSummary {
   };
   audio: {
     enabled: boolean;
+    anime_only: boolean;
     convert_dts: boolean;
+    convert_dts_x: boolean;
     convert_truehd: boolean;
     keep_original: boolean;
+    keep_original_dts_x: boolean;
+    original_as_secondary: boolean;
     prefer_ac3: boolean;
     // Advanced
     ac3_bitrate: number;
@@ -100,6 +104,7 @@ export interface ConfigSummary {
   };
   cleanup: {
     enabled: boolean;
+    anime_only: boolean;
     clean_audio: boolean;
     clean_subtitles: boolean;
     keep_languages: string[];

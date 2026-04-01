@@ -89,42 +89,27 @@ backend/
 - [x] Comprehensive code cleanup and optimization
 - [x] Rebranding to remuXcode (v2.0.0)
 
-## Phase 1.7: Configuration & Control Improvements
+## Phase 1.7: Configuration & Control Improvements ✓ (COMPLETED)
 
 ### Goal
 Improve consistency and clarity of content filtering and processing controls.
 
-### Planned Features
-- [ ] **Per-Worker Anime-Only Flags**
-  - Individual anime-only flags per worker: `VIDEO_ANIME_ONLY`, `AUDIO_ANIME_ONLY`, `CLEANUP_ANIME_ONLY`
+### Completed Features
+- [x] **Per-Worker Anime-Only Flags**
+  - Individual `anime_only` setting per worker: Video, Audio, Cleanup
   - When `true`: that worker only processes anime content, skipping everything else
-  - When `false`: that worker processes all content regardless of type
+  - When `false` (default for Audio/Cleanup): that worker processes all content
   - Allows independent control — e.g. only encode anime video, but convert DTS audio on everything
-  
-- [ ] **Global Anime-Only Toggle** *(nice-to-have)*
-  - Single `ANIME_ONLY` flag as a convenience shortcut
-  - Sets all workers at once for users who want a single toggle
-  - Per-worker flags take precedence if set individually
+  - Full UI support in Settings page with per-section Anime Only toggles
 
-### Architecture
-```
-Per-worker control (primary):
-├─ VIDEO_ANIME_ONLY    → Video worker: anime only or all content
-├─ AUDIO_ANIME_ONLY   → Audio worker: anime only or all content
-└─ CLEANUP_ANIME_ONLY → Cleanup worker: anime only or all content
-
-Global toggle (nice-to-have):
-└─ ANIME_ONLY → Sets all workers at once (per-worker flags override)
-
-Worker enable flags (unchanged):
-├─ VIDEO_ENCODING_ENABLED
-├─ AUDIO_CONVERSION_ENABLED
-└─ STREAM_CLEANUP_ENABLED
-```
+- [x] **DTS:X Object-Based Audio Awareness**
+  - Separate `convert_dts_x` toggle (off by default — DTS:X is high quality)
+  - Per-type keep-original: `keep_original` for DTS, `keep_original_dts_x` for DTS:X
+  - `original_as_secondary`: converted track first (default player pick), original second
+  - ffprobe profile detection for DTS:X streams
 
 ### Implementation Notes
 - Per-worker anime check evaluated inside each worker's `should_*` method
-- Per-worker flags override global `ANIME_ONLY` if explicitly set
 - Backward compatible: existing behavior unchanged if new flags are not configured
 
 ## Phase 2: Docker + WebUI ✓ (COMPLETED)
