@@ -22,7 +22,7 @@ The application also supports manually updating and maintaining existing Sonarr/
 - 🎞️ **Library Browse**: Movies & Shows pages with poster grids, filters, and processing previews
 - 🔎 **File Analysis**: Full ffprobe/MediaInfo modal — video, audio, and subtitle stream details per file
 - 📡 **Live Job Status**: Pending/running indicators on movie posters and episode rows, auto-refresh on completion
-- 🔃 **Manual Library Refresh**: Force Sonarr/Radarr metadata re-read from the Config page
+- 🔃 **Manual Library Refresh**: Force Sonarr/Radarr metadata re-read from the Movies/Shows pages
 - 🎌 **Anime Dual-Audio**: Optionally keep original-language audio on anime while still cleaning subtitles
 - 🔍 **Detection Accuracy**: Config-aware audio detection, EAC3 Atmos vs TrueHD distinction
 
@@ -64,7 +64,7 @@ docker compose pull  # get the latest image
 docker compose up -d
 ```
 
-`config/config.yaml` is created automatically on first run. Edit it to tune encoding settings.
+`config/config.yaml` is created automatically on first run with sensible defaults. All settings can be tuned from the Settings page in the web UI.
 
 ### 3. Configure Sonarr/Radarr Webhook
 
@@ -84,43 +84,23 @@ docker compose up -d
 
 ## Configuration
 
+All conversion settings — audio, video, cleanup, languages, integrations, and processing options — are configurable through the **Settings** page in the web UI at `http://localhost:7889/config`. Changes take effect immediately.
+
+On first run, a default `config/config.yaml` is created automatically. You can also edit this file directly if you prefer, but the UI is the recommended approach.
+
 ### `.env` (secrets only)
+
+The only values that must be set outside the UI are the initial connection secrets, passed via environment variables or a `.env` file:
 
 ```ini
 SONARR_URL=http://localhost:8989
 SONARR_API_KEY=your-sonarr-key
 RADARR_URL=http://localhost:7878
 RADARR_API_KEY=your-radarr-key
-REMUXCODE_API_KEY=   # leave blank to auto-generate
+REMUXCODE_API_KEY=   # leave blank to auto-generate on first run
 ```
 
-### `config/config.yaml` (everything else)
-
-Auto-created on first run from the built-in template. Key settings:
-
-```yaml
-video:
-  enabled: true
-  convert_10bit_x264: true    # Main target
-  convert_8bit_x264: false    # Optional (often makes files larger)
-  anime_only: true            # Only convert anime content
-  anime_crf: 19               # Quality (lower = better/larger)
-  anime_preset: slow          # Encoding speed
-
-audio:
-  enabled: true
-  convert_dts: true           # DTS → AC3/AAC
-  prefer_ac3: true            # AC3 for 5.1, AAC for stereo/7.1+
-
-cleanup:
-  enabled: true
-  keep_languages: [eng]       # Always keep English
-  keep_commentary: true
-  keep_sdh: true
-  anime_keep_original_audio: true  # Keep original-language audio on anime (e.g. Japanese)
-```
-
-See [backend/config.yaml](backend/config.yaml) for the full reference with all options.
+Once the container is running, these values (and all other settings) can be updated from the Settings page.
 
 ---
 
@@ -143,13 +123,13 @@ See [backend/config.yaml](backend/config.yaml) for the full reference with all o
 | Tune | animation | none |
 | Output | HEVC 10-bit | HEVC 10-bit |
 
-AV1 mode is also available (`codec: av1` in config.yaml) — ~30% better compression, slower encoding, less hardware decoder support.
+AV1 mode is also available (set codec to `av1` in Settings) — ~30% better compression, slower encoding, less hardware decoder support.
 
-> Video conversion is **anime-only** by default (`anime_only: true`). Audio conversion and stream cleanup apply to all content.
+> Video conversion is **anime-only** by default. Audio conversion and stream cleanup apply to all content. All of these defaults can be changed from the Settings page.
 
 ### Job Persistence
 
-Jobs are persisted to `config/jobs.db`. On startup, pending jobs are automatically resumed and old completed jobs are pruned after `general.job_history_days` (default: 30) days.
+Jobs are persisted to `config/jobs.db`. On startup, pending jobs are automatically resumed and old completed jobs are pruned after the configured retention period (default: 30 days).
 
 ---
 
@@ -281,7 +261,7 @@ frontend/                 # SvelteKit UI (built into Docker image)
 │       ├── movies/        # Library browse (poster grid + detail modal + job status)
 │       ├── shows/         # Series browse (drill-down to episodes + job status)
 │       ├── jobs/          # Job queue with processing details
-│       └── config/        # Configuration, API key, Sonarr/Radarr refresh
+│       └── config/        # Settings page
 ```
 ---
 
@@ -328,7 +308,7 @@ curl "http://localhost:7889/api/analyze?path=/share/your/file.mkv" \
 
 ## Build from Source (Optional)
 
-If you want to run the latest development version or make local changes, you can build the image yourself:
+If you want to make local changes, you can build the image yourself:
 
 ### 1. Clone and configure
 
@@ -340,8 +320,7 @@ nano .env  # Set SONARR_URL, SONARR_API_KEY, RADARR_URL, RADARR_API_KEY
 ```
 
 ### 2. Create and update compose.yml
-Follow the instructions above to create your `compose.yml` file
-Replace
+Follow the instructions above to create your `compose.yml` file, then replace
 ```yaml
 image: ghcr.io/sirjmann92/remuxcode:latest
 ```

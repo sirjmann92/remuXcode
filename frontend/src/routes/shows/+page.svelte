@@ -1,6 +1,15 @@
 <script lang="ts">
-import { convertFile, getActiveJobs, getConfig, getSeries, getSeriesDetail } from '$lib/api';
+import {
+  convertFile,
+  getActiveJobs,
+  getConfig,
+  getSeries,
+  getSeriesDetail,
+  refreshSonarr,
+} from '$lib/api';
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
+import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
+import { langName } from '$lib/languages';
 import type {
   ActiveJobsMap,
   BrowseSeries,
@@ -16,14 +25,21 @@ let loading = $state(true);
 let loadError = $state(false);
 let search = $state('');
 let filter: string = $state('any');
+let sortBy: string = $state('needsWork');
 
 // Detail view state
 let selectedSeries: SeriesDetail | null = $state(null);
 let detailLoading = $state(false);
 let expandedSeasons: Record<number, boolean> = $state({});
 let queueing: Record<string, boolean> = $state({});
+let queueingAll = $state(false);
+let selectedEps: Set<string> = $state(new Set());
+let queueingSelected = $state(false);
 let analyzePath: string | null = $state(null);
 let activeJobs: ActiveJobsMap = $state({});
+let showRefreshConfirm = $state(false);
+let refreshingLibrary = $state(false);
+let refreshMsg = $state('');
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -60,6 +76,14 @@ function getJobStatus(path: string) {
   return activeJobs[path] ?? null;
 }
 
+function seriesActiveCount(seriesPath: string): number {
+  return Object.keys(activeJobs).filter((p) => p.startsWith(seriesPath)).length;
+}
+
+function seasonActiveJobs(season: Season): number {
+  return season.episodes.filter((ep) => activeJobs[ep.path]).length;
+}
+
 $effect(() => {
   startJobPolling();
   return () => {
@@ -67,12 +91,50 @@ $effect(() => {
   };
 });
 
+async function handleRefreshLibrary() {
+  showRefreshConfirm = false;
+  refreshingLibrary = true;
+  refreshMsg = '';
+  try {
+    const res = await refreshSonarr();
+    refreshMsg = res.message;
+    setTimeout(() => {
+      refreshMsg = '';
+    }, 4000);
+  } catch (e) {
+    refreshMsg = e instanceof Error ? e.message : 'Sonarr refresh failed';
+  } finally {
+    refreshingLibrary = false;
+  }
+}
+
 const filtered = $derived.by(() => {
-  if (!search) return seriesList;
-  const q = search.toLowerCase();
-  return seriesList.filter(
-    (s) => s.title.toLowerCase().includes(q) || s.genres.some((g) => g.toLowerCase().includes(q)),
-  );
+  let result = seriesList;
+  if (search) {
+    const q = search.toLowerCase();
+    result = result.filter(
+      (s) => s.title.toLowerCase().includes(q) || s.genres.some((g) => g.toLowerCase().includes(q)),
+    );
+  }
+  switch (sortBy) {
+    case 'needsWork':
+      result = result.toSorted((a, b) => {
+        const aw = (a.audio_convert_count ?? 0) + (a.cleanup_count ?? 0);
+        const bw = (b.audio_convert_count ?? 0) + (b.cleanup_count ?? 0);
+        return bw - aw || a.title.localeCompare(b.title);
+      });
+      break;
+    case 'title':
+      result = result.toSorted((a, b) => a.title.localeCompare(b.title));
+      break;
+    case 'episodes':
+      result = result.toSorted((a, b) => b.episode_file_count - a.episode_file_count);
+      break;
+    case 'size':
+      result = result.toSorted((a, b) => b.size_on_disk - a.size_on_disk);
+      break;
+  }
+  return result;
 });
 
 const listSummary = $derived.by(() => {
@@ -109,6 +171,7 @@ async function openDetail(series: BrowseSeries) {
 
 function closeDetail() {
   selectedSeries = null;
+  selectedEps = new Set();
 }
 
 function toggleSeason(num: number) {
@@ -132,7 +195,9 @@ async function queueSeason(season: Season) {
   queueing[key] = true;
   try {
     for (const ep of season.episodes) {
-      await convertFile(ep.path, 'full');
+      if (episodeNeedsWork(ep)) {
+        await convertFile(ep.path, 'full');
+      }
     }
   } catch {
     // ignore
@@ -147,7 +212,9 @@ async function queueAllSeries() {
   try {
     for (const season of selectedSeries.seasons) {
       for (const ep of season.episodes) {
-        await convertFile(ep.path, 'full');
+        if (episodeNeedsWork(ep)) {
+          await convertFile(ep.path, 'full');
+        }
       }
     }
   } catch {
@@ -157,70 +224,71 @@ async function queueAllSeries() {
   }
 }
 
-function formatSize(bytes: number | null | undefined): string {
-  if (!bytes) return '—';
-  if (bytes > 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes > 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
-  return `${bytes} B`;
+async function queueAllFiltered() {
+  const items = filtered.filter(
+    (s) => (s.audio_convert_count ?? 0) > 0 || (s.cleanup_count ?? 0) > 0,
+  );
+  if (items.length === 0) return;
+  queueingAll = true;
+  try {
+    for (const series of items) {
+      const detail = await getSeriesDetail(series.id);
+      for (const season of detail.seasons) {
+        for (const ep of season.episodes) {
+          if (episodeNeedsWork(ep)) {
+            await convertFile(ep.path, 'full');
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  } finally {
+    queueingAll = false;
+  }
 }
 
 function episodeNeedsWork(ep: EpisodeFile): boolean {
   return !!ep.needs_audio_conversion || ep.needs_cleanup;
 }
 
+function toggleEpSelect(path: string) {
+  const next = new Set(selectedEps);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  selectedEps = next;
+}
+
+function selectAllEps() {
+  if (!selectedSeries) return;
+  const paths = selectedSeries.seasons
+    .flatMap((s) => s.episodes)
+    .filter((ep) => episodeNeedsWork(ep))
+    .map((ep) => ep.path);
+  selectedEps = new Set(paths);
+}
+
+function clearEpSelection() {
+  selectedEps = new Set();
+}
+
+async function queueSelectedEps() {
+  if (selectedEps.size === 0) return;
+  queueingSelected = true;
+  try {
+    for (const path of selectedEps) {
+      await convertFile(path, 'full');
+    }
+  } catch {
+    // ignore
+  } finally {
+    queueingSelected = false;
+    selectedEps = new Set();
+  }
+}
+
 function seasonNeedsWork(season: Season): number {
   return season.needs_work;
-}
-
-const langNames: Record<string, string> = {
-  eng: 'English',
-  fre: 'French',
-  spa: 'Spanish',
-  ger: 'German',
-  ita: 'Italian',
-  por: 'Portuguese',
-  rus: 'Russian',
-  chi: 'Chinese',
-  jpn: 'Japanese',
-  kor: 'Korean',
-  ara: 'Arabic',
-  dut: 'Dutch',
-  dan: 'Danish',
-  fin: 'Finnish',
-  nor: 'Norwegian',
-  swe: 'Swedish',
-  pol: 'Polish',
-  cze: 'Czech',
-  hun: 'Hungarian',
-  tur: 'Turkish',
-};
-
-function langName(code: string): string {
-  return langNames[code.toLowerCase()] ?? code.toUpperCase();
-}
-
-function removableTracks(tracks: string[], isAnimeAudio?: boolean): string[] {
-  if (!config) return [];
-  if (isAnimeAudio && config.cleanup.anime_keep_original_audio) return [];
-  const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
-  return tracks.filter((t) => !keep.has(t.toLowerCase()));
-}
-
-function keptTracks(tracks: string[]): string[] {
-  if (!config) return [];
-  const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
-  return tracks.filter((t) => keep.has(t.toLowerCase()));
-}
-
-function trackSummary(tracks: string[]): string {
-  const counts: Record<string, number> = {};
-  for (const t of tracks) {
-    const name = langName(t);
-    counts[name] = (counts[name] ?? 0) + 1;
-  }
-  return Object.entries(counts)
-    .map(([name, n]) => (n > 1 ? `${name} (${n})` : name))
-    .join(', ');
 }
 
 $effect(() => {
@@ -241,6 +309,13 @@ const filters: { value: string; label: string }[] = [
   { value: 'audio', label: 'Audio' },
   { value: 'cleanup', label: 'Cleanup' },
   { value: 'anime', label: 'Anime' },
+];
+
+const sortOptions: { value: string; label: string }[] = [
+  { value: 'needsWork', label: 'Needs Work First' },
+  { value: 'title', label: 'Title' },
+  { value: 'episodes', label: 'Episodes' },
+  { value: 'size', label: 'Size' },
 ];
 </script>
 
@@ -284,17 +359,37 @@ const filters: { value: string; label: string }[] = [
             {/each}
           </div>
           <div class="flex gap-2 mt-2">
-            <button
-              class="btn btn-primary btn-sm"
-              onclick={queueAllSeries}
-              disabled={queueing['all']}
-            >
-              {#if queueing['all']}
-                <span class="loading loading-spinner loading-xs"></span>
-              {:else}
-                Queue All Episodes
-              {/if}
-            </button>
+            {#if selectedEps.size > 0}
+              <button class="btn btn-ghost btn-sm" onclick={clearEpSelection}>
+                Clear ({selectedEps.size})
+              </button>
+              <button
+                class="btn btn-primary btn-sm"
+                onclick={queueSelectedEps}
+                disabled={queueingSelected}
+              >
+                {#if queueingSelected}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                  Queue {selectedEps.size} Selected
+                {/if}
+              </button>
+            {:else}
+              <button class="btn btn-ghost btn-sm" onclick={selectAllEps}>
+                Select All
+              </button>
+              <button
+                class="btn btn-primary btn-sm"
+                onclick={queueAllSeries}
+                disabled={queueing['all']}
+              >
+                {#if queueing['all']}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                  Queue All Episodes
+                {/if}
+              </button>
+            {/if}
           </div>
         </div>
       </div>
@@ -326,6 +421,12 @@ const filters: { value: string; label: string }[] = [
             </span>
           </div>
           <div class="flex items-center gap-2">
+            {#if seasonActiveJobs(season) > 0}
+              <span class="flex items-center gap-1">
+                <span class="loading loading-spinner loading-xs text-primary"></span>
+                <span class="text-xs text-primary">{seasonActiveJobs(season)} active</span>
+              </span>
+            {/if}
             {#if seasonNeedsWork(season) > 0}
               <span class="badge badge-warning badge-sm">{seasonNeedsWork(season)} need work</span>
             {/if}
@@ -348,7 +449,18 @@ const filters: { value: string; label: string }[] = [
         {#if expandedSeasons[season.season_number]}
           <div class="border-t border-base-content/5">
             {#each season.episodes as ep (ep.episode_number)}
-              <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-base-content/5 transition-colors border-b border-base-content/5 last:border-b-0">
+              <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-base-content/5 transition-colors border-b border-base-content/5 last:border-b-0 {selectedEps.has(ep.path) ? 'bg-primary/5' : ''}">
+                <!-- Checkbox -->
+                {#if episodeNeedsWork(ep)}
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-primary checkbox-xs shrink-0"
+                    checked={selectedEps.has(ep.path)}
+                    onchange={() => toggleEpSelect(ep.path)}
+                  />
+                {:else}
+                  <div class="w-4 shrink-0"></div>
+                {/if}
                 <!-- Episode number -->
                 <span class="text-sm text-base-content/30 w-8 text-right shrink-0">
                   {ep.episode_number}
@@ -376,10 +488,10 @@ const filters: { value: string; label: string }[] = [
                   <!-- Language details -->
                   {#if (ep.audio_languages.length > 0 || ep.subtitles.length > 0) && config}
                     {@const isAnime = selectedSeries?.is_anime}
-                    {@const removeSubs = removableTracks(ep.subtitles)}
-                    {@const keepSubs = keptTracks(ep.subtitles)}
-                    {@const removeAudio = removableTracks(ep.audio_languages, isAnime)}
-                    {@const keepAudio = keptTracks(ep.audio_languages)}
+                    {@const removeSubs = removableTracks(ep.subtitles, config)}
+                    {@const keepSubs = keptTracks(ep.subtitles, config)}
+                    {@const removeAudio = removableTracks(ep.audio_languages, config, isAnime)}
+                    {@const keepAudio = keptTracks(ep.audio_languages, config)}
                     <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                       {#if ep.audio_languages.length > 0}
                         <span class="text-xs text-base-content/30">
@@ -466,6 +578,11 @@ const filters: { value: string; label: string }[] = [
           </button>
         {/each}
       </div>
+      <select class="select select-sm select-bordered" bind:value={sortBy}>
+        {#each sortOptions as s}
+          <option value={s.value}>{s.label}</option>
+        {/each}
+      </select>
       <div class="relative flex-1">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -479,10 +596,43 @@ const filters: { value: string; label: string }[] = [
       </div>
     </div>
 
-    <div class="text-sm text-base-content/50">
-      {listSummary.total} show{listSummary.total !== 1 ? 's' : ''}
+    <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="text-sm text-base-content/50">
+        {listSummary.total} show{listSummary.total !== 1 ? 's' : ''}
+        {#if listSummary.needsWorkEps > 0}
+          <span class="text-warning">· {listSummary.needsWorkEps} episode{listSummary.needsWorkEps !== 1 ? 's' : ''} need work</span>
+        {/if}
+      </div>
+      {#if refreshMsg}
+        <span class="text-xs text-success">{refreshMsg}</span>
+      {/if}
+      <button
+        class="btn btn-ghost btn-xs text-base-content/40"
+        onclick={() => (showRefreshConfirm = true)}
+        disabled={refreshingLibrary || !config?.sonarr?.configured}
+        title="Force Sonarr to re-read all series files from disk"
+      >
+        {#if refreshingLibrary}
+          <span class="loading loading-spinner loading-xs"></span>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+        {/if}
+        Refresh Library
+      </button>
+    </div>
       {#if listSummary.needsWorkEps > 0}
-        <span class="text-warning">· {listSummary.needsWorkEps} episode{listSummary.needsWorkEps !== 1 ? 's' : ''} need work</span>
+        <button
+          class="btn btn-primary btn-sm"
+          onclick={queueAllFiltered}
+          disabled={queueingAll}
+        >
+          {#if queueingAll}
+            <span class="loading loading-spinner loading-xs"></span>
+          {:else}
+            Queue {listSummary.needsWorkEps} Episode{listSummary.needsWorkEps !== 1 ? 's' : ''}
+          {/if}
+        </button>
       {/if}
     </div>
 
@@ -534,6 +684,12 @@ const filters: { value: string; label: string }[] = [
               </div>
               <!-- Needs work badges -->
               <div class="flex items-center gap-2 shrink-0">
+                {#if seriesActiveCount(series.path) > 0}
+                  <span class="flex items-center gap-1">
+                    <span class="loading loading-spinner loading-xs text-primary"></span>
+                    <span class="text-xs text-primary">{seriesActiveCount(series.path)}</span>
+                  </span>
+                {/if}
                 {#if (series.audio_convert_count ?? 0) > 0}
                   <span class="badge badge-warning badge-sm">{series.audio_convert_count} audio</span>
                 {/if}
@@ -555,4 +711,18 @@ const filters: { value: string; label: string }[] = [
 
 {#if analyzePath}
   <AnalyzeModal path={analyzePath} onclose={() => (analyzePath = null)} />
+{/if}
+
+{#if showRefreshConfirm}
+  <div class="modal modal-open">
+    <div class="modal-box max-w-sm">
+      <h3 class="font-bold text-lg">Refresh Sonarr Library</h3>
+      <p class="py-4 text-sm text-base-content/70">This will force Sonarr to re-read metadata for <strong>every series</strong> in your library from disk. Depending on library size, this could take a long time.</p>
+      <div class="modal-action">
+        <button class="btn btn-ghost btn-sm" onclick={() => (showRefreshConfirm = false)}>Cancel</button>
+        <button class="btn btn-warning btn-sm" onclick={handleRefreshLibrary}>Refresh Library</button>
+      </div>
+    </div>
+    <div class="modal-backdrop" onclick={() => (showRefreshConfirm = false)}></div>
+  </div>
 {/if}

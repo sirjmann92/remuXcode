@@ -1,5 +1,6 @@
 <script lang="ts">
-import { deleteJob } from '$lib/api';
+import { cancelJob, deleteJob } from '$lib/api';
+import { channelLabel } from '$lib/format';
 import type { Job } from '$lib/types';
 import StatusBadge from './StatusBadge.svelte';
 
@@ -11,6 +12,7 @@ interface Props {
 
 const { job, onRemoved, detailed = false }: Props = $props();
 let deleting = $state(false);
+let cancelling = $state(false);
 
 const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
 const elapsed = $derived.by(() => {
@@ -33,13 +35,6 @@ function codecLabel(codec: string): string {
   return map[codec.toLowerCase()] ?? codec.toUpperCase();
 }
 
-function channelLabel(ch: number): string {
-  if (ch === 2) return '2.0';
-  if (ch === 6) return '5.1';
-  if (ch === 8) return '7.1';
-  return `${ch}ch`;
-}
-
 async function handleDelete() {
   deleting = true;
   try {
@@ -49,6 +44,18 @@ async function handleDelete() {
     // ignore
   } finally {
     deleting = false;
+  }
+}
+
+async function handleCancel() {
+  cancelling = true;
+  try {
+    await cancelJob(job.id);
+    onRemoved?.();
+  } catch {
+    // ignore
+  } finally {
+    cancelling = false;
   }
 }
 </script>
@@ -64,7 +71,22 @@ async function handleDelete() {
           <span class="text-xs text-base-content/30">{elapsed}</span>
         {/if}
       </div>
-      {#if job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled'}
+      {#if job.status === 'running' || job.status === 'pending'}
+        <button
+          class="btn btn-ghost btn-xs text-warning opacity-60 hover:opacity-100 transition-opacity"
+          onclick={handleCancel}
+          disabled={cancelling}
+          title="Cancel"
+        >
+          {#if cancelling}
+            <span class="loading loading-spinner loading-xs"></span>
+          {:else}
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+            </svg>
+          {/if}
+        </button>
+      {:else if job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled'}
         <button
           class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
           onclick={handleDelete}

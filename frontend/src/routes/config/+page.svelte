@@ -1,5 +1,6 @@
 <script lang="ts">
-import { getConfig, refreshRadarr, refreshSonarr, regenerateApiKey } from '$lib/api';
+import { getConfig, regenerateApiKey, updateConfig } from '$lib/api';
+import LanguageSelect from '$lib/components/LanguageSelect.svelte';
 import type { ConfigSummary } from '$lib/types';
 
 let config: ConfigSummary | null = $state(null);
@@ -8,9 +9,8 @@ let error = $state('');
 let keyCopied = $state(false);
 let keyVisible = $state(false);
 let regenerating = $state(false);
-let refreshingSonarr = $state(false);
-let refreshingRadarr = $state(false);
-let refreshMsg = $state('');
+let saving = $state(false);
+let saveMsg = $state('');
 
 async function fetchConfig() {
   loading = true;
@@ -21,6 +21,85 @@ async function fetchConfig() {
     error = e instanceof Error ? e.message : 'Failed to load config';
   } finally {
     loading = false;
+  }
+}
+
+async function save(section: string, field: string, value: unknown) {
+  saving = true;
+  saveMsg = '';
+  try {
+    await updateConfig({ [section]: { [field]: value } });
+    saveMsg = 'Saved';
+    setTimeout(() => {
+      saveMsg = '';
+    }, 1500);
+  } catch (e) {
+    saveMsg = e instanceof Error ? e.message : 'Save failed';
+  } finally {
+    saving = false;
+  }
+}
+
+async function toggleBool(section: 'audio' | 'video' | 'cleanup', field: string) {
+  if (!config) return;
+  const current = (config[section] as Record<string, unknown>)[field] as boolean;
+  const next = !current;
+  (config[section] as Record<string, unknown>)[field] = next;
+  await save(section, field, next);
+}
+
+function clampInt(
+  e: Event & { currentTarget: HTMLInputElement },
+  min: number,
+  max: number,
+): number {
+  let v = parseInt(e.currentTarget.value, 10);
+  if (Number.isNaN(v)) v = min;
+  v = Math.max(min, Math.min(max, v));
+  e.currentTarget.value = String(v);
+  return v;
+}
+
+function saveStr(
+  section: 'audio' | 'video' | 'cleanup',
+  field: string,
+  e: Event & { currentTarget: HTMLInputElement | HTMLSelectElement },
+) {
+  const v = e.currentTarget.value;
+  if (!config) return;
+  (config[section] as Record<string, unknown>)[field] = v;
+  save(section, field, v || null);
+}
+
+async function saveTop(field: string, value: unknown) {
+  saving = true;
+  saveMsg = '';
+  try {
+    await updateConfig({ [field]: value });
+    saveMsg = 'Saved';
+    setTimeout(() => {
+      saveMsg = '';
+    }, 1500);
+  } catch (e) {
+    saveMsg = e instanceof Error ? e.message : 'Save failed';
+  } finally {
+    saving = false;
+  }
+}
+
+async function saveNested(section: 'sonarr' | 'radarr', field: string, value: unknown) {
+  saving = true;
+  saveMsg = '';
+  try {
+    await updateConfig({ [section]: { [field]: value } });
+    saveMsg = 'Saved';
+    setTimeout(() => {
+      saveMsg = '';
+    }, 1500);
+  } catch (e) {
+    saveMsg = e instanceof Error ? e.message : 'Save failed';
+  } finally {
+    saving = false;
   }
 }
 
@@ -51,40 +130,10 @@ async function handleRegenerate() {
 $effect(() => {
   fetchConfig();
 });
-
-async function handleRefreshSonarr() {
-  refreshingSonarr = true;
-  refreshMsg = '';
-  try {
-    const res = await refreshSonarr();
-    refreshMsg = res.message;
-  } catch (e) {
-    refreshMsg = e instanceof Error ? e.message : 'Sonarr refresh failed';
-  } finally {
-    refreshingSonarr = false;
-  }
-}
-
-async function handleRefreshRadarr() {
-  refreshingRadarr = true;
-  refreshMsg = '';
-  try {
-    const res = await refreshRadarr();
-    refreshMsg = res.message;
-  } catch (e) {
-    refreshMsg = e instanceof Error ? e.message : 'Radarr refresh failed';
-  } finally {
-    refreshingRadarr = false;
-  }
-}
-
-function boolBadge(val: boolean): string {
-  return val ? 'badge-success' : 'badge-ghost';
-}
 </script>
 
 <svelte:head>
-  <title>Config · remuXcode</title>
+  <title>Settings · remuXcode</title>
 </svelte:head>
 
 <div class="space-y-6">
@@ -98,6 +147,14 @@ function boolBadge(val: boolean): string {
       <span>{error}</span>
     </div>
   {:else if config}
+    {#if saveMsg}
+      <div class="toast toast-top toast-end z-50">
+        <div class="alert alert-success alert-sm py-2">
+          <span class="text-xs">{saveMsg}</span>
+        </div>
+      </div>
+    {/if}
+
     <!-- Webhook API Key -->
     <div class="card-glass rounded-box">
       <div class="p-5">
@@ -147,37 +204,54 @@ function boolBadge(val: boolean): string {
       <!-- Audio -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-3">Audio Processing</h2>
-          <div class="space-y-1 text-sm">
-            <div class="flex justify-between">
-              <span>Enabled</span>
-              <span class="badge badge-xs {boolBadge(config.audio.enabled)}">
-                {config.audio.enabled ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Convert DTS</span>
-              <span class="badge badge-xs {boolBadge(config.audio.convert_dts)}">
-                {config.audio.convert_dts ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Convert TrueHD</span>
-              <span class="badge badge-xs {boolBadge(config.audio.convert_truehd)}">
-                {config.audio.convert_truehd ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Keep Original</span>
-              <span class="badge badge-xs {boolBadge(config.audio.keep_original)}">
-                {config.audio.keep_original ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Prefer AC3</span>
-              <span class="badge badge-xs {boolBadge(config.audio.prefer_ac3)}">
-                {config.audio.prefer_ac3 ? 'Yes' : 'No'}
-              </span>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Audio Processing</h2>
+          <p class="text-xs text-base-content/40 mb-3">Convert lossless and legacy audio codecs to smaller, compatible formats.</p>
+          <div class="space-y-2 text-sm">
+            <label class="flex items-center justify-between cursor-pointer" title="Enable automatic audio conversion">
+              <span>Enabled<span class="block text-xs text-base-content/30 font-normal">Enable automatic audio conversion</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.audio.enabled} onchange={() => toggleBool('audio', 'enabled')} />
+            </label>
+            <div class="{config.audio.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
+            {#each [
+              { field: 'convert_dts', label: 'Convert DTS', hint: 'Re-encode DTS/DTS-HD audio to EAC3 or AC3' },
+              { field: 'convert_truehd', label: 'Convert TrueHD', hint: 'Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)' },
+              { field: 'keep_original', label: 'Keep Original', hint: 'Retain the original audio track alongside the converted one' },
+              { field: 'prefer_ac3', label: 'Prefer AC3', hint: 'Use AC3 (Dolby Digital) instead of EAC3 for wider device support' },
+            ] as item}
+              <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
+                <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-sm toggle-primary"
+                  checked={(config.audio as Record<string, unknown>)[item.field] as boolean}
+                  onchange={() => toggleBool('audio', item.field)}
+                />
+              </label>
+            {/each}
+            <!-- Advanced -->
+            <details class="border-t border-base-content/10 pt-2 mt-3">
+              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
+              <div class="space-y-2 mt-2">
+                {#each [
+                  { field: 'ac3_bitrate', label: 'AC3 Bitrate', hint: 'kbps for Dolby Digital 5.1 output', min: 64, max: 6144 },
+                  { field: 'eac3_bitrate', label: 'EAC3 Bitrate', hint: 'kbps for Dolby Digital Plus output', min: 64, max: 6144 },
+                  { field: 'aac_surround_bitrate', label: 'AAC Surround Bitrate', hint: 'kbps for AAC 5.1+ output', min: 64, max: 6144 },
+                  { field: 'aac_stereo_bitrate', label: 'AAC Stereo Bitrate', hint: 'kbps for AAC stereo output', min: 64, max: 6144 },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="number"
+                      class="input input-xs input-bordered w-20 text-center font-mono"
+                      min={item.min}
+                      max={item.max}
+                      value={(config.audio as Record<string, unknown>)[item.field]}
+                      onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min, item.max); (config!.audio as Record<string, unknown>)[item.field] = v; save('audio', item.field, v); }}
+                    />
+                  </div>
+                {/each}
+              </div>
+            </details>
             </div>
           </div>
         </div>
@@ -186,43 +260,171 @@ function boolBadge(val: boolean): string {
       <!-- Video -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-3">Video Processing</h2>
-          <div class="space-y-1 text-sm">
-            <div class="flex justify-between">
-              <span>Enabled</span>
-              <span class="badge badge-xs {boolBadge(config.video.enabled)}">
-                {config.video.enabled ? 'Yes' : 'No'}
-              </span>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Video Processing</h2>
+          <p class="text-xs text-base-content/40 mb-3">Re-encode video to modern codecs for smaller file sizes.</p>
+          <div class="space-y-2 text-sm">
+            <label class="flex items-center justify-between cursor-pointer" title="Enable automatic video conversion">
+              <span>Enabled<span class="block text-xs text-base-content/30 font-normal">Enable automatic video conversion</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.video.enabled} onchange={() => toggleBool('video', 'enabled')} />
+            </label>
+            <div class="{config.video.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
+            <div class="flex items-center justify-between">
+              <span>Target Codec<span class="block text-xs text-base-content/30 font-normal">Output codec for converted video</span></span>
+              <select
+                class="select select-xs select-bordered w-24"
+                value={config.video.codec}
+                onchange={(e) => { config!.video.codec = e.currentTarget.value; save('video', 'codec', e.currentTarget.value); }}
+              >
+                <option value="hevc">HEVC</option>
+                <option value="av1">AV1</option>
+              </select>
             </div>
-            <div class="flex justify-between">
-              <span>Target Codec</span>
-              <span class="font-mono">{config.video.codec}</span>
+            {#each [
+              { field: 'convert_10bit_x264', label: 'Convert 10-bit x264', hint: 'Re-encode 10-bit H.264 files (common in anime releases)' },
+              { field: 'convert_8bit_x264', label: 'Convert 8-bit x264', hint: 'Re-encode standard 8-bit H.264 files' },
+              { field: 'anime_only', label: 'Anime Only', hint: 'Only convert video for anime content, skip live action' },
+            ] as item}
+              <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
+                <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-sm toggle-primary"
+                  checked={(config.video as Record<string, unknown>)[item.field] as boolean}
+                  onchange={() => toggleBool('video', item.field)}
+                />
+              </label>
+            {/each}
+            <div class="flex items-center justify-between">
+              <span>Anime CRF<span class="block text-xs text-base-content/30 font-normal">Quality level for anime (lower = better, 15–23 typical)</span></span>
+              <input
+                type="number"
+                class="input input-xs input-bordered w-16 text-center font-mono"
+                min="0"
+                max="51"
+                value={config.video.anime_crf}
+                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, 51); config!.video.anime_crf = v; save('video', 'anime_crf', v); }}
+              />
             </div>
-            <div class="flex justify-between">
-              <span>Convert 10-bit x264</span>
-              <span class="badge badge-xs {boolBadge(config.video.convert_10bit_x264)}">
-                {config.video.convert_10bit_x264 ? 'Yes' : 'No'}
-              </span>
+            <div class="flex items-center justify-between">
+              <span>Live Action CRF<span class="block text-xs text-base-content/30 font-normal">Quality level for live action (lower = better, 18–26 typical)</span></span>
+              <input
+                type="number"
+                class="input input-xs input-bordered w-16 text-center font-mono"
+                min="0"
+                max="51"
+                value={config.video.live_action_crf}
+                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, 51); config!.video.live_action_crf = v; save('video', 'live_action_crf', v); }}
+              />
             </div>
-            <div class="flex justify-between">
-              <span>Convert 8-bit x264</span>
-              <span class="badge badge-xs {boolBadge(config.video.convert_8bit_x264)}">
-                {config.video.convert_8bit_x264 ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Anime Only</span>
-              <span class="badge badge-xs {boolBadge(config.video.anime_only)}">
-                {config.video.anime_only ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Anime CRF</span>
-              <span class="font-mono">{config.video.anime_crf}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Live Action CRF</span>
-              <span class="font-mono">{config.video.live_action_crf}</span>
+            <!-- Advanced -->
+            <details class="border-t border-base-content/10 pt-2 mt-3">
+              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
+              <div class="space-y-2 mt-2">
+                <label class="flex items-center justify-between cursor-pointer" title="Use path patterns and metadata to identify anime content">
+                  <span class="text-xs">Auto-Detect Anime<span class="block text-xs text-base-content/30 font-normal">Use path patterns and metadata to identify anime</span></span>
+                  <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.video.anime_auto_detect} onchange={() => toggleBool('video', 'anime_auto_detect')} />
+                </label>
+                <!-- HEVC Encoding -->
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">HEVC Encoding</h3>
+                {#each [
+                  { field: 'anime_preset', label: 'Anime Preset', type: 'select', options: ['ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow','placebo'], hint: 'Encoding speed vs quality for anime' },
+                  { field: 'anime_tune', label: 'Anime Tune', type: 'select', options: ['','animation','grain','psnr','ssim','fastdecode','zerolatency'], hint: 'x265 tuning profile (empty = none)' },
+                  { field: 'anime_framerate', label: 'Anime Framerate', type: 'text', hint: 'e.g. 24000/1001 for 23.976fps (empty = auto)' },
+                  { field: 'live_action_preset', label: 'Live Action Preset', type: 'select', options: ['ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow','placebo'], hint: 'Encoding speed vs quality for live action' },
+                  { field: 'live_action_tune', label: 'Live Action Tune', type: 'select', options: ['','grain','psnr','ssim','fastdecode','zerolatency'], hint: 'x265 tuning profile (empty = none)' },
+                  { field: 'live_action_framerate', label: 'Live Action Framerate', type: 'text', hint: 'Framerate override (empty = auto-detect)' },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    {#if item.type === 'select'}
+                      <select
+                        class="select select-xs select-bordered w-28 font-mono"
+                        value={(config.video as Record<string, unknown>)[item.field] as string}
+                        onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLSelectElement })}
+                      >
+                        {#each item.options! as opt}
+                          <option value={opt}>{opt || '(none)'}</option>
+                        {/each}
+                      </select>
+                    {:else}
+                      <input
+                        type="text"
+                        class="input input-xs input-bordered w-28 font-mono text-xs"
+                        value={(config.video as Record<string, unknown>)[item.field] as string}
+                        onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
+                      />
+                    {/if}
+                  </div>
+                {/each}
+                <!-- AV1 Encoding -->
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">AV1 Encoding (SVT-AV1)</h3>
+                {#each [
+                  { field: 'av1_anime_crf', label: 'Anime CRF', hint: 'Quality for anime (0–63, lower = better)', min: 0, max: 63 },
+                  { field: 'av1_anime_preset', label: 'Anime Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                  { field: 'av1_live_action_crf', label: 'Live Action CRF', hint: 'Quality for live action (0–63)', min: 0, max: 63 },
+                  { field: 'av1_live_action_preset', label: 'Live Action Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="number"
+                      class="input input-xs input-bordered w-16 text-center font-mono"
+                      min={item.min}
+                      max={item.max}
+                      value={(config.video as Record<string, unknown>)[item.field]}
+                      onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min, item.max); (config!.video as Record<string, unknown>)[item.field] = v; save('video', item.field, v); }}
+                    />
+                  </div>
+                {/each}
+                {#each [
+                  { field: 'av1_anime_framerate', label: 'Anime Framerate', hint: 'e.g. 24000/1001 (empty = auto)' },
+                  { field: 'av1_live_action_framerate', label: 'Live Action Framerate', hint: 'Framerate override (empty = auto)' },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="text"
+                      class="input input-xs input-bordered w-28 font-mono text-xs"
+                      value={(config.video as Record<string, unknown>)[item.field] as string}
+                      onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
+                    />
+                  </div>
+                {/each}
+                <!-- Output Format -->
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">Output Format (HEVC)</h3>
+                {#each [
+                  { field: 'vbv_maxrate', label: 'VBV Max Rate', hint: 'Max bitrate in kbps for rate control', min: 0, max: 100000 },
+                  { field: 'vbv_bufsize', label: 'VBV Buffer Size', hint: 'Buffer size in kbps for rate control', min: 0, max: 200000 },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="number"
+                      class="input input-xs input-bordered w-20 text-center font-mono"
+                      min={item.min}
+                      max={item.max}
+                      value={(config.video as Record<string, unknown>)[item.field]}
+                      onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min, item.max); (config!.video as Record<string, unknown>)[item.field] = v; save('video', item.field, v); }}
+                    />
+                  </div>
+                {/each}
+                {#each [
+                  { field: 'level', label: 'Level', hint: 'H.265 level (e.g. 4.1)' },
+                  { field: 'profile', label: 'Profile', hint: 'H.265 profile (e.g. main10)' },
+                  { field: 'pix_fmt', label: 'Pixel Format', hint: 'Output pixel format (e.g. yuv420p10le)' },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="text"
+                      class="input input-xs input-bordered w-28 font-mono text-xs"
+                      value={(config.video as Record<string, unknown>)[item.field] as string}
+                      onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
+                    />
+                  </div>
+                {/each}
+              </div>
+            </details>
             </div>
           </div>
         </div>
@@ -231,35 +433,61 @@ function boolBadge(val: boolean): string {
       <!-- Cleanup -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-3">Stream Cleanup</h2>
-          <div class="space-y-1 text-sm">
-            <div class="flex justify-between">
-              <span>Enabled</span>
-              <span class="badge badge-xs {boolBadge(config.cleanup.enabled)}">
-                {config.cleanup.enabled ? 'Yes' : 'No'}
-              </span>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Stream Cleanup</h2>
+          <p class="text-xs text-base-content/40 mb-3">Remove unwanted audio tracks and subtitles based on language preferences.</p>
+          <div class="space-y-2 text-sm">
+            <label class="flex items-center justify-between cursor-pointer" title="Enable automatic removal of unwanted streams">
+              <span>Enabled<span class="block text-xs text-base-content/30 font-normal">Enable automatic removal of unwanted streams</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.cleanup.enabled} onchange={() => toggleBool('cleanup', 'enabled')} />
+            </label>
+            <div class="{config.cleanup.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
+            <div class="flex items-center justify-between">
+              <span>Languages<span class="block text-xs text-base-content/30 font-normal">Audio and subtitle languages to keep</span></span>
+              <LanguageSelect
+                selected={config.cleanup.keep_languages}
+                onchange={(codes) => {
+                  config!.cleanup.keep_languages = codes;
+                  save('cleanup', 'keep_languages', codes);
+                }}
+              />
             </div>
-            <div class="flex justify-between">
-              <span>Clean Audio</span>
-              <span class="badge badge-xs {boolBadge(config.cleanup.clean_audio)}">
-                {config.cleanup.clean_audio ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Clean Subtitles</span>
-              <span class="badge badge-xs {boolBadge(config.cleanup.clean_subtitles)}">
-                {config.cleanup.clean_subtitles ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Keep Commentary</span>
-              <span class="badge badge-xs {boolBadge(config.cleanup.keep_commentary)}">
-                {config.cleanup.keep_commentary ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span>Languages</span>
-              <span class="font-mono text-xs">{config.cleanup.keep_languages.join(', ')}</span>
+            {#each [
+              { field: 'clean_audio', label: 'Clean Audio', hint: 'Remove audio tracks not in your language list' },
+              { field: 'clean_subtitles', label: 'Clean Subtitles', hint: 'Remove subtitle tracks not in your language list' },
+              { field: 'keep_commentary', label: 'Keep Commentary', hint: 'Preserve director/cast commentary tracks regardless of language' },
+              { field: 'anime_keep_original_audio', label: 'Anime Keep Original Audio', hint: 'Always keep the original-language audio in anime files (Japanese, Korean, etc.)' },
+            ] as item}
+              <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
+                <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-sm toggle-primary"
+                  checked={(config.cleanup as Record<string, unknown>)[item.field] as boolean}
+                  onchange={() => toggleBool('cleanup', item.field)}
+                />
+              </label>
+            {/each}
+            <!-- Advanced -->
+            <details class="border-t border-base-content/10 pt-2 mt-3">
+              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
+              <div class="space-y-2 mt-2">
+                {#each [
+                  { field: 'keep_undefined', label: 'Keep Undefined Language', hint: 'Keep tracks with no language tag instead of removing them' },
+                  { field: 'keep_audio_description', label: 'Keep Audio Description', hint: 'Preserve audio description tracks for visually impaired' },
+                  { field: 'keep_sdh', label: 'Keep SDH Subtitles', hint: 'Preserve subtitles for the deaf and hard of hearing' },
+                ] as item}
+                  <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-sm toggle-primary"
+                      checked={(config.cleanup as Record<string, unknown>)[item.field] as boolean}
+                      onchange={() => toggleBool('cleanup', item.field)}
+                    />
+                  </label>
+                {/each}
+              </div>
+            </details>
             </div>
           </div>
         </div>
@@ -268,68 +496,90 @@ function boolBadge(val: boolean): string {
       <!-- Integrations -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-3">Integrations</h2>
-          <div class="space-y-1 text-sm">
-            <div class="flex justify-between">
-              <span>Sonarr</span>
-              <span class="badge badge-xs {boolBadge(config.sonarr.configured)}">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Integrations & Processing</h2>
+          <p class="text-xs text-base-content/40 mb-3">Sonarr/Radarr connections and processing settings.</p>
+          <div class="space-y-3 text-sm">
+            <!-- Sonarr -->
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30">Sonarr</h3>
+            <div class="flex items-center justify-between" title="Sonarr instance URL (e.g. http://192.168.1.100:8989)">
+              <span class="text-xs">URL<span class="block text-xs text-base-content/30 font-normal">Sonarr server address</span></span>
+              <input
+                type="text"
+                class="input input-xs input-bordered w-52 font-mono text-xs"
+                value={config.sonarr.url}
+                placeholder="http://localhost:8989"
+                onchange={(e) => { config!.sonarr.url = e.currentTarget.value; saveNested('sonarr', 'url', e.currentTarget.value); }}
+              />
+            </div>
+            <div class="flex items-center justify-between" title="Sonarr API key from Settings → General → Security">
+              <span class="text-xs">API Key<span class="block text-xs text-base-content/30 font-normal">Found in Sonarr → Settings → General</span></span>
+              <input
+                type="password"
+                class="input input-xs input-bordered w-52 font-mono text-xs"
+                value={config.sonarr.api_key}
+                placeholder="Your Sonarr API key"
+                onchange={(e) => { config!.sonarr.api_key = e.currentTarget.value; saveNested('sonarr', 'api_key', e.currentTarget.value); }}
+              />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-xs {config.sonarr.configured ? 'badge-success' : 'badge-ghost'}">
                 {config.sonarr.configured ? 'Connected' : 'Not configured'}
               </span>
             </div>
-            {#if config.sonarr.url}
-              <p class="text-xs opacity-60 font-mono truncate">{config.sonarr.url}</p>
-            {/if}
-            <div class="flex justify-between">
-              <span>Radarr</span>
-              <span class="badge badge-xs {boolBadge(config.radarr.configured)}">
+
+            <!-- Radarr -->
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-1">Radarr</h3>
+            <div class="flex items-center justify-between" title="Radarr instance URL (e.g. http://192.168.1.100:7878)">
+              <span class="text-xs">URL<span class="block text-xs text-base-content/30 font-normal">Radarr server address</span></span>
+              <input
+                type="text"
+                class="input input-xs input-bordered w-52 font-mono text-xs"
+                value={config.radarr.url}
+                placeholder="http://localhost:7878"
+                onchange={(e) => { config!.radarr.url = e.currentTarget.value; saveNested('radarr', 'url', e.currentTarget.value); }}
+              />
+            </div>
+            <div class="flex items-center justify-between" title="Radarr API key from Settings → General → Security">
+              <span class="text-xs">API Key<span class="block text-xs text-base-content/30 font-normal">Found in Radarr → Settings → General</span></span>
+              <input
+                type="password"
+                class="input input-xs input-bordered w-52 font-mono text-xs"
+                value={config.radarr.api_key}
+                placeholder="Your Radarr API key"
+                onchange={(e) => { config!.radarr.api_key = e.currentTarget.value; saveNested('radarr', 'api_key', e.currentTarget.value); }}
+              />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-xs {config.radarr.configured ? 'badge-success' : 'badge-ghost'}">
                 {config.radarr.configured ? 'Connected' : 'Not configured'}
               </span>
             </div>
-            {#if config.radarr.url}
-              <p class="text-xs opacity-60 font-mono truncate">{config.radarr.url}</p>
-            {/if}
-            <div class="flex justify-between">
-              <span>Workers</span>
-              <span class="font-mono">{config.workers}</span>
+
+            <!-- Processing -->
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-1">Processing</h3>
+            <div class="flex items-center justify-between" title="Number of files that can be processed simultaneously">
+              <span class="text-xs">Workers<span class="block text-xs text-base-content/30 font-normal">Concurrent processing threads (1–16)</span></span>
+              <input
+                type="number"
+                class="input input-xs input-bordered w-16 text-center font-mono"
+                min="1"
+                max="16"
+                value={config.workers}
+                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 1, 16); config!.workers = v; saveTop('workers', v); }}
+              />
             </div>
-            <div class="flex justify-between">
-              <span>Job History</span>
-              <span class="font-mono">{config.job_history_days} days</span>
+            <div class="flex items-center justify-between" title="Completed and failed jobs are removed after this many days">
+              <span class="text-xs">Job History<span class="block text-xs text-base-content/30 font-normal">Days to retain completed job records (1–365)</span></span>
+              <input
+                type="number"
+                class="input input-xs input-bordered w-16 text-center font-mono"
+                min="1"
+                max="365"
+                value={config.job_history_days}
+                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 1, 365); config!.job_history_days = v; saveTop('job_history_days', v); }}
+              />
             </div>
           </div>
-          {#if config.sonarr.configured || config.radarr.configured}
-            <div class="divider my-2"></div>
-            <p class="text-xs opacity-60 mb-2">Force a full library refresh (re-reads all metadata from disk).</p>
-            <div class="flex gap-2">
-              {#if config.sonarr.configured}
-                <button
-                  class="btn btn-sm btn-outline"
-                  onclick={handleRefreshSonarr}
-                  disabled={refreshingSonarr}
-                >
-                  {#if refreshingSonarr}
-                    <span class="loading loading-spinner loading-xs"></span>
-                  {/if}
-                  Refresh Sonarr
-                </button>
-              {/if}
-              {#if config.radarr.configured}
-                <button
-                  class="btn btn-sm btn-outline"
-                  onclick={handleRefreshRadarr}
-                  disabled={refreshingRadarr}
-                >
-                  {#if refreshingRadarr}
-                    <span class="loading loading-spinner loading-xs"></span>
-                  {/if}
-                  Refresh Radarr
-                </button>
-              {/if}
-            </div>
-            {#if refreshMsg}
-              <p class="text-xs mt-2 text-success">{refreshMsg}</p>
-            {/if}
-          {/if}
         </div>
       </div>
     </div>

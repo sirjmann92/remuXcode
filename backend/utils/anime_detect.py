@@ -386,12 +386,3 @@ class AnimeDetector:
         except requests.RequestException as e:
             logger.warning("Radarr API request failed: %s", e)
             return ContentType.UNKNOWN
-
-
-def is_anime(file_path: str) -> bool:
-    """Simple function to check if a file is anime.
-
-    Uses default detector with path-based detection only.
-    """
-    detector = AnimeDetector()
-    return detector.is_anime(file_path, use_api=False)
