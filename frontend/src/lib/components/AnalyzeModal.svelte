@@ -1,5 +1,7 @@
 <script lang="ts">
 import { analyzeFile } from '$lib/api';
+import { channelLabel } from '$lib/format';
+import { langLabel } from '$lib/languages';
 import type { AnalyzeResult } from '$lib/types';
 
 interface Props {
@@ -60,42 +62,6 @@ function formatFrameRate(rate: string): string {
     return `${fps.toFixed(3)} fps`;
   }
   return rate;
-}
-
-function channelLabel(ch: number, layout: string | null): string {
-  if (layout) return `${ch}ch (${layout})`;
-  const map: Record<number, string> = { 1: 'Mono', 2: 'Stereo', 6: '5.1', 8: '7.1' };
-  return map[ch] ?? `${ch}ch`;
-}
-
-const langNames: Record<string, string> = {
-  eng: 'English',
-  fre: 'French',
-  spa: 'Spanish',
-  ger: 'German',
-  ita: 'Italian',
-  por: 'Portuguese',
-  rus: 'Russian',
-  chi: 'Chinese',
-  jpn: 'Japanese',
-  kor: 'Korean',
-  ara: 'Arabic',
-  dut: 'Dutch',
-  dan: 'Danish',
-  fin: 'Finnish',
-  nor: 'Norwegian',
-  swe: 'Swedish',
-  pol: 'Polish',
-  cze: 'Czech',
-  hun: 'Hungarian',
-  tur: 'Turkish',
-  hin: 'Hindi',
-  tha: 'Thai',
-};
-
-function langLabel(code: string | null): string {
-  if (!code) return 'Unknown';
-  return langNames[code.toLowerCase()] ?? code.toUpperCase();
 }
 
 function fileName(path: string): string {

@@ -66,6 +66,25 @@ export interface ConfigSummary {
     anime_only: boolean;
     anime_crf: number;
     live_action_crf: number;
+    // Advanced
+    anime_auto_detect: boolean;
+    anime_preset: string;
+    anime_tune: string;
+    anime_framerate: string;
+    live_action_preset: string;
+    live_action_tune: string;
+    live_action_framerate: string;
+    av1_anime_crf: number;
+    av1_anime_preset: number;
+    av1_anime_framerate: string;
+    av1_live_action_crf: number;
+    av1_live_action_preset: number;
+    av1_live_action_framerate: string;
+    vbv_maxrate: number;
+    vbv_bufsize: number;
+    level: string;
+    profile: string;
+    pix_fmt: string;
   };
   audio: {
     enabled: boolean;
@@ -73,6 +92,11 @@ export interface ConfigSummary {
     convert_truehd: boolean;
     keep_original: boolean;
     prefer_ac3: boolean;
+    // Advanced
+    ac3_bitrate: number;
+    eac3_bitrate: number;
+    aac_surround_bitrate: number;
+    aac_stereo_bitrate: number;
   };
   cleanup: {
     enabled: boolean;
@@ -81,14 +105,20 @@ export interface ConfigSummary {
     keep_languages: string[];
     keep_commentary: boolean;
     anime_keep_original_audio: boolean;
+    // Advanced
+    keep_undefined: boolean;
+    keep_audio_description: boolean;
+    keep_sdh: boolean;
   };
   sonarr: {
     configured: boolean;
     url: string;
+    api_key: string;
   };
   radarr: {
     configured: boolean;
     url: string;
+    api_key: string;
   };
   path_mappings: { container: string; host: string }[];
   workers: number;

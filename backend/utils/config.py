@@ -10,7 +10,6 @@ import logging
 import os
 from pathlib import Path
 import re
-import tempfile
 from typing import Any
 
 import yaml
@@ -104,25 +103,12 @@ class VideoConfig:
 
 
 @dataclass
-class LanguageConfig:
-    """Language filtering settings."""
-
-    enabled: bool = True
-    always_keep: list[str] = field(default_factory=lambda: ["eng"])
-    keep_original: bool = True
-    keep_forced_subs: bool = True
-    keep_sdh: bool = True
-    remove_commentary: bool = False
-
-
-@dataclass
 class SonarrConfig:
     """Sonarr integration settings."""
 
     enabled: bool = True
     url: str = "http://localhost:8989"
     api_key: str = ""
-    trigger_rename: bool = True
 
 
 @dataclass
@@ -132,35 +118,6 @@ class RadarrConfig:
     enabled: bool = True
     url: str = "http://localhost:7878"
     api_key: str = ""
-    trigger_rename: bool = True
-
-
-@dataclass
-class WebhookConfig:
-    """Webhook server settings."""
-
-    enabled: bool = True
-    host: str = "0.0.0.0"
-    port: int = 7889
-    api_key: str = ""
-
-
-@dataclass
-class PathMapping:
-    """Container to host path mapping."""
-
-    container: str
-    host: str
-
-
-@dataclass
-class NotificationConfig:
-    """Notification settings."""
-
-    discord_enabled: bool = False
-    discord_webhook: str = ""
-    slack_enabled: bool = False
-    slack_webhook: str = ""
 
 
 class Config:
@@ -178,21 +135,15 @@ class Config:
         # Typed configuration sections
         self.audio = self._parse_audio_config()
         self.video = self._parse_video_config()
-        self.language = self._parse_language_config()
         self.cleanup = self._parse_cleanup_config()
         self.sonarr = self._parse_sonarr_config()
         self.radarr = self._parse_radarr_config()
-        self.webhook = self._parse_webhook_config()
-        self.path_mappings = self._parse_path_mappings()
-        self.notifications = self._parse_notification_config()
 
         # General settings
-        self.log_level = self._get("general.log_level", "INFO")
         # Worker count with env override: REMUXCODE_WORKERS > processing.max_concurrent_jobs > default (1)
         self.workers = int(
             os.getenv("REMUXCODE_WORKERS", self._get("processing.max_concurrent_jobs", 1))
         )
-        self.temp_dir = self._get("general.temp_dir", tempfile.gettempdir())
         self.job_history_days = int(
             os.getenv("JOB_HISTORY_DAYS", self._get("general.job_history_days", 30))
         )
@@ -336,24 +287,12 @@ class Config:
             job_timeout=self._get("processing.job_timeout", 7200),
         )
 
-    def _parse_language_config(self) -> LanguageConfig:
-        """Parse language filtering configuration."""
-        return LanguageConfig(
-            enabled=self._get("language.enabled", True),
-            always_keep=self._get("language.always_keep", ["eng"]),
-            keep_original=self._get("language.keep_original", True),
-            keep_forced_subs=self._get("language.keep_forced_subs", True),
-            keep_sdh=self._get("language.keep_sdh", True),
-            remove_commentary=self._get("language.remove_commentary", False),
-        )
-
     def _parse_sonarr_config(self) -> SonarrConfig:
         """Parse Sonarr configuration."""
         return SonarrConfig(
             enabled=self._get("sonarr.enabled", True),
             url=self._get("sonarr.url", "http://localhost:8989"),
             api_key=self._get("sonarr.api_key", os.getenv("SONARR_API_KEY", "")),
-            trigger_rename=self._get("sonarr.trigger_rename", True),
         )
 
     def _parse_radarr_config(self) -> RadarrConfig:
@@ -362,34 +301,6 @@ class Config:
             enabled=self._get("radarr.enabled", True),
             url=self._get("radarr.url", "http://localhost:7878"),
             api_key=self._get("radarr.api_key", os.getenv("RADARR_API_KEY", "")),
-            trigger_rename=self._get("radarr.trigger_rename", True),
-        )
-
-    def _parse_webhook_config(self) -> WebhookConfig:
-        """Parse webhook server configuration."""
-        return WebhookConfig(
-            enabled=self._get("webhook.enabled", True),
-            host=self._get("webhook.host", "0.0.0.0"),
-            port=self._get("webhook.port", 7889),
-            api_key=self._get("webhook.api_key", os.getenv("WEBHOOK_API_KEY", "")),
-        )
-
-    def _parse_path_mappings(self) -> list[PathMapping]:
-        """Parse path mappings configuration."""
-        mappings_raw = self._get("path_mappings", [])
-        return [
-            PathMapping(container=m["container"], host=m["host"])
-            for m in mappings_raw
-            if isinstance(m, dict) and "container" in m and "host" in m
-        ]
-
-    def _parse_notification_config(self) -> NotificationConfig:
-        """Parse notification configuration."""
-        return NotificationConfig(
-            discord_enabled=self._get("notifications.discord.enabled", False),
-            discord_webhook=self._get("notifications.discord.webhook_url", ""),
-            slack_enabled=self._get("notifications.slack.enabled", False),
-            slack_webhook=self._get("notifications.slack.webhook_url", ""),
         )
 
     def reload(self) -> None:
@@ -397,14 +308,92 @@ class Config:
         self._load_config()
         self.audio = self._parse_audio_config()
         self.video = self._parse_video_config()
-        self.language = self._parse_language_config()
         self.cleanup = self._parse_cleanup_config()
         self.sonarr = self._parse_sonarr_config()
         self.radarr = self._parse_radarr_config()
-        self.webhook = self._parse_webhook_config()
-        self.path_mappings = self._parse_path_mappings()
-        self.notifications = self._parse_notification_config()
         logger.info("Configuration reloaded")
+
+    def save(self) -> None:
+        """Persist current in-memory config back to the YAML file."""
+        if not self.config_path:
+            raise RuntimeError("No config file path available")
+
+        # Merge updated sections into raw config
+        self._raw_config.setdefault("audio", {})
+        for key in (
+            "enabled",
+            "convert_dts",
+            "convert_truehd",
+            "keep_original",
+            "prefer_ac3",
+            "ac3_bitrate",
+            "eac3_bitrate",
+            "aac_surround_bitrate",
+            "aac_stereo_bitrate",
+        ):
+            self._raw_config["audio"][key] = getattr(self.audio, key)
+
+        self._raw_config.setdefault("video", {})
+        for key in (
+            "enabled",
+            "codec",
+            "convert_10bit_x264",
+            "convert_8bit_x264",
+            "anime_only",
+            "anime_auto_detect",
+            "anime_crf",
+            "anime_preset",
+            "anime_tune",
+            "anime_framerate",
+            "live_action_crf",
+            "live_action_preset",
+            "live_action_tune",
+            "live_action_framerate",
+            "av1_anime_crf",
+            "av1_anime_preset",
+            "av1_anime_framerate",
+            "av1_live_action_crf",
+            "av1_live_action_preset",
+            "av1_live_action_framerate",
+            "vbv_maxrate",
+            "vbv_bufsize",
+            "level",
+            "profile",
+            "pix_fmt",
+        ):
+            self._raw_config["video"][key] = getattr(self.video, key)
+
+        self._raw_config.setdefault("cleanup", {})
+        for key in (
+            "enabled",
+            "clean_audio",
+            "clean_subtitles",
+            "keep_languages",
+            "keep_undefined",
+            "keep_commentary",
+            "keep_audio_description",
+            "keep_sdh",
+            "anime_keep_original_audio",
+        ):
+            self._raw_config["cleanup"][key] = getattr(self.cleanup, key)
+
+        self._raw_config.setdefault("sonarr", {})
+        for key in ("enabled", "url", "api_key"):
+            self._raw_config["sonarr"][key] = getattr(self.sonarr, key)
+
+        self._raw_config.setdefault("radarr", {})
+        for key in ("enabled", "url", "api_key"):
+            self._raw_config["radarr"][key] = getattr(self.radarr, key)
+
+        self._raw_config.setdefault("processing", {})
+        self._raw_config["processing"]["max_concurrent_jobs"] = self.workers
+
+        self._raw_config.setdefault("general", {})
+        self._raw_config["general"]["job_history_days"] = self.job_history_days
+
+        with self.config_path.open("w") as f:
+            yaml.dump(self._raw_config, f, default_flow_style=False, sort_keys=False)
+        logger.info("Configuration saved to %s", self.config_path)
 
 
 # Global configuration instance

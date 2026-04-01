@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
 import uuid
 
 from backend.utils.anime_detect import AnimeDetector, ContentType
@@ -135,6 +136,7 @@ class VideoConverter:
         force_content_type: ContentType | None = None,
         job_id: str | None = None,
         progress_callback: Callable[[float], None] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -144,6 +146,7 @@ class VideoConverter:
             force_content_type: Override content type detection
             job_id: Unique job identifier (used for temp directory naming)
             progress_callback: Optional callback receiving progress 0-100.
+            cancel_event: Event to signal cancellation (kills ffmpeg).
 
         Returns:
             VideoConversionResult with conversion details
@@ -251,6 +254,7 @@ class VideoConverter:
                 duration_secs=info.duration,
                 progress_cb=progress_callback,
                 timeout=self.config.job_timeout or None,  # 0 = no timeout
+                cancel_event=cancel_event,
             )
 
             if returncode != 0:
@@ -573,29 +577,3 @@ class VideoConverter:
         cmd.append(output_file)
 
         return cmd
-
-    def get_status(self, file_path: str) -> dict:
-        """Get conversion status/info for a file."""
-        info = self.ffprobe.get_file_info(file_path)
-        if info is None:
-            return {"status": "error", "message": "Failed to analyze file"}
-
-        video = info.primary_video
-        if video is None:
-            return {"status": "error", "message": "No video stream found"}
-
-        content_type = self.anime_detector.detect(file_path)
-
-        return {
-            "status": "ok",
-            "file": file_path,
-            "codec": video.codec_name,
-            "bit_depth": video.bit_depth,
-            "resolution": f"{video.width}x{video.height}",
-            "is_hevc": video.is_hevc,
-            "is_10bit_h264": video.is_10bit_h264,
-            "needs_conversion": self.should_convert(file_path),
-            "content_type": content_type.value,
-            "file_size": info.size,
-            "duration": info.duration,
-        }
