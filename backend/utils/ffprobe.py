@@ -92,11 +92,6 @@ class AudioStream:
             or "dts_ma" in self.codec_name.lower()
         )
 
-    @property
-    def needs_conversion(self) -> bool:
-        """Check if stream needs conversion for compatibility (DTS only, config-unaware)."""
-        return self.is_dts
-
 
 @dataclass
 class SubtitleStream:
@@ -114,16 +109,6 @@ class SubtitleStream:
     def is_sdh(self) -> bool:
         """Alias for is_hearing_impaired (SDH = Subtitles for Deaf/Hard of Hearing)."""
         return self.is_hearing_impaired
-
-    @property
-    def is_pgs(self) -> bool:
-        """Check if stream is PGS (Blu-ray image-based)."""
-        return self.codec_name.lower() in ("hdmv_pgs_subtitle", "pgssub")
-
-    @property
-    def is_text_based(self) -> bool:
-        """Check if stream is text-based (SRT, ASS, etc.)."""
-        return self.codec_name.lower() in ("subrip", "srt", "ass", "ssa", "mov_text", "webvtt")
 
 
 @dataclass
@@ -173,17 +158,6 @@ class MediaInfo:
         return any(s.is_truehd for s in self.audio_streams)
 
     @property
-    def needs_audio_conversion(self) -> bool:
-        """Check if file needs audio conversion (DTS by default, config-unaware)."""
-        return any(s.needs_conversion for s in self.audio_streams)
-
-    @property
-    def needs_video_conversion(self) -> bool:
-        """Check if file needs video conversion (10-bit H.264)."""
-        video = self.primary_video
-        return video is not None and video.is_10bit_h264
-
-    @property
     def is_hevc(self) -> bool:
         """Check if primary video is already HEVC."""
         video = self.primary_video
@@ -194,14 +168,6 @@ class MediaInfo:
         """Check if primary video is already AV1."""
         video = self.primary_video
         return video is not None and video.is_av1
-
-    def get_audio_by_language(self, lang_codes: list[str]) -> list[AudioStream]:
-        """Get audio streams matching language codes."""
-        return [s for s in self.audio_streams if s.language in lang_codes]
-
-    def get_subs_by_language(self, lang_codes: list[str]) -> list[SubtitleStream]:
-        """Get subtitle streams matching language codes."""
-        return [s for s in self.subtitle_streams if s.language in lang_codes]
 
 
 class FFProbe:
@@ -381,13 +347,3 @@ class FFProbe:
             filename=tags.get("filename"),
             mimetype=tags.get("mimetype"),
         )
-
-    def is_10bit_h264(self, file_path: str) -> bool:
-        """Quick check if file is 10-bit H.264."""
-        info = self.get_file_info(file_path)
-        return info is not None and info.needs_video_conversion
-
-    def has_dts(self, file_path: str) -> bool:
-        """Quick check if file has DTS audio."""
-        info = self.get_file_info(file_path)
-        return info is not None and info.has_dts

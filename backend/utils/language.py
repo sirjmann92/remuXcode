@@ -372,25 +372,3 @@ class LanguageDetector:
             return "spa"
 
         return None
-
-    def get_languages_to_keep(
-        self, file_path: str, always_keep: list[str], keep_original: bool = True
-    ) -> list[str]:
-        """Get list of language codes to keep for a file.
-
-        Args:
-            file_path: Path to the media file
-            always_keep: Languages to always keep (e.g., ['eng'])
-            keep_original: Whether to keep original language
-
-        Returns:
-            List of ISO 639-2 language codes to keep
-        """
-        languages = list(always_keep)
-
-        if keep_original:
-            original = self.detect_original_language(file_path)
-            if original and original not in languages:
-                languages.append(original)
-
-        return languages

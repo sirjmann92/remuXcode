@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "remuxcode"
-version = "2.0.0"
+version = "2.1.0"
 description = "remuXcode - Unified media transcoding for DTS audio, HEVC video, and stream cleanup"
 authors = [
     {name = "remuXcode contributors"}
@@ -30,7 +30,6 @@ Repository = "https://github.com/sirjmann92/remuXcode"
 Issues = "https://github.com/sirjmann92/remuXcode/issues"
 
 dependencies = [
-    "aiofiles",
     "fastapi",
     "pyyaml>=6.0",
     "requests>=2.28.0",
@@ -54,8 +53,8 @@ packages = ["backend", "backend.utils", "backend.workers"]
 # Codespell
 # ---------------------------------------------------------------------------
 [tool.codespell]
-skip = "*.py,*.toml,*.json"
-ignore-words-list = "tha"
+skip = ".git,node_modules,frontend/build,*.svg,**/package-lock.json"
+ignore-words-list = "tha,vie,wit,ans,sade,nd"
 quiet-level = 3
 
 # ---------------------------------------------------------------------------
@@ -152,7 +151,6 @@ select = [
 ]
 
 ignore = [
-    "D202", "D203", "D213", "D401", "D406", "D407",
     "D202", "D203", "D213", "D401", "D406", "D407",
     "E501",
     "PLC0415",  # lazy-import pattern in app.py/auth.py is intentional

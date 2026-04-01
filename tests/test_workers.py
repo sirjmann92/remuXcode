@@ -72,7 +72,7 @@ def test_ffprobe(file_path: str) -> bool:
             f"    [{audio.index}] {audio.codec_name} {audio.channels}ch {bitrate} ({lang}) {title}"
         )
         print(
-            f"         DTS: {audio.is_dts}, TrueHD: {audio.is_truehd}, Needs conversion: {audio.needs_conversion}"
+            f"         DTS: {audio.is_dts}, TrueHD: {audio.is_truehd}, Lossless: {audio.is_lossless}"
         )
 
     # Subtitle streams
@@ -93,8 +93,6 @@ def test_ffprobe(file_path: str) -> bool:
     print("\n  Summary:")
     print_result("Has DTS", info.has_dts)
     print_result("Has TrueHD", info.has_truehd)
-    print_result("Needs audio conversion", info.needs_audio_conversion)
-    print_result("Needs video conversion", info.needs_video_conversion)
     print_result("Is HEVC", info.is_hevc)
 
     return True
@@ -173,13 +171,9 @@ def test_audio_worker(file_path: str):
     converter = AudioConverter(config)
 
     should_convert = converter.should_convert(file_path)
-    status = converter.get_status(file_path)
 
     print_result("File", Path(file_path).name)
     print_result("Should Convert", should_convert)
-    print_result("Audio Streams", status.get("audio_streams", 0))
-    print_result("DTS Streams", status.get("dts_streams", 0))
-    print_result("TrueHD Streams", status.get("truehd_streams", 0))
 
     if should_convert:
         print("\n  Would convert DTS → AC3/AAC")
@@ -206,16 +200,9 @@ def test_video_worker(file_path: str, content_type: ContentType):
     converter = VideoConverter(config)
 
     should_convert = converter.should_convert(file_path)
-    status = converter.get_status(file_path)
 
     print_result("File", Path(file_path).name)
-    print_result("Current Codec", status.get("codec", "unknown"))
-    print_result("Bit Depth", status.get("bit_depth", "unknown"))
-    print_result("Resolution", status.get("resolution", "unknown"))
-    print_result("Is HEVC", status.get("is_hevc", False))
-    print_result("Is 10-bit H.264", status.get("is_10bit_h264", False))
     print_result("Should Convert", should_convert)
-    print_result("Content Type", status.get("content_type", "unknown"))
 
     if should_convert:
         if content_type == ContentType.ANIME:
@@ -248,34 +235,9 @@ def test_cleanup_worker(file_path: str, original_language: str):
     cleanup = StreamCleanup(config)
 
     should_cleanup = cleanup.should_cleanup(file_path)
-    status = cleanup.get_status(file_path)
 
     print_result("File", Path(file_path).name)
-    print_result("Original Language", status.get("original_language", "unknown"))
-    print_result("Keep Languages", status.get("keep_languages", []))
     print_result("Should Cleanup", should_cleanup)
-
-    # Audio stream analysis
-    audio_status = status.get("audio_streams", [])
-    if audio_status:
-        print("\n  Audio Streams:")
-        for a in audio_status:
-            action = "KEEP" if a["keep"] else "REMOVE"
-            print(f"    [{a['index']}] {a['codec']} ({a['language']}) {a['channels']}ch → {action}")
-
-    # Subtitle stream analysis
-    sub_status = status.get("subtitle_streams", [])
-    if sub_status:
-        print("\n  Subtitle Streams:")
-        for s in sub_status:
-            action = "KEEP" if s["keep"] else "REMOVE"
-            flags = []
-            if s.get("forced"):
-                flags.append("forced")
-            if s.get("sdh"):
-                flags.append("SDH")
-            flags_str = f" [{', '.join(flags)}]" if flags else ""
-            print(f"    [{s['index']}] {s['codec']} ({s['language']}){flags_str} → {action}")
 
 
 def main():
