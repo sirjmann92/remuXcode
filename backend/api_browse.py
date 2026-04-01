@@ -104,7 +104,12 @@ def _split_slash_field(value: Any) -> list[str]:
 
 
 def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> bool:
-    """Check if a file likely needs subtitle/audio cleanup based on Sonarr/Radarr mediaInfo."""
+    """Check if a file likely needs subtitle/audio cleanup based on Sonarr/Radarr mediaInfo.
+
+    This is an imprecise check — Radarr's mediaInfo lacks track titles,
+    so commentary/audio-description exemptions cannot be applied here.
+    Use _needs_cleanup_from_streams() when ffprobe-level data is available.
+    """
     cfg = core.config.cleanup if core.config else None
     if not cfg or (not cfg.clean_subtitles and not cfg.clean_audio):
         return False
@@ -130,6 +135,41 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
             extra_audio = [a for a in audio_langs if a not in keep]
             if extra_audio:
                 return True
+    return False
+
+
+def _needs_cleanup_from_streams(
+    audio_streams: list[dict[str, Any]],
+    subtitle_langs: list[str],
+    *,
+    is_anime: bool = False,
+) -> bool:
+    """Precise cleanup check using stream-level data (applies commentary/AD exemptions)."""
+    cfg = core.config.cleanup if core.config else None
+    if not cfg or (not cfg.clean_subtitles and not cfg.clean_audio):
+        return False
+    keep = {lang.lower() for lang in cfg.keep_languages}
+
+    if cfg.clean_subtitles and subtitle_langs:
+        extra_subs = [s for s in subtitle_langs if s.lower() not in keep]
+        if extra_subs:
+            return True
+
+    if cfg.clean_audio and audio_streams:
+        if is_anime and cfg.anime_keep_original_audio:
+            pass
+        else:
+            for stream in audio_streams:
+                lang = (stream.get("language") or "").lower()
+
+                # Untagged streams are always kept at runtime
+                if not lang or lang == "und":
+                    continue
+                if lang in keep:
+                    continue
+                # This stream would be removed → needs cleanup
+                return True
+
     return False
 
 
@@ -177,6 +217,19 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
     info = core.ffprobe.get_file_info(file_path) if core.ffprobe else None
     if not info:
         raise HTTPException(status_code=500, detail="Failed to analyze file")
+
+    # Store analysis in media.db for filter/badge use
+    if core.media_store:
+        try:
+            from backend.api_analyze import build_analysis_dict
+
+            stat = Path(file_path).stat()
+            core.media_store.upsert(
+                file_path, build_analysis_dict(info), stat.st_mtime, stat.st_size
+            )
+            logger.info("Stored analysis for %s", Path(file_path).name)
+        except Exception:
+            logger.warning("Failed to store analysis in media.db", exc_info=True)
 
     content_type = (
         core.anime_detector.detect(file_path, use_api=False)
@@ -384,6 +437,8 @@ def list_movies(
 def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> list[dict[str, Any]]:
     """Build processed movie results from raw Radarr data."""
     results: list[dict[str, Any]] = []
+    movie_file_ids: list[int] = []
+
     for movie in all_movies:
         if not movie.get("hasFile"):
             continue
@@ -416,6 +471,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
             "poster": f"/api/poster/radarr/{movie['id']}",
             "has_dts": "DTS" in audio_codec,
             "has_truehd": "TRUEHD" in audio_codec,
+            "has_dts_x": False,
             "video_codec": video_codec,
             "audio_codec": media_info.get("audioCodec", ""),
             "audio_channels": media_info.get("audioChannels"),
@@ -423,7 +479,14 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
             "subtitles": _split_slash_field(media_info.get("subtitles", "")),
             "resolution": media_info.get("resolution", ""),
             "needs_cleanup": _needs_cleanup(media_info, is_anime=movie_is_anime),
+            "analyzed": False,
         }
+
+        # Track movie_file_id for bulk analysis lookup
+        mf_id = movie_file.get("id")
+        item["_movie_file_id"] = mf_id
+        if mf_id is not None:
+            movie_file_ids.append(mf_id)
 
         # Config-aware audio detection from mediaInfo (overridden by ffprobe if analyzed)
         cfg_audio = core.config.audio if core.config else None
@@ -448,6 +511,11 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     is_anime = content_type == ContentType.ANIME
                     needs_audio = _needs_audio_conversion(info)
                     needs_video = _needs_video_conversion(info, is_anime)
+                    # Precise cleanup check using full stream data with titles
+                    stream_dicts = [
+                        {"language": a.language, "title": a.title} for a in info.audio_streams
+                    ]
+                    sub_langs = [s.language or "" for s in info.subtitle_streams]
                     item.update(
                         {
                             "video": {
@@ -460,15 +528,59 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                             },
                             "has_dts": info.has_dts,
                             "has_truehd": info.has_truehd,
+                            "has_dts_x": info.has_dts_x,
                             "needs_audio_conversion": needs_audio,
                             "needs_video_conversion": needs_video,
+                            "needs_cleanup": _needs_cleanup_from_streams(
+                                stream_dicts,
+                                sub_langs,
+                                is_anime=is_anime,
+                            ),
                             "is_anime": is_anime,
+                            "analyzed": True,
                         }
                     )
             except Exception as e:
                 logger.warning("Error analyzing %s: %s", host_path, e)
 
         results.append(item)
+
+    # Enrich results from media analysis cache (bulk lookup)
+    if core.media_store and movie_file_ids:
+        analysis_map = core.media_store.bulk_lookup_radarr(movie_file_ids)
+        if analysis_map:
+            for item in results:
+                mf_id = item.pop("_movie_file_id", None)
+                entry = analysis_map.get(mf_id) if mf_id else None
+                if entry and not item.get("analyzed"):
+                    a = entry.get("analysis", {})
+                    item["has_dts_x"] = a.get("has_dts_x", False)
+                    item["has_dts"] = a.get("has_dts", item["has_dts"])
+                    item["has_truehd"] = a.get("has_truehd", item["has_truehd"])
+                    item["analyzed"] = True
+                    # Re-evaluate cleanup using stream-level data if titles are available
+                    cached_streams = a.get("audio_streams", [])
+                    if cached_streams and any(s.get("title") is not None for s in cached_streams):
+                        item["needs_cleanup"] = _needs_cleanup_from_streams(
+                            cached_streams,
+                            item.get("subtitles", []),
+                            is_anime=item.get("is_anime", False),
+                        )
+                    # Update path if renamed since last analysis
+                    if entry.get("file_path") != item["path"]:
+                        core.media_store.upsert(
+                            item["path"],
+                            a,
+                            entry.get("file_mtime", 0),
+                            entry.get("file_size", 0),
+                            radarr_movie_file_id=mf_id,
+                        )
+            # Clean up _movie_file_id from items that weren't enriched
+            for item in results:
+                item.pop("_movie_file_id", None)
+    else:
+        for item in results:
+            item.pop("_movie_file_id", None)
 
     return results
 
@@ -525,6 +637,16 @@ def _movie_matches_filter(item: dict[str, Any], filter_val: str) -> bool:
         return bool(item.get("is_anime"))
     if filter_val == "cleanup":
         return bool(item.get("needs_cleanup"))
+    if filter_val == "dts":
+        return bool(item.get("has_dts"))
+    if filter_val == "dts_x":
+        return bool(item.get("has_dts_x"))
+    if filter_val == "truehd":
+        return bool(item.get("has_truehd"))
+    if filter_val == "hevc":
+        return item.get("video_codec", "").upper() in ("HEVC", "H265", "X265")
+    if filter_val == "h264":
+        return item.get("video_codec", "").upper() in ("H264", "H.264", "X264", "AVC")
     return True
 
 
@@ -630,7 +752,17 @@ def _build_series_results(
                 episode_files = ep_response.json()
                 audio_count = 0
                 cleanup_count = 0
+                dts_x_count = 0
                 cfg_audio = core.config.audio if core.config else None
+                audio_codecs_set: set[str] = set()
+                video_codecs_set: set[str] = set()
+
+                # Bulk lookup analysis for this series' episode files
+                ep_file_ids = [ef.get("id") for ef in episode_files if ef.get("id")]
+                analysis_map: dict[int, dict[str, Any]] = {}
+                if core.media_store and ep_file_ids:
+                    analysis_map = core.media_store.bulk_lookup_sonarr(ep_file_ids)
+
                 for ef in episode_files:
                     mi = ef.get("mediaInfo", {})
                     ac = mi.get("audioCodec", "").upper()
@@ -642,10 +774,40 @@ def _build_series_results(
                             has_audio_issue = True
                     if has_audio_issue:
                         audio_count += 1
-                    if _needs_cleanup(mi, is_anime=item.get("is_anime", False)):
+                    # Use stream-level data for precise cleanup check when available
+                    entry = analysis_map.get(ef.get("id")) if ef.get("id") else None
+                    cached_streams = (
+                        entry.get("analysis", {}).get("audio_streams", []) if entry else []
+                    )
+                    if cached_streams and any(s.get("title") is not None for s in cached_streams):
+                        ep_sub_langs = item.get("subtitles", []) or [
+                            s.lower() for s in _split_slash_field(mi.get("subtitles", ""))
+                        ]
+                        if _needs_cleanup_from_streams(
+                            cached_streams,
+                            ep_sub_langs,
+                            is_anime=item.get("is_anime", False),
+                        ):
+                            cleanup_count += 1
+                    elif _needs_cleanup(mi, is_anime=item.get("is_anime", False)):
                         cleanup_count += 1
+                    # Collect unique codec strings for contextual filtering
+                    ac_raw = mi.get("audioCodec", "")
+                    vc_raw = mi.get("videoCodec", "")
+                    if ac_raw:
+                        audio_codecs_set.add(ac_raw)
+                    if vc_raw:
+                        video_codecs_set.add(vc_raw)
+                    # Check for DTS:X from analysis cache
+                    entry = analysis_map.get(ef.get("id")) if ef.get("id") else None
+                    if entry and entry.get("analysis", {}).get("has_dts_x"):
+                        dts_x_count += 1
+                        audio_codecs_set.add("DTS:X")
                 item["audio_convert_count"] = audio_count
                 item["cleanup_count"] = cleanup_count
+                item["dts_x_count"] = dts_x_count
+                item["audio_codecs"] = sorted(audio_codecs_set)
+                item["video_codecs"] = sorted(video_codecs_set)
         except Exception as e:
             logger.warning("Error getting episodes for series %s: %s", series_id, e)
 
@@ -702,6 +864,8 @@ def _series_matches_filter(item: dict[str, Any], filter_val: str) -> bool:
         return bool(item.get("is_anime"))
     if filter_val == "cleanup":
         return item.get("cleanup_count", 0) > 0
+    if filter_val == "dts_x":
+        return item.get("dts_x_count", 0) > 0
     return True
 
 
@@ -766,6 +930,13 @@ def get_series_detail(
     # Index episode files by ID for lookup
     ef_by_id: dict[int, dict[str, Any]] = {ef["id"]: ef for ef in episode_files}
 
+    # Bulk lookup analysis from media cache
+    ep_analysis_map: dict[int, dict[str, Any]] = {}
+    if core.media_store:
+        ep_ids = list(ef_by_id.keys())
+        if ep_ids:
+            ep_analysis_map = core.media_store.bulk_lookup_sonarr(ep_ids)
+
     # Detect anime from series metadata (Sonarr/TVDB genre or seriesType)
     series_genres = [g.lower() for g in series.get("genres", [])]
     series_is_anime = "anime" in series_genres or series.get("seriesType", "").lower() == "anime"
@@ -799,6 +970,26 @@ def get_series_detail(
         ac = mi.get("audioCodec", "").upper()
         ep_item["has_dts"] = "DTS" in ac
         ep_item["has_truehd"] = "TRUEHD" in ac
+        ep_item["has_dts_x"] = False
+        ep_item["analyzed"] = False
+
+        # Merge analysis cache data
+        entry = ep_analysis_map.get(ep_file_id)
+        if entry:
+            a = entry.get("analysis", {})
+            ep_item["has_dts_x"] = a.get("has_dts_x", False)
+            ep_item["has_dts"] = a.get("has_dts", ep_item["has_dts"])
+            ep_item["has_truehd"] = a.get("has_truehd", ep_item["has_truehd"])
+            ep_item["analyzed"] = True
+            # Re-evaluate cleanup with stream-level data if titles are available
+            cached_streams = a.get("audio_streams", [])
+            if cached_streams and any(s.get("title") is not None for s in cached_streams):
+                ep_sub_langs = ep_item.get("subtitles", [])
+                ep_item["needs_cleanup"] = _needs_cleanup_from_streams(
+                    cached_streams,
+                    ep_sub_langs,
+                    is_anime=series_is_anime,
+                )
 
         # Config-aware audio detection from mediaInfo
         cfg_audio = core.config.audio if core.config else None
