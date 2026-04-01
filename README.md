@@ -124,7 +124,38 @@ See [backend/config.yaml](backend/config.yaml) for the full reference with all o
 
 ---
 
-## API Reference
+## Conversion Rules
+
+### Audio
+
+| Source | Target | Notes |
+|--------|--------|-------|
+| Stereo DTS (2ch) | AAC | Max 320 kbps |
+| 5.1 DTS (6ch) | AC3 | Max 640 kbps |
+| 7.1+ DTS (8ch) | E-AC3 | Max 1536 kbps |
+
+### Video
+
+| Setting | Anime | Live Action |
+|---------|-------|-------------|
+| CRF (HEVC) | 19 | 22 |
+| Preset | slow | medium |
+| Tune | animation | none |
+| Output | HEVC 10-bit | HEVC 10-bit |
+
+AV1 mode is also available (`codec: av1` in config.yaml) — ~30% better compression, slower encoding, less hardware decoder support.
+
+> Video conversion is **anime-only** by default (`anime_only: true`). Audio conversion and stream cleanup apply to all content.
+
+### Job Persistence
+
+Jobs are persisted to `config/jobs.db`. On startup, pending jobs are automatically resumed and old completed jobs are pruned after `general.job_history_days` (default: 30) days.
+
+---
+
+## API Reference (Advanced)
+
+If you'd like to create custom scripts or manually use a CLI to manage your media, remuXcode comes with a full set of APIs. You can find all endpoints and options at http://localhost:7889/docs
 
 All endpoints require `X-API-Key` header except `/health`.
 
@@ -201,68 +232,6 @@ curl -X DELETE http://localhost:7889/api/jobs/abc-123 -H "X-API-Key: your-key"
 
 ---
 
-## Conversion Rules
-
-### Audio
-
-| Source | Target | Notes |
-|--------|--------|-------|
-| Stereo DTS (2ch) | AAC | Max 320 kbps |
-| 5.1 DTS (6ch) | AC3 | Max 640 kbps |
-| 7.1+ DTS (8ch) | E-AC3 | Max 1536 kbps |
-
-### Video
-
-| Setting | Anime | Live Action |
-|---------|-------|-------------|
-| CRF (HEVC) | 19 | 22 |
-| Preset | slow | medium |
-| Tune | animation | none |
-| Output | HEVC 10-bit | HEVC 10-bit |
-
-AV1 mode is also available (`codec: av1` in config.yaml) — ~30% better compression, slower encoding, less hardware decoder support.
-
-> Video conversion is **anime-only** by default (`anime_only: true`). Audio conversion and stream cleanup apply to all content.
-
----
-
-## Logs & Debugging
-
-```bash
-# Live logs
-docker compose logs -f
-
-# Last 100 lines
-docker compose logs --tail=100
-
-# Quick codec check
-ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile \
-  -of default=noprint_wrappers=1 file.mkv
-```
-
----
-
-## Container Management
-
-```bash
-# Start
-docker compose up -d
-
-# Stop
-docker compose down
-
-# Restart (picks up config changes)
-docker compose restart
-
-# Rebuild and restart (after code changes)
-docker compose up -d --build
-
-# Update
-git pull && docker compose up -d --build
-```
-
----
-
 ## Architecture
 
 ```
@@ -314,10 +283,21 @@ frontend/                 # SvelteKit UI (built into Docker image)
 │       ├── jobs/          # Job queue with processing details
 │       └── config/        # Configuration, API key, Sonarr/Radarr refresh
 ```
+---
 
-### Job Persistence
+## Logs & Debugging
 
-Jobs are persisted to `config/jobs.db`. On startup, pending jobs are automatically resumed and old completed jobs are pruned after `general.job_history_days` (default: 30) days.
+```bash
+# Live logs
+docker compose logs -f
+
+# Last 100 lines
+docker compose logs --tail=100
+
+# Quick codec check
+ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile \
+  -of default=noprint_wrappers=1 file.mkv
+```
 
 ---
 
