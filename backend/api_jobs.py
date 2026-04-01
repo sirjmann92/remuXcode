@@ -54,7 +54,7 @@ async def cancel_or_delete_job(job_id: str) -> dict[str, Any]:
     if not core.job_queue:
         raise HTTPException(status_code=503, detail="Service not ready")
 
-    # Try to cancel first
+    # Try to cancel first (works for pending and running)
     if core.job_queue.cancel_job(job_id):
         return {"message": "Job cancelled", "job_id": job_id}
 
@@ -65,4 +65,52 @@ async def cancel_or_delete_job(job_id: str) -> dict[str, Any]:
     job = core.job_queue.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    raise HTTPException(status_code=400, detail="Cannot delete running job")
+    raise HTTPException(status_code=400, detail="Cannot modify job in current state")
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str) -> dict[str, Any]:
+    """Cancel a pending or running job (kills ffmpeg if running)."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+    if core.job_queue.cancel_job(job_id):
+        return {"message": "Job cancelled", "job_id": job_id}
+
+    job = core.job_queue.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    raise HTTPException(
+        status_code=400,
+        detail=f"Cannot cancel job with status: {job.status.value}",
+    )
+
+
+@router.post("/jobs/cancel-pending")
+async def cancel_all_pending() -> dict[str, Any]:
+    """Cancel all pending jobs in the queue."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+    cancelled = 0
+    for job in core.job_queue.get_all_jobs():
+        if job.status.value == "pending":
+            if core.job_queue.cancel_job(job.id):
+                cancelled += 1
+
+    return {"message": f"Cancelled {cancelled} pending job(s)", "cancelled": cancelled}
+
+
+@router.post("/jobs/cancel-all")
+async def cancel_all_jobs() -> dict[str, Any]:
+    """Cancel all pending and running jobs (kills ffmpeg for running jobs)."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+    cancelled = 0
+    for job in core.job_queue.get_all_jobs():
+        if job.status.value in ("pending", "running"):
+            if core.job_queue.cancel_job(job.id):
+                cancelled += 1
+
+    return {"message": f"Cancelled {cancelled} job(s)", "cancelled": cancelled}

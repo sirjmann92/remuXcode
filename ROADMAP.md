@@ -277,7 +277,7 @@ services:
 - [x] **File Analysis Modal** — full ffprobe/MediaInfo viewer with tabbed UI (General, Video, Audio, Subs) per file
 - [x] **Live Job Status** — pending/running indicators on movie posters and episode rows with 3-second polling
 - [x] **Auto-Refresh on Completion** — Movies/Shows pages automatically re-fetch data when a job finishes
-- [x] **Manual Library Refresh** — Config page buttons to force Sonarr/Radarr full metadata re-read
+- [x] **Manual Library Refresh** — Refresh Library buttons on Movies/Shows pages with confirmation modal, forces Sonarr/Radarr full metadata re-read
 - [x] **Anime Dual-Audio** — `anime_keep_original_audio` config to preserve original-language audio on anime content
 - [x] **Sonarr Integration Hardening** — RefreshSeries + RescanSeries (polled), polled rename commands, Specials folder support
 
@@ -292,6 +292,20 @@ services:
 - [x] Error handling improvements
 - [x] Documentation
 - [x] GitHub release
+
+#### 2.5: Batch Operations & UX Improvements
+- [x] **Queue All Button** — Movies and Shows parent pages get a "Queue All" button that queues all currently filtered items needing work
+- [x] **Fix Queue All Episodes** — "Queue All" on a series detail page should only queue episodes that need work, not all episodes
+- [x] **Multi-Select Batch Queue** — Checkboxes on movie posters and episode rows to select multiple items and queue them in one action
+- [x] **Sort Options** — Sort filtered lists by: Needs Work (default, work items first), Title, Year/Episodes, Size
+- [x] **Editable Config Page** — Make settings editable in the UI (audio, video, cleanup options including `anime_keep_original_audio`)
+- [x] **Stop & Clear Queue Controls** — Cancel pending jobs and clear finished jobs from the Jobs page
+- [x] **Complete Language Name Map** — Fix abbreviated language codes (IND, MAY, THA, VIE, GRE, RUM, SLO, BUL, EST, HEB, HIN, etc.) in episode tables and Analyze modal
+- [x] **Show/Season Job Indicators** — Display queued/in-progress badge at the show and season level so users can see activity without expanding seasons
+- [x] **Individual & Bulk Job Cancellation** — Cancel running/pending jobs individually or stop all at once
+- [x] **Language Select Dropdown** — Searchable multi-select component for keep-languages configuration, replacing raw text input
+- [x] **Fully Editable Settings Page** — All settings including Sonarr/Radarr URLs, API keys, worker count, job retention, and all advanced options editable from the UI
+- [x] **Code Audit & Cleanup** — Removed dead code, unused dependencies, deduplicated frontend utilities into shared `format.ts`, optimized Dockerfile
 
 ## Phase 3: Community & Distribution
 

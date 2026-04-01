@@ -38,12 +38,20 @@ export async function getJobs(): Promise<{ jobs: Job[] }> {
   return request('/api/jobs');
 }
 
-export async function getJob(id: string): Promise<Job> {
-  return request(`/api/jobs/${encodeURIComponent(id)}`);
-}
-
 export async function deleteJob(id: string): Promise<{ message: string }> {
   return request(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function cancelJob(id: string): Promise<{ message: string }> {
+  return request(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+}
+
+export async function cancelAllPending(): Promise<{ message: string; cancelled: number }> {
+  return request('/api/jobs/cancel-pending', { method: 'POST' });
+}
+
+export async function cancelAllJobs(): Promise<{ message: string; cancelled: number }> {
+  return request('/api/jobs/cancel-all', { method: 'POST' });
 }
 
 // Convert
@@ -60,6 +68,13 @@ export async function convertFile(
 // Config
 export async function getConfig(): Promise<ConfigSummary> {
   return request('/api/config');
+}
+
+export async function updateConfig(patch: Record<string, unknown>): Promise<{ message: string }> {
+  return request('/api/config', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
 }
 
 export async function regenerateApiKey(): Promise<{ api_key: string }> {

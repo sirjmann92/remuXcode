@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
 import uuid
 
 from backend.utils.config import CleanupConfig
@@ -120,6 +121,7 @@ class StreamCleanup:
         progress_callback: Callable[[float], None] | None = None,
         *,
         is_anime: bool = False,
+        cancel_event: threading.Event | None = None,
     ) -> CleanupResult:
         """Remove unwanted streams from a media file.
 
@@ -130,6 +132,7 @@ class StreamCleanup:
             force_original_language: Override language detection
             progress_callback: Optional callback receiving progress 0-100.
             is_anime: Whether the content is anime (affects audio language keep logic).
+            cancel_event: Event to signal cancellation (kills ffmpeg).
 
         Returns:
             CleanupResult with details of streams removed
@@ -302,6 +305,7 @@ class StreamCleanup:
                 duration_secs=info.duration,
                 progress_cb=progress_callback,
                 timeout=3600,
+                cancel_event=cancel_event,
             )
 
             if returncode != 0:
@@ -547,15 +551,6 @@ class StreamCleanup:
             return False
         return any(not (s.language or "").strip() for s in audio_streams)
 
-    def _needs_encoder_tag(self, info: MediaInfo) -> bool:
-        """Return True if the container is missing the remuxcode marker tag.
-
-        Writing this tag changes the file size, which triggers Sonarr/Radarr to
-        re-read MediaInfo after a remux pass (they skip re-analysis when size is
-        unchanged).
-        """
-        return info.format_tags.get("ENCODED_BY", "").lower() != "remuxcode"
-
     def _sort_audio_for_playback(
         self, audio_streams: list[AudioStream], original_lang: str
     ) -> list[AudioStream]:
@@ -631,52 +626,3 @@ class StreamCleanup:
 
         cmd.append(output_file)
         return cmd
-
-    def get_status(self, file_path: str) -> dict:
-        """Get cleanup status/info for a file."""
-        info = self.ffprobe.get_file_info(file_path)
-        if info is None:
-            return {"status": "error", "message": "Failed to analyze file"}
-
-        original_lang = self._detect_original_language(file_path)
-        keep_languages = self._get_languages_to_keep(original_lang)
-
-        audio_status = []
-        for stream in info.audio_streams:
-            keep = self._should_keep_audio(stream, keep_languages)
-            audio_status.append(
-                {
-                    "index": stream.index,
-                    "codec": stream.codec_name,
-                    "language": stream.language,
-                    "title": stream.title,
-                    "channels": stream.channels,
-                    "keep": keep,
-                }
-            )
-
-        subtitle_status = []
-        for sub_stream in info.subtitle_streams:
-            keep = self._should_keep_subtitle(sub_stream, keep_languages)
-            subtitle_status.append(
-                {
-                    "index": sub_stream.index,
-                    "codec": sub_stream.codec_name,
-                    "language": sub_stream.language,
-                    "title": sub_stream.title,
-                    "forced": sub_stream.is_forced,
-                    "sdh": sub_stream.is_sdh,
-                    "keep": keep,
-                }
-            )
-
-        return {
-            "status": "ok",
-            "file": file_path,
-            "original_language": original_lang,
-            "keep_languages": list(keep_languages),
-            "audio_streams": audio_status,
-            "subtitle_streams": subtitle_status,
-            "needs_cleanup": self.should_cleanup(file_path),
-            "file_size": info.size,
-        }

@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
 import uuid
 
 from backend.utils.config import AudioConfig
@@ -137,6 +138,7 @@ class AudioConverter:
         output_file: str | None = None,
         job_id: str | None = None,
         progress_callback: Callable[[float], None] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> AudioConversionResult:
         """Convert incompatible audio in a media file.
 
@@ -145,6 +147,7 @@ class AudioConverter:
             output_file: Path for output file (defaults to replacing input)
             job_id: Unique job ID for temp directory
             progress_callback: Optional callback receiving progress 0-100.
+            cancel_event: Event to signal cancellation (kills ffmpeg).
 
         Returns:
             AudioConversionResult with conversion details
@@ -240,6 +243,7 @@ class AudioConverter:
                 duration_secs=info.duration,
                 progress_cb=progress_callback,
                 timeout=self.config.job_timeout or None,  # 0 = no timeout
+                cancel_event=cancel_event,
             )
 
             if returncode != 0:
@@ -551,23 +555,3 @@ class AudioConverter:
 
         cmd.append(output_file)
         return cmd
-
-    def get_status(self, file_path: str) -> dict:
-        """Get conversion status/info for a file."""
-        info = self.ffprobe.get_file_info(file_path)
-        if info is None:
-            return {"status": "error", "message": "Failed to analyze file"}
-
-        dts_streams = self.get_dts_streams(info)
-        truehd_streams = self.get_truehd_streams(info)
-
-        return {
-            "status": "ok",
-            "file": file_path,
-            "audio_streams": len(info.audio_streams),
-            "dts_streams": len(dts_streams),
-            "truehd_streams": len(truehd_streams),
-            "needs_conversion": self.should_convert(file_path),
-            "file_size": info.size,
-            "duration": info.duration,
-        }
