@@ -1,7 +1,6 @@
 """Authentication helpers for API routes."""
 
 import logging
-import os
 from pathlib import Path
 import uuid
 
@@ -11,26 +10,15 @@ logger = logging.getLogger("remuxcode")
 
 
 def get_api_key() -> str:
-    """Get the active API key. Runtime value takes priority over env vars."""
+    """Get the active API key. Runtime value takes priority, then .api_key file."""
     from backend import core
 
     # Runtime value (set at startup, updated on regeneration)
     if core.api_key:
         return core.api_key
 
-    # Fallback for calls before initialize_components()
-    key = os.getenv(
-        "REMUXCODE_API_KEY",
-        os.getenv("MEDIA_API_KEY", os.getenv("DTS_WEBHOOK_API_KEY", "")),
-    ).strip()
-    if key:
-        return key
-
-    config_path = os.getenv(
-        "REMUXCODE_CONFIG_PATH",
-        str(Path(__file__).parent / "config.yaml"),
-    )
-    key_file = Path(config_path).parent / ".api_key"
+    # Fallback: read from .api_key file
+    key_file = Path(core.CONFIG_PATH).parent / ".api_key"
     if key_file.is_file():
         return key_file.read_text().strip()
 
@@ -42,11 +30,9 @@ def regenerate_api_key() -> str:
     from backend import core
 
     new_key = uuid.uuid4().hex + uuid.uuid4().hex  # 64-char hex
-    config_path = os.getenv(
-        "REMUXCODE_CONFIG_PATH",
-        str(Path(__file__).parent / "config.yaml"),
-    )
-    key_file = Path(config_path).parent / ".api_key"
+    config_dir = Path(core.CONFIG_PATH).parent
+    config_dir.mkdir(parents=True, exist_ok=True)
+    key_file = config_dir / ".api_key"
     key_file.write_text(new_key)
     key_file.chmod(0o600)
 

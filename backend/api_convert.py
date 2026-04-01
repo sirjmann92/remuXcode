@@ -1,7 +1,6 @@
 """Convert API routes - single file and batch conversion."""
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -45,8 +44,8 @@ def batch_convert_movies(data: dict[str, Any]) -> dict[str, Any]:
     if not movie_ids:
         raise HTTPException(status_code=400, detail="Missing movie_ids")
 
-    radarr_url = os.getenv("RADARR_URL", core.config.radarr.url if core.config else "")
-    radarr_key = os.getenv("RADARR_API_KEY", core.config.radarr.api_key if core.config else "")
+    radarr_url = core.config.radarr.url if core.config else ""
+    radarr_key = core.config.radarr.api_key if core.config else ""
     if not radarr_url or not radarr_key:
         raise HTTPException(status_code=500, detail="Radarr not configured")
 
@@ -89,8 +88,8 @@ def batch_convert_series(data: dict[str, Any]) -> dict[str, Any]:
     if not series_ids:
         raise HTTPException(status_code=400, detail="Missing series_ids")
 
-    sonarr_url = os.getenv("SONARR_URL", core.config.sonarr.url if core.config else "")
-    sonarr_key = os.getenv("SONARR_API_KEY", core.config.sonarr.api_key if core.config else "")
+    sonarr_url = core.config.sonarr.url if core.config else ""
+    sonarr_key = core.config.sonarr.api_key if core.config else ""
     if not sonarr_url or not sonarr_key:
         raise HTTPException(status_code=500, detail="Sonarr not configured")
 

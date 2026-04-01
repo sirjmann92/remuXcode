@@ -8,30 +8,7 @@
 
 ---
 
-## 1. Configure
-
-Copy the example environment file and fill in your Sonarr/Radarr details:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Set at minimum:
-
-```ini
-SONARR_URL=http://your-sonarr-host:8989
-SONARR_API_KEY=your_sonarr_api_key
-
-RADARR_URL=http://your-radarr-host:7878
-RADARR_API_KEY=your_radarr_api_key
-```
-
-Leave `REMUXCODE_API_KEY` blank — a key is auto-generated on first run and saved to `config/.api_key`.
-
----
-
-## 2. Create your `compose.yml`
+## 1. Create your `compose.yml`
 
 `compose.yml` is not included in the repo — create your own. Mount your media at the **same paths Sonarr/Radarr use internally** so webhook paths work without any translation:
 
@@ -49,24 +26,25 @@ services:
       - /mnt/yournas2:/share-exp:rw   # add more mounts as needed
     environment:
       - TZ=America/Chicago
-      - REMUXCODE_API_KEY=${REMUXCODE_API_KEY}
-      - SONARR_URL=${SONARR_URL}
-      - SONARR_API_KEY=${SONARR_API_KEY}
-      - RADARR_URL=${RADARR_URL}
-      - RADARR_API_KEY=${RADARR_API_KEY}
     restart: unless-stopped
 ```
 
 ---
 
-## 3. Start
+## 2. Start
 
 ```bash
 docker compose up -d
 ```
 
-On first run, `config/config.yaml` is created automatically from the built-in template.
-Edit it to adjust encoding quality, audio settings, language preferences, etc.
+On first run, `config/config.yaml` is created automatically with sensible defaults.
+An API key is auto-generated and stored in `config/.api_key`.
+
+---
+
+## 3. Configure via Settings Page
+
+Open `http://localhost:7889/config` and fill in your **Sonarr/Radarr connection details** (URL and API key). All other settings — encoding, audio, cleanup, languages — can be tuned here too.
 
 ---
 

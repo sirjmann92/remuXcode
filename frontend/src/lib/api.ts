@@ -82,20 +82,30 @@ export async function regenerateApiKey(): Promise<{ api_key: string }> {
 }
 
 // Browse
-export async function getMovies(search?: string, filter?: string): Promise<MoviesResponse> {
+export async function getMovies(
+  search?: string,
+  filter?: string,
+  cacheBust?: boolean,
+): Promise<MoviesResponse> {
   const params = new URLSearchParams();
   if (search) params.set('search', search);
   if (filter && filter !== 'any') params.set('filter', filter);
   params.set('analyze', 'false');
+  if (cacheBust) params.set('cache_bust', 'true');
   const qs = params.toString();
   return request(`/api/movies${qs ? `?${qs}` : ''}`);
 }
 
-export async function getSeries(search?: string, filter?: string): Promise<SeriesResponse> {
+export async function getSeries(
+  search?: string,
+  filter?: string,
+  cacheBust?: boolean,
+): Promise<SeriesResponse> {
   const params = new URLSearchParams();
   if (search) params.set('search', search);
   if (filter && filter !== 'any') params.set('filter', filter);
   params.set('analyze', 'false');
+  if (cacheBust) params.set('cache_bust', 'true');
   const qs = params.toString();
   return request(`/api/series${qs ? `?${qs}` : ''}`);
 }

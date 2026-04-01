@@ -1,8 +1,9 @@
 """Browse library API routes - movies, series, scan, analyze."""
 
 import logging
-import os
 from pathlib import Path
+import threading
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -14,6 +15,44 @@ from backend.core import translate_path
 from backend.utils.anime_detect import ContentType
 
 logger = logging.getLogger("remuxcode")
+
+
+# ---------------------------------------------------------------------------
+# Server-side response cache for Sonarr/Radarr API calls
+# ---------------------------------------------------------------------------
+
+_cache_lock = threading.Lock()
+_cache: dict[str, dict[str, Any]] = {}
+# Each entry: {"data": <response dict>, "timestamp": <float>}
+
+CACHE_TTL = 300  # 5 minutes — fresh data served within this window
+
+
+def _cache_get(key: str) -> dict[str, Any] | None:
+    """Get cached data. Returns None if no cache exists."""
+    with _cache_lock:
+        return _cache.get(key)
+
+
+def _cache_set(key: str, data: dict[str, Any]) -> None:
+    """Store data in cache with current timestamp."""
+    with _cache_lock:
+        _cache[key] = {"data": data, "timestamp": time.monotonic()}
+
+
+def invalidate_cache(key: str | None = None) -> None:
+    """Soft-invalidate cache entries (mark stale but keep for fallback).
+
+    Stale entries are still served if the upstream API is unreachable,
+    preventing timeouts during heavy processing.
+    """
+    with _cache_lock:
+        if key is None:
+            for entry in _cache.values():
+                entry["stale"] = True
+        elif key in _cache:
+            _cache[key]["stale"] = True
+
 
 router = APIRouter(tags=["browse"])
 
@@ -98,18 +137,12 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
 def proxy_poster(source: str, item_id: int) -> Response:
     """Proxy poster images from Sonarr/Radarr to avoid CORS issues."""
     if source == "radarr":
-        base_url = os.getenv("RADARR_URL", core.config.radarr.url if core.config else "")
-        api_key = os.getenv(
-            "RADARR_API_KEY",
-            core.config.radarr.api_key if core.config else "",
-        )
+        base_url = core.config.radarr.url if core.config else ""
+        api_key = core.config.radarr.api_key if core.config else ""
         poster_path = f"/api/v3/mediacover/{item_id}/poster.jpg"
     elif source == "sonarr":
-        base_url = os.getenv("SONARR_URL", core.config.sonarr.url if core.config else "")
-        api_key = os.getenv(
-            "SONARR_API_KEY",
-            core.config.sonarr.api_key if core.config else "",
-        )
+        base_url = core.config.sonarr.url if core.config else ""
+        api_key = core.config.sonarr.api_key if core.config else ""
         poster_path = f"/api/v3/mediacover/{item_id}/poster.jpg"
     else:
         raise HTTPException(status_code=400, detail="Source must be 'sonarr' or 'radarr'")
@@ -305,28 +338,51 @@ def list_movies(
     search: str | None = Query(None),
     analyze: bool = Query(True),
     filter: str = Query("any", description="Filter: any, needs_conversion, video, audio, anime"),
+    cache_bust: bool = Query(False, description="Force bypass server cache"),
 ) -> dict[str, Any]:
     """List movies from Radarr with optional media analysis."""
-    radarr_url = os.getenv("RADARR_URL", core.config.radarr.url if core.config else "")
-    radarr_key = os.getenv("RADARR_API_KEY", core.config.radarr.api_key if core.config else "")
+    radarr_url = core.config.radarr.url if core.config else ""
+    radarr_key = core.config.radarr.api_key if core.config else ""
     if not radarr_url or not radarr_key:
         raise HTTPException(status_code=500, detail="Radarr not configured")
 
+    # Try to serve from cache when not analyzing
+    cache_key = "movies"
+    cached = _cache_get(cache_key)
+    now = time.monotonic()
+
+    if not analyze and not cache_bust and cached and not cached.get("stale"):
+        age = now - cached["timestamp"]
+        if age < CACHE_TTL:
+            return _apply_movie_filters(cached["data"], search, filter)
+
+    # Fetch fresh data from Radarr
     try:
         response = requests.get(
             f"{radarr_url}/api/v3/movie",
             headers={"X-Api-Key": radarr_key},
-            timeout=30,
+            timeout=60,
         )
         response.raise_for_status()
         all_movies = response.json()
     except Exception as e:
+        # Serve stale/cached data on upstream failure
+        if cached:
+            logger.warning("Radarr unavailable, serving stale cache: %s", e)
+            return _apply_movie_filters(cached["data"], search, filter)
         raise HTTPException(status_code=500, detail=f"Failed to query Radarr: {e}") from e
 
-    if search:
-        search_lower = search.lower()
-        all_movies = [m for m in all_movies if search_lower in m.get("title", "").lower()]
+    full_results = _build_movie_results(all_movies, analyze)
+    full_response = _build_movie_response(full_results)
 
+    # Cache the full unfiltered result
+    _cache_set(cache_key, full_response)
+
+    return _apply_movie_filters(full_response, search, filter)
+
+
+def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> list[dict[str, Any]]:
+    """Build processed movie results from raw Radarr data."""
     results: list[dict[str, Any]] = []
     for movie in all_movies:
         if not movie.get("hasFile"):
@@ -345,7 +401,7 @@ def list_movies(
         genres_lower = [g.lower() for g in movie.get("genres", [])]
         orig_lang = movie.get("originalLanguage", {}).get("name", "").lower()
         movie_is_anime = "animation" in genres_lower and orig_lang == "japanese"
-        if not movie_is_anime and core.anime_detector:
+        if not movie_is_anime and analyze and core.anime_detector:
             movie_is_anime = (
                 core.anime_detector.detect(host_path, use_api=False) == ContentType.ANIME
             )
@@ -412,24 +468,13 @@ def list_movies(
             except Exception as e:
                 logger.warning("Error analyzing %s: %s", host_path, e)
 
-        if (
-            filter == "needs_conversion"
-            and not item.get("needs_audio_conversion", False)
-            and not item.get("needs_video_conversion", False)
-            and not item.get("needs_cleanup", False)
-        ):
-            continue
-        if filter == "video" and not item.get("needs_video_conversion", False):
-            continue
-        if filter == "audio" and not item.get("needs_audio_conversion", False):
-            continue
-        if filter == "anime" and not item.get("is_anime", False):
-            continue
-        if filter == "cleanup" and not item.get("needs_cleanup", False):
-            continue
-
         results.append(item)
 
+    return results
+
+
+def _build_movie_response(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build the full response dict from a list of movie results."""
     return {
         "total": len(results),
         "summary": {
@@ -446,35 +491,100 @@ def list_movies(
     }
 
 
+def _apply_movie_filters(
+    response: dict[str, Any],
+    search: str | None,
+    filter_val: str,
+) -> dict[str, Any]:
+    """Apply search and filter to a cached movie response."""
+    movies = response["movies"]
+
+    if search:
+        search_lower = search.lower()
+        movies = [m for m in movies if search_lower in (m.get("title") or "").lower()]
+
+    if filter_val and filter_val != "any":
+        movies = [m for m in movies if _movie_matches_filter(m, filter_val)]
+
+    return _build_movie_response(movies)
+
+
+def _movie_matches_filter(item: dict[str, Any], filter_val: str) -> bool:
+    """Check if a movie matches a given filter."""
+    if filter_val == "needs_conversion":
+        return bool(
+            item.get("needs_audio_conversion")
+            or item.get("needs_video_conversion")
+            or item.get("needs_cleanup")
+        )
+    if filter_val == "video":
+        return bool(item.get("needs_video_conversion"))
+    if filter_val == "audio":
+        return bool(item.get("needs_audio_conversion"))
+    if filter_val == "anime":
+        return bool(item.get("is_anime"))
+    if filter_val == "cleanup":
+        return bool(item.get("needs_cleanup"))
+    return True
+
+
 @router.get("/series")
 def list_series(
     search: str | None = Query(None),
     analyze: bool = Query(True),
     filter: str = Query("any", description="Filter: any, needs_conversion, video, audio, anime"),
+    cache_bust: bool = Query(False, description="Force bypass server cache"),
 ) -> dict[str, Any]:
     """List series from Sonarr with optional media analysis."""
-    sonarr_url = os.getenv("SONARR_URL", core.config.sonarr.url if core.config else "")
-    sonarr_key = os.getenv("SONARR_API_KEY", core.config.sonarr.api_key if core.config else "")
+    sonarr_url = core.config.sonarr.url if core.config else ""
+    sonarr_key = core.config.sonarr.api_key if core.config else ""
     if not sonarr_url or not sonarr_key:
         raise HTTPException(status_code=500, detail="Sonarr not configured")
 
+    # Try to serve from cache when not analyzing
+    cache_key = "series"
+    cached = _cache_get(cache_key)
+    now = time.monotonic()
+
+    if not analyze and not cache_bust and cached and not cached.get("stale"):
+        age = now - cached["timestamp"]
+        if age < CACHE_TTL:
+            return _apply_series_filters(cached["data"], search, filter)
+
+    # Fetch fresh data from Sonarr
     try:
         response = requests.get(
             f"{sonarr_url}/api/v3/series",
             headers={"X-Api-Key": sonarr_key},
-            timeout=30,
+            timeout=60,
         )
         response.raise_for_status()
         all_series = response.json()
     except Exception as e:
+        # Serve stale/cached data on upstream failure
+        if cached:
+            logger.warning("Sonarr unavailable, serving stale cache: %s", e)
+            return _apply_series_filters(cached["data"], search, filter)
         raise HTTPException(status_code=500, detail=f"Failed to query Sonarr: {e}") from e
-
-    if search:
-        search_lower = search.lower()
-        all_series = [s for s in all_series if search_lower in s.get("title", "").lower()]
 
     logger.info("Fetching series list (%d series, analyze=%s)", len(all_series), analyze)
 
+    full_results = _build_series_results(all_series, sonarr_url, sonarr_key, analyze)
+    full_response = _build_series_response(full_results)
+
+    # Cache the full unfiltered result
+    _cache_set(cache_key, full_response)
+
+    return _apply_series_filters(full_response, search, filter)
+
+
+def _build_series_results(
+    all_series: list[dict[str, Any]],
+    sonarr_url: str,
+    sonarr_key: str,
+    analyze: bool,
+) -> list[dict[str, Any]]:
+    """Build processed series results from raw Sonarr data."""
     results: list[dict[str, Any]] = []
     for series in all_series:
         series_id = series["id"]
@@ -539,24 +649,13 @@ def list_series(
         except Exception as e:
             logger.warning("Error getting episodes for series %s: %s", series_id, e)
 
-        if (
-            filter == "needs_conversion"
-            and item.get("audio_convert_count", 0) == 0
-            and item.get("video_convert_count", 0) == 0
-            and item.get("cleanup_count", 0) == 0
-        ):
-            continue
-        if filter == "video" and item.get("video_convert_count", 0) == 0:
-            continue
-        if filter == "audio" and item.get("audio_convert_count", 0) == 0:
-            continue
-        if filter == "anime" and not item["is_anime"]:
-            continue
-        if filter == "cleanup" and item.get("cleanup_count", 0) == 0:
-            continue
-
         results.append(item)
 
+    return results
+
+
+def _build_series_response(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build the full response dict from a list of series results."""
     return {
         "total": len(results),
         "summary": {
@@ -569,14 +668,51 @@ def list_series(
     }
 
 
+def _apply_series_filters(
+    response: dict[str, Any],
+    search: str | None,
+    filter_val: str,
+) -> dict[str, Any]:
+    """Apply search and filter to a cached series response."""
+    series = response["series"]
+
+    if search:
+        search_lower = search.lower()
+        series = [s for s in series if search_lower in (s.get("title") or "").lower()]
+
+    if filter_val and filter_val != "any":
+        series = [s for s in series if _series_matches_filter(s, filter_val)]
+
+    return _build_series_response(series)
+
+
+def _series_matches_filter(item: dict[str, Any], filter_val: str) -> bool:
+    """Check if a series matches a given filter."""
+    if filter_val == "needs_conversion":
+        return (
+            item.get("audio_convert_count", 0) > 0
+            or item.get("video_convert_count", 0) > 0
+            or item.get("cleanup_count", 0) > 0
+        )
+    if filter_val == "video":
+        return item.get("video_convert_count", 0) > 0
+    if filter_val == "audio":
+        return item.get("audio_convert_count", 0) > 0
+    if filter_val == "anime":
+        return bool(item.get("is_anime"))
+    if filter_val == "cleanup":
+        return item.get("cleanup_count", 0) > 0
+    return True
+
+
 @router.get("/series/{series_id}")
 def get_series_detail(
     series_id: int,
     analyze: bool = Query(False),
 ) -> dict[str, Any]:
     """Get detailed series info with seasons and episodes from Sonarr."""
-    sonarr_url = os.getenv("SONARR_URL", core.config.sonarr.url if core.config else "")
-    sonarr_key = os.getenv("SONARR_API_KEY", core.config.sonarr.api_key if core.config else "")
+    sonarr_url = core.config.sonarr.url if core.config else ""
+    sonarr_key = core.config.sonarr.api_key if core.config else ""
     if not sonarr_url or not sonarr_key:
         raise HTTPException(status_code=500, detail="Sonarr not configured")
 

@@ -49,11 +49,6 @@ services:
       - /mnt/yournas:/share:rw       # match Sonarr/Radarr's internal path
     environment:
       - TZ=America/Chicago
-      - REMUXCODE_API_KEY=${REMUXCODE_API_KEY}
-      - SONARR_URL=${SONARR_URL}
-      - SONARR_API_KEY=${SONARR_API_KEY}
-      - RADARR_URL=${RADARR_URL}
-      - RADARR_API_KEY=${RADARR_API_KEY}
     restart: unless-stopped
 ```
 
@@ -64,7 +59,9 @@ docker compose pull  # get the latest image
 docker compose up -d
 ```
 
-`config/config.yaml` is created automatically on first run with sensible defaults. All settings can be tuned from the Settings page in the web UI.
+`config/config.yaml` is created automatically on first run with sensible defaults. All settings — including Sonarr/Radarr connection details — can be configured from the Settings page in the web UI.
+
+An API key is auto-generated on first start and stored in `config/.api_key`. You can find it on the Settings page or view it with `cat config/.api_key`.
 
 ### 3. Configure Sonarr/Radarr Webhook
 
@@ -86,21 +83,7 @@ docker compose up -d
 
 All conversion settings — audio, video, cleanup, languages, integrations, and processing options — are configurable through the **Settings** page in the web UI at `http://localhost:7889/config`. Changes take effect immediately.
 
-On first run, a default `config/config.yaml` is created automatically. You can also edit this file directly if you prefer, but the UI is the recommended approach.
-
-### `.env` (secrets only)
-
-The only values that must be set outside the UI are the initial connection secrets, passed via environment variables or a `.env` file:
-
-```ini
-SONARR_URL=http://localhost:8989
-SONARR_API_KEY=your-sonarr-key
-RADARR_URL=http://localhost:7878
-RADARR_API_KEY=your-radarr-key
-REMUXCODE_API_KEY=   # leave blank to auto-generate on first run
-```
-
-Once the container is running, these values (and all other settings) can be updated from the Settings page.
+On first run, a default `config/config.yaml` is created automatically. You can also edit this file directly if you prefer, but the UI is the recommended approach. No `.env` file is needed — everything is configured through the Settings page.
 
 ---
 
@@ -302,7 +285,7 @@ curl "http://localhost:7889/api/analyze?path=/share/your/file.mkv" \
 ```
 
 **"Failed to trigger rename"**
-- Verify Sonarr/Radarr URLs and API keys in `.env`
+- Verify Sonarr/Radarr URLs and API keys on the Settings page
 
 ---
 
@@ -310,13 +293,11 @@ curl "http://localhost:7889/api/analyze?path=/share/your/file.mkv" \
 
 If you want to make local changes, you can build the image yourself:
 
-### 1. Clone and configure
+### 1. Clone
 
 ```bash
 git clone https://github.com/sirjmann92/remuXcode.git
 cd remuXcode
-cp .env.example .env
-nano .env  # Set SONARR_URL, SONARR_API_KEY, RADARR_URL, RADARR_API_KEY
 ```
 
 ### 2. Create and update compose.yml
