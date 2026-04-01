@@ -1,6 +1,8 @@
 <script lang="ts">
-import { convertFile, getActiveJobs, getConfig, getMovies } from '$lib/api';
+import { convertFile, getActiveJobs, getConfig, getMovies, refreshRadarr } from '$lib/api';
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
+import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
+import { langName } from '$lib/languages';
 import type { ActiveJobsMap, BrowseMovie, ConfigSummary } from '$lib/types';
 
 let movies: BrowseMovie[] = $state([]);
@@ -9,10 +11,17 @@ let loading = $state(true);
 let loadError = $state(false);
 let search = $state('');
 let filter: string = $state('any');
+let sortBy: string = $state('needsWork');
 let queueing: Record<number, boolean> = $state({});
+let queueingAll = $state(false);
+let selected: Set<number> = $state(new Set());
+let queueingSelected = $state(false);
 let detailMovie: BrowseMovie | null = $state(null);
 let analyzePath: string | null = $state(null);
 let activeJobs: ActiveJobsMap = $state({});
+let showRefreshConfirm = $state(false);
+let refreshingLibrary = $state(false);
+let refreshMsg = $state('');
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -48,11 +57,32 @@ $effect(() => {
 });
 
 const filtered = $derived.by(() => {
-  if (!search) return movies;
-  const q = search.toLowerCase();
-  return movies.filter(
-    (m) => m.title.toLowerCase().includes(q) || m.genres.some((g) => g.toLowerCase().includes(q)),
-  );
+  let result = movies;
+  if (search) {
+    const q = search.toLowerCase();
+    result = result.filter(
+      (m) => m.title.toLowerCase().includes(q) || m.genres.some((g) => g.toLowerCase().includes(q)),
+    );
+  }
+  switch (sortBy) {
+    case 'needsWork':
+      result = result.toSorted((a, b) => {
+        const aw = needsWork(a) ? 0 : 1;
+        const bw = needsWork(b) ? 0 : 1;
+        return aw - bw || a.title.localeCompare(b.title);
+      });
+      break;
+    case 'title':
+      result = result.toSorted((a, b) => a.title.localeCompare(b.title));
+      break;
+    case 'year':
+      result = result.toSorted((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+      break;
+    case 'size':
+      result = result.toSorted((a, b) => (b.size ?? 0) - (a.size ?? 0));
+      break;
+  }
+  return result;
 });
 
 const summary = $derived({
@@ -85,76 +115,71 @@ async function queueMovie(movie: BrowseMovie) {
   }
 }
 
-function formatSize(bytes: number | null): string {
-  if (!bytes) return '—';
-  if (bytes > 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes > 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
-  return `${bytes} B`;
-}
-
 function needsWork(m: BrowseMovie): boolean {
   return !!m.needs_audio_conversion || !!m.needs_video_conversion || m.needs_cleanup;
 }
 
-const langNames: Record<string, string> = {
-  eng: 'English',
-  fre: 'French',
-  spa: 'Spanish',
-  ger: 'German',
-  ita: 'Italian',
-  por: 'Portuguese',
-  rus: 'Russian',
-  chi: 'Chinese',
-  jpn: 'Japanese',
-  kor: 'Korean',
-  ara: 'Arabic',
-  dut: 'Dutch',
-  dan: 'Danish',
-  fin: 'Finnish',
-  nor: 'Norwegian',
-  swe: 'Swedish',
-  pol: 'Polish',
-  cze: 'Czech',
-  hun: 'Hungarian',
-  tur: 'Turkish',
-  gre: 'Greek',
-  heb: 'Hebrew',
-  hin: 'Hindi',
-  tha: 'Thai',
-  ind: 'Indonesian',
-  rum: 'Romanian',
-  bul: 'Bulgarian',
-  hrv: 'Croatian',
-  ukr: 'Ukrainian',
-  ice: 'Icelandic',
-};
-
-function langName(code: string): string {
-  return langNames[code.toLowerCase()] ?? code.toUpperCase();
-}
-
-function removableTracks(tracks: string[], isAnimeAudio?: boolean): string[] {
-  if (!config) return [];
-  if (isAnimeAudio && config.cleanup.anime_keep_original_audio) return [];
-  const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
-  return tracks.filter((t) => !keep.has(t.toLowerCase()));
-}
-
-function keptTracks(tracks: string[]): string[] {
-  if (!config) return [];
-  const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
-  return tracks.filter((t) => keep.has(t.toLowerCase()));
-}
-
-function trackSummary(tracks: string[]): string {
-  const counts: Record<string, number> = {};
-  for (const t of tracks) {
-    const name = langName(t);
-    counts[name] = (counts[name] ?? 0) + 1;
+async function queueAllFiltered() {
+  const items = filtered.filter((m) => needsWork(m));
+  if (items.length === 0) return;
+  queueingAll = true;
+  try {
+    for (const m of items) {
+      await convertFile(m.path, 'full');
+    }
+  } catch {
+    // ignore
+  } finally {
+    queueingAll = false;
   }
-  return Object.entries(counts)
-    .map(([name, n]) => (n > 1 ? `${name} (${n})` : name))
-    .join(', ');
+}
+
+function toggleSelect(id: number) {
+  const next = new Set(selected);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  selected = next;
+}
+
+function selectAllFiltered() {
+  selected = new Set(filtered.filter((m) => needsWork(m)).map((m) => m.id));
+}
+
+function clearSelection() {
+  selected = new Set();
+}
+
+async function queueSelected() {
+  const items = filtered.filter((m) => selected.has(m.id));
+  if (items.length === 0) return;
+  queueingSelected = true;
+  try {
+    for (const m of items) {
+      await convertFile(m.path, 'full');
+    }
+  } catch {
+    // ignore
+  } finally {
+    queueingSelected = false;
+    selected = new Set();
+  }
+}
+
+async function handleRefreshLibrary() {
+  showRefreshConfirm = false;
+  refreshingLibrary = true;
+  refreshMsg = '';
+  try {
+    const res = await refreshRadarr();
+    refreshMsg = res.message;
+    setTimeout(() => {
+      refreshMsg = '';
+    }, 4000);
+  } catch (e) {
+    refreshMsg = e instanceof Error ? e.message : 'Radarr refresh failed';
+  } finally {
+    refreshingLibrary = false;
+  }
 }
 
 $effect(() => {
@@ -176,6 +201,13 @@ const filters: { value: string; label: string }[] = [
   { value: 'cleanup', label: 'Cleanup' },
   { value: 'anime', label: 'Anime' },
 ];
+
+const sortOptions: { value: string; label: string }[] = [
+  { value: 'needsWork', label: 'Needs Work First' },
+  { value: 'title', label: 'Title' },
+  { value: 'year', label: 'Year' },
+  { value: 'size', label: 'Size' },
+];
 </script>
 
 <svelte:head>
@@ -195,6 +227,11 @@ const filters: { value: string; label: string }[] = [
         </button>
       {/each}
     </div>
+    <select class="select select-sm select-bordered" bind:value={sortBy}>
+      {#each sortOptions as s}
+        <option value={s.value}>{s.label}</option>
+      {/each}
+    </select>
     <div class="relative flex-1">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -208,11 +245,64 @@ const filters: { value: string; label: string }[] = [
     </div>
   </div>
 
-  <div class="text-sm text-base-content/50">
-    {summary.total} movie{summary.total !== 1 ? 's' : ''}
-    {#if summary.needsWork > 0}
-      <span class="text-warning">· {summary.needsWork} need{summary.needsWork !== 1 ? '' : 's'} work</span>
-    {/if}
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="text-sm text-base-content/50">
+        {summary.total} movie{summary.total !== 1 ? 's' : ''}
+        {#if summary.needsWork > 0}
+          <span class="text-warning">· {summary.needsWork} need{summary.needsWork !== 1 ? '' : 's'} work</span>
+        {/if}
+      </div>
+      {#if refreshMsg}
+        <span class="text-xs text-success">{refreshMsg}</span>
+      {/if}
+      <button
+        class="btn btn-ghost btn-xs text-base-content/40"
+        onclick={() => (showRefreshConfirm = true)}
+        disabled={refreshingLibrary || !config?.radarr?.configured}
+        title="Force Radarr to re-read all movie files from disk"
+      >
+        {#if refreshingLibrary}
+          <span class="loading loading-spinner loading-xs"></span>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+        {/if}
+        Refresh Library
+      </button>
+    </div>
+    <div class="flex items-center gap-2">
+      {#if selected.size > 0}
+        <button class="btn btn-ghost btn-sm" onclick={clearSelection}>
+          Clear ({selected.size})
+        </button>
+        <button
+          class="btn btn-primary btn-sm"
+          onclick={queueSelected}
+          disabled={queueingSelected}
+        >
+          {#if queueingSelected}
+            <span class="loading loading-spinner loading-xs"></span>
+          {:else}
+            Queue {selected.size} Selected
+          {/if}
+        </button>
+      {:else if summary.needsWork > 0}
+        <button class="btn btn-ghost btn-sm" onclick={selectAllFiltered}>
+          Select All
+        </button>
+        <button
+          class="btn btn-primary btn-sm"
+          onclick={queueAllFiltered}
+          disabled={queueingAll}
+        >
+          {#if queueingAll}
+            <span class="loading loading-spinner loading-xs"></span>
+          {:else}
+            Queue {summary.needsWork} Movie{summary.needsWork !== 1 ? 's' : ''}
+          {/if}
+        </button>
+      {/if}
+    </div>
   </div>
 
   <!-- Movie grid -->
@@ -235,7 +325,7 @@ const filters: { value: string; label: string }[] = [
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="card-glass rounded-box overflow-hidden cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all"
+          class="card-glass rounded-box overflow-hidden cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all {selected.has(movie.id) ? 'ring-2 ring-primary' : ''}"
           onclick={() => (detailMovie = movie)}
         >
           <!-- Poster -->
@@ -273,6 +363,21 @@ const filters: { value: string; label: string }[] = [
                   <span class="text-xs text-base-content/60 mt-0.5">{Math.round(job.progress)}%</span>
                 {/if}
               </div>
+            {/if}
+            <!-- Select checkbox -->
+            {#if needsWork(movie)}
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <label
+                class="absolute bottom-2 left-2 z-10 cursor-pointer"
+                onclick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-primary checkbox-sm bg-black/40 border-white/40"
+                  checked={selected.has(movie.id)}
+                  onchange={() => toggleSelect(movie.id)}
+                />
+              </label>
             {/if}
             <!-- Analyze button -->
             <button
@@ -348,10 +453,10 @@ const filters: { value: string; label: string }[] = [
           {/if}
 
           {#if detailMovie.needs_cleanup && config}
-            {@const removeSubs = removableTracks(detailMovie.subtitles)}
-            {@const keepSubs = keptTracks(detailMovie.subtitles)}
-            {@const removeAudio = removableTracks(detailMovie.audio_languages, detailMovie.is_anime)}
-            {@const keepAudio = keptTracks(detailMovie.audio_languages)}
+            {@const removeSubs = removableTracks(detailMovie.subtitles, config)}
+            {@const keepSubs = keptTracks(detailMovie.subtitles, config)}
+            {@const removeAudio = removableTracks(detailMovie.audio_languages, config, detailMovie.is_anime)}
+            {@const keepAudio = keptTracks(detailMovie.audio_languages, config)}
 
             {#if removeSubs.length > 0}
               <div class="flex items-start gap-2">
@@ -444,4 +549,18 @@ const filters: { value: string; label: string }[] = [
 
 {#if analyzePath}
   <AnalyzeModal path={analyzePath} onclose={() => (analyzePath = null)} />
+{/if}
+
+{#if showRefreshConfirm}
+  <div class="modal modal-open">
+    <div class="modal-box max-w-sm">
+      <h3 class="font-bold text-lg">Refresh Radarr Library</h3>
+      <p class="py-4 text-sm text-base-content/70">This will force Radarr to re-read metadata for <strong>every movie</strong> in your library from disk. Depending on library size, this could take a long time.</p>
+      <div class="modal-action">
+        <button class="btn btn-ghost btn-sm" onclick={() => (showRefreshConfirm = false)}>Cancel</button>
+        <button class="btn btn-warning btn-sm" onclick={handleRefreshLibrary}>Refresh Library</button>
+      </div>
+    </div>
+    <div class="modal-backdrop" onclick={() => (showRefreshConfirm = false)}></div>
+  </div>
 {/if}

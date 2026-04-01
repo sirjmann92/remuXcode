@@ -7,7 +7,9 @@ component initialization, and Sonarr/Radarr integration.
 from collections.abc import Callable
 import contextlib
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+import json as _json
 import logging
 import os
 from pathlib import Path
@@ -100,6 +102,7 @@ class ConversionJob:
     result: dict[str, Any] | None = None
     error: str | None = None
     source: str = "webhook"
+    cancel_event: threading.Event | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for API responses."""
@@ -182,6 +185,9 @@ class JobQueue:
         job.status = JobStatus.CANCELLED
         job.completed_at = time.time()
         job.error = "Cancelled by user"
+        # Signal the cancel event to kill any running ffmpeg subprocess
+        if job.cancel_event:
+            job.cancel_event.set()
         if self.job_store:
             self._save_job_to_store(job)
         logger.info("Cancelled job %s", job_id)
@@ -280,8 +286,6 @@ class JobQueue:
         if not iso_str:
             return None
         try:
-            from datetime import datetime
-
             dt = datetime.fromisoformat(iso_str)
             return dt.timestamp()
         except (ValueError, TypeError):
@@ -289,8 +293,6 @@ class JobQueue:
 
     def _row_to_job(self, row: dict[str, Any]) -> ConversionJob:
         """Convert a DB row dict to a ConversionJob."""
-        import json as _json
-
         result = None
         result_json = row.get("result_json")
         if result_json:
@@ -354,6 +356,9 @@ class JobQueue:
             logger.info("Job %s was cancelled, skipping", job_id)
             return
 
+        # Create cancel event for this job so cancel_job() can kill ffmpeg
+        job.cancel_event = threading.Event()
+
         job.status = JobStatus.RUNNING
         job.started_at = time.time()
         if self.job_store:
@@ -364,7 +369,11 @@ class JobQueue:
 
         try:
             result = process_file(
-                job.file_path, job.job_type, job.id, progress_callback=_update_progress
+                job.file_path,
+                job.job_type,
+                job.id,
+                progress_callback=_update_progress,
+                cancel_event=job.cancel_event,
             )
             if job.status == JobStatus.CANCELLED:
                 logger.info("Job %s was cancelled during processing", job_id)
@@ -385,6 +394,10 @@ class JobQueue:
             job.status = JobStatus.COMPLETED
             logger.info("Job %s completed successfully", job_id)
         except Exception as e:
+            # CancelledError from workers is expected when user cancels
+            if job.status == JobStatus.CANCELLED:
+                logger.info("Job %s was cancelled during processing", job_id)
+                return
             job.error = str(e)
             job.status = JobStatus.FAILED
             logger.error("Job %s failed: %s", job_id, e)
@@ -446,6 +459,7 @@ def process_file(
     job_type: JobType,
     job_id: str | None = None,
     progress_callback: Callable[[float], None] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> dict[str, Any]:
     """Process a single file with the specified conversion type."""
     results: dict[str, Any] = {"file": file_path, "audio": None, "video": None, "cleanup": None}
@@ -493,7 +507,10 @@ def process_file(
         logger.info("Converting audio: %s", Path(file_path).name)
         assert audio_converter is not None
         audio_result = audio_converter.convert(
-            file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
+            file_path,
+            job_id=job_id,
+            progress_callback=make_phase_cb(phase_idx),
+            cancel_event=cancel_event,
         )
         phase_idx += 1
         results["audio"] = {
@@ -509,7 +526,10 @@ def process_file(
         logger.info("Converting video: %s", Path(file_path).name)
         assert video_converter is not None
         video_result = video_converter.convert(
-            file_path, job_id=job_id, progress_callback=make_phase_cb(phase_idx)
+            file_path,
+            job_id=job_id,
+            progress_callback=make_phase_cb(phase_idx),
+            cancel_event=cancel_event,
         )
         phase_idx += 1
         results["video"] = {
@@ -531,6 +551,7 @@ def process_file(
             job_id=job_id,
             progress_callback=make_phase_cb(phase_idx),
             is_anime=file_is_anime,
+            cancel_event=cancel_event,
         )
         results["cleanup"] = {
             "success": cleanup_result.success,

@@ -19,7 +19,7 @@ COPY requirements.txt /app/requirements.txt
 
 # Install system dependencies, create users/groups, and install Python deps
 RUN apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev \
-    && apk add --no-cache ffmpeg gettext su-exec shadow \
+    && apk add --no-cache ffmpeg su-exec shadow \
     && addgroup -g 1000 appgroup \
     && adduser -u 1000 -G appgroup -D -s /bin/sh appuser \
     && pip install --no-cache-dir -r /app/requirements.txt \
@@ -36,15 +36,10 @@ ENV PYTHONUNBUFFERED=1 \
     REMUXCODE_DB_PATH=/app/config/jobs.db
 
 # Copy backend code
-COPY backend/*.py /app/backend/
-COPY backend/config.yaml /app/backend/
-COPY backend/utils/*.py /app/backend/utils/
-COPY backend/workers/*.py /app/backend/workers/
+COPY backend/ /app/backend/
 
-# Copy frontend build output
+# Copy frontend build output and startup script
 COPY --from=frontend-build /frontend/build /app/frontend/build
-
-# Copy startup script
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh \
     && mkdir -p /app/logs /app/config
