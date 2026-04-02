@@ -85,6 +85,9 @@ function fileName(path: string): string {
     {:else if error}
       <div class="alert alert-error">
         <span>{error}</span>
+        {#if error.toLowerCase().includes('not found')}
+          <p class="text-xs mt-1 opacity-70">The file may have been moved, deleted, or is still downloading. Try refreshing the library in Radarr/Sonarr.</p>
+        {/if}
       </div>
     {:else if result}
       <!-- Tabs -->
