@@ -3,7 +3,7 @@
 # Node.js 22 uses CPU instructions that QEMU cannot emulate, causing SIGILL
 # (exit 132) when building for arm64 under QEMU. The output is pure static
 # files (JS/CSS/HTML), so the build architecture does not matter.
-FROM --platform=linux/amd64 node:22-alpine AS frontend-build
+FROM --platform=linux/amd64 node:25-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci --silent && npm cache clean --force
