@@ -69,9 +69,7 @@ function fileName(path: string): string {
 }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal modal-open">
+<div class="modal modal-open" role="dialog" aria-modal="true">
   <div class="modal-box max-w-2xl">
     <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={onclose}>✕</button>
 
@@ -272,5 +270,5 @@ function fileName(path: string): string {
       </div><!-- end min-h tab content -->
     {/if}
   </div>
-  <div class="modal-backdrop" onclick={onclose}></div>
+  <div class="modal-backdrop" role="button" tabindex="-1" aria-label="Close" onclick={onclose} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onclose(); }}></div>
 </div>
