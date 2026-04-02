@@ -679,7 +679,7 @@ const sortOptions: { value: string; label: string }[] = [
                     {@const removeSubs = removableTracks(ep.subtitles, config)}
                     {@const keepSubs = keptTracks(ep.subtitles, config)}
                     {@const removeAudio = removableTracks(ep.audio_languages, config, isAnime)}
-                    {@const keepAudio = keptTracks(ep.audio_languages, config)}
+                    {@const keepAudio = (isAnime && config.cleanup.anime_keep_original_audio) ? ep.audio_languages : keptTracks(ep.audio_languages, config)}
                     <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                       {#if ep.audio_languages.length > 0}
                         <span class="text-xs text-base-content/30">
@@ -687,9 +687,6 @@ const sortOptions: { value: string; label: string }[] = [
                           {#if keepAudio.length > 0}<span class="text-success/70">{trackSummary(keepAudio)}</span>{/if}
                           {#if keepAudio.length > 0 && removeAudio.length > 0}<span class="text-base-content/20"> · </span>{/if}
                           {#if removeAudio.length > 0}<span class="text-error/60 line-through">{trackSummary(removeAudio)}</span>{/if}
-                          {#if isAnime && config.cleanup.anime_keep_original_audio && keepAudio.length === 0 && ep.audio_languages.length > 0}
-                            <span class="text-success/70">{trackSummary(ep.audio_languages)}</span>
-                          {/if}
                         </span>
                       {/if}
                       {#if ep.subtitles.length > 0}
