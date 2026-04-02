@@ -132,7 +132,7 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
             # Skip audio-based cleanup flagging for anime — subtitles above still apply.
             pass
         else:
-            extra_audio = [a for a in audio_langs if a not in keep]
+            extra_audio = [a for a in audio_langs if a and a != "und" and a not in keep]
             if extra_audio:
                 return True
     return False
@@ -560,7 +560,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     item["analyzed"] = True
                     # Re-evaluate cleanup using stream-level data if titles are available
                     cached_streams = a.get("audio_streams", [])
-                    if cached_streams and any(s.get("title") is not None for s in cached_streams):
+                    if cached_streams:
                         item["needs_cleanup"] = _needs_cleanup_from_streams(
                             cached_streams,
                             item.get("subtitles", []),
@@ -779,7 +779,7 @@ def _build_series_results(
                     cached_streams = (
                         entry.get("analysis", {}).get("audio_streams", []) if entry else []
                     )
-                    if cached_streams and any(s.get("title") is not None for s in cached_streams):
+                    if cached_streams:
                         ep_sub_langs = item.get("subtitles", []) or [
                             s.lower() for s in _split_slash_field(mi.get("subtitles", ""))
                         ]
@@ -983,7 +983,7 @@ def get_series_detail(
             ep_item["analyzed"] = True
             # Re-evaluate cleanup with stream-level data if titles are available
             cached_streams = a.get("audio_streams", [])
-            if cached_streams and any(s.get("title") is not None for s in cached_streams):
+            if cached_streams:
                 ep_sub_langs = ep_item.get("subtitles", [])
                 ep_item["needs_cleanup"] = _needs_cleanup_from_streams(
                     cached_streams,
