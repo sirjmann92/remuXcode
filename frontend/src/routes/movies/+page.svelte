@@ -676,7 +676,7 @@ const sortOptions: { value: string; label: string }[] = [
             {@const removeSubs = removableTracks(detailMovie.subtitles, config)}
             {@const keepSubs = keptTracks(detailMovie.subtitles, config)}
             {@const removeAudio = removableTracks(detailMovie.audio_languages, config, detailMovie.is_anime)}
-            {@const keepAudio = keptTracks(detailMovie.audio_languages, config)}
+            {@const keepAudio = (detailMovie.is_anime && config.cleanup.anime_keep_original_audio) ? detailMovie.audio_languages : keptTracks(detailMovie.audio_languages, config)}
 
             {#if removeSubs.length > 0}
               <div class="flex items-start gap-2">
