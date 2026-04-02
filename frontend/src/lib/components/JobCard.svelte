@@ -15,6 +15,11 @@ let deleting = $state(false);
 let cancelling = $state(false);
 
 const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
+const libraryLink = $derived.by(() => {
+  const isShow = /\/Season \d+\//i.test(job.file_path);
+  const page = isShow ? '/shows' : '/movies';
+  return `${page}?file=${encodeURIComponent(job.file_path)}`;
+});
 const elapsed = $derived.by(() => {
   if (!job.started_at) return null;
   const end = job.completed_at ?? Date.now() / 1000;
@@ -100,7 +105,19 @@ async function handleCancel() {
       {/if}
     </div>
 
-    <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
+    <p class="text-sm font-mono truncate text-base-content/80 flex items-center gap-1.5" title={job.file_path}>
+      <span class="truncate">{fileName}</span>
+      <a
+        href={libraryLink}
+        class="shrink-0 text-base-content/25 hover:text-primary transition-colors"
+        title="View in library"
+        onclick={(e) => e.stopPropagation()}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+        </svg>
+      </a>
+    </p>
 
     {#if job.status === 'running'}
       <div class="space-y-1">

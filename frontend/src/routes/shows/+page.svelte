@@ -1,4 +1,6 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
 import {
   convertFile,
   getActiveJobs,
@@ -63,6 +65,7 @@ let scanProgress: ScanProgress | null = $state(null);
 let scanPollTimer: ReturnType<typeof setInterval> | null = null;
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
+let deepLinkFile: string | null = $page.url.searchParams.get('file');
 
 async function handleStartScan() {
   try {
@@ -466,6 +469,32 @@ getConfig()
     config = c;
   })
   .catch(() => {});
+
+// Deep-link: open series detail from ?file= param (e.g. from job card)
+$effect(() => {
+  if (!deepLinkFile || seriesList.length === 0 || selectedSeries) return;
+  const match = seriesList.find((s) => deepLinkFile!.startsWith(s.path));
+  if (!match) return;
+  const filePath = deepLinkFile;
+  deepLinkFile = null;
+  goto('/shows', { replaceState: true });
+  // Open detail, then expand the matching season
+  detailLoading = true;
+  expandedSeasons = {};
+  getSeriesDetail(match.id).then((detail) => {
+    selectedSeries = detail;
+    detailLoading = false;
+    // Find and expand the season containing the target episode
+    for (const season of detail.seasons) {
+      if (season.episodes.some((ep) => ep.path === filePath)) {
+        expandedSeasons[season.season_number] = true;
+        break;
+      }
+    }
+  }).catch(() => {
+    detailLoading = false;
+  });
+});
 
 const filters: { value: string; label: string }[] = [
   { value: 'any', label: 'All' },
