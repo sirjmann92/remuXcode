@@ -539,11 +539,12 @@ const sortOptions: { value: string; label: string }[] = [
   {:else}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
       {#each filtered as movie (movie.id)}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="card-glass rounded-box overflow-hidden cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all {selected.has(movie.id) ? 'ring-2 ring-primary' : ''}"
+          role="button"
+          tabindex="0"
           onclick={() => (detailMovie = movie)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); detailMovie = movie; } }}
         >
           <!-- Poster -->
           <div class="aspect-[2/3] bg-base-300 relative overflow-hidden">
@@ -590,6 +591,7 @@ const sortOptions: { value: string; label: string }[] = [
               <label
                 class="absolute bottom-2 left-2 z-10 cursor-pointer"
                 onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
               >
                 <input
                   type="checkbox"
@@ -637,9 +639,7 @@ const sortOptions: { value: string; label: string }[] = [
 
 <!-- Detail Modal -->
 {#if detailMovie}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal modal-open">
+  <div class="modal modal-open" role="dialog" aria-modal="true">
     <div class="modal-box max-w-lg">
       <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={() => (detailMovie = null)}>✕</button>
 
@@ -763,7 +763,7 @@ const sortOptions: { value: string; label: string }[] = [
         </div>
       {/if}
     </div>
-    <div class="modal-backdrop" onclick={() => (detailMovie = null)}></div>
+    <div class="modal-backdrop" role="button" tabindex="-1" aria-label="Close" onclick={() => (detailMovie = null)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') detailMovie = null; }}></div>
   </div>
 {/if}
 
@@ -781,6 +781,6 @@ const sortOptions: { value: string; label: string }[] = [
         <button class="btn btn-warning btn-sm" onclick={handleRefreshLibrary}>Refresh Library</button>
       </div>
     </div>
-    <div class="modal-backdrop" onclick={() => (showRefreshConfirm = false)}></div>
+    <div class="modal-backdrop" role="button" tabindex="-1" aria-label="Close" onclick={() => (showRefreshConfirm = false)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showRefreshConfirm = false; }}></div>
   </div>
 {/if}
