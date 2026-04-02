@@ -481,19 +481,21 @@ $effect(() => {
   // Open detail, then expand the matching season
   detailLoading = true;
   expandedSeasons = {};
-  getSeriesDetail(match.id).then((detail) => {
-    selectedSeries = detail;
-    detailLoading = false;
-    // Find and expand the season containing the target episode
-    for (const season of detail.seasons) {
-      if (season.episodes.some((ep) => ep.path === filePath)) {
-        expandedSeasons[season.season_number] = true;
-        break;
+  getSeriesDetail(match.id)
+    .then((detail) => {
+      selectedSeries = detail;
+      detailLoading = false;
+      // Find and expand the season containing the target episode
+      for (const season of detail.seasons) {
+        if (season.episodes.some((ep) => ep.path === filePath)) {
+          expandedSeasons[season.season_number] = true;
+          break;
+        }
       }
-    }
-  }).catch(() => {
-    detailLoading = false;
-  });
+    })
+    .catch(() => {
+      detailLoading = false;
+    });
 });
 
 const filters: { value: string; label: string }[] = [
