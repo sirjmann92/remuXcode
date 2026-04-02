@@ -473,7 +473,7 @@ getConfig()
 // Deep-link: open series detail from ?file= param (e.g. from job card)
 $effect(() => {
   if (!deepLinkFile || seriesList.length === 0 || selectedSeries) return;
-  const match = seriesList.find((s) => deepLinkFile!.startsWith(s.path));
+  const match = seriesList.find((s) => deepLinkFile?.startsWith(s.path));
   if (!match) return;
   const filePath = deepLinkFile;
   deepLinkFile = null;
