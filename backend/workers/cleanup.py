@@ -370,9 +370,8 @@ class StreamCleanup:
                         output_path,
                     )
                 elif replace_input:
-                    # Normal case: remove original before move
-                    if output_path.exists():
-                        output_path.unlink()
+                    pass  # Don't unlink — shutil.move overwrites in-place,
+                    # preserving the file's location on mergerfs setups.
 
                 shutil.move(str(temp_output), str(output_path))
 

@@ -22,7 +22,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`${res.status}: ${body}`);
+      // Extract human-readable detail from JSON error responses
+      let message = body;
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed.detail) message = parsed.detail;
+      } catch {
+        // not JSON, use raw body
+      }
+      throw new Error(message);
     }
     return res.json();
   } finally {
