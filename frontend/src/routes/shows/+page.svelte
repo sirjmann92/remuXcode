@@ -583,11 +583,12 @@ const sortOptions: { value: string; label: string }[] = [
     {#each filteredSeasons as season (season.season_number)}
       <div class="card-glass rounded-box overflow-hidden">
         <!-- Season header (clickable) -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
           class="p-4 flex items-center justify-between hover:bg-base-content/5 transition-colors cursor-pointer"
+          role="button"
+          tabindex="0"
           onclick={() => toggleSeason(season.season_number)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSeason(season.season_number); } }}
         >
           <div class="flex items-center gap-3">
             <svg
@@ -976,6 +977,6 @@ const sortOptions: { value: string; label: string }[] = [
         <button class="btn btn-warning btn-sm" onclick={handleRefreshLibrary}>Refresh Library</button>
       </div>
     </div>
-    <div class="modal-backdrop" onclick={() => (showRefreshConfirm = false)}></div>
+    <div class="modal-backdrop" role="button" tabindex="-1" aria-label="Close" onclick={() => (showRefreshConfirm = false)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showRefreshConfirm = false; }}></div>
   </div>
 {/if}
