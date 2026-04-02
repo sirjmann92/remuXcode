@@ -1,4 +1,6 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
 import {
   convertFile,
   getActiveJobs,
@@ -329,6 +331,17 @@ getConfig()
     config = c;
   })
   .catch(() => {});
+
+// Deep-link: open movie detail from ?file= param (e.g. from job card)
+$effect(() => {
+  const fileParam = $page.url.searchParams.get('file');
+  if (!fileParam || movies.length === 0) return;
+  const match = movies.find((m) => m.path === fileParam);
+  if (match) {
+    detailMovie = match;
+    goto('/movies', { replaceState: true });
+  }
+});
 
 const filters: { value: string; label: string }[] = [
   { value: 'any', label: 'All' },
