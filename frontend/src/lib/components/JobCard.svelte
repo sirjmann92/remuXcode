@@ -76,48 +76,47 @@ async function handleCancel() {
           <span class="text-xs text-base-content/30">{elapsed}</span>
         {/if}
       </div>
-      {#if job.status === 'running' || job.status === 'pending'}
-        <button
-          class="btn btn-ghost btn-xs text-warning opacity-60 hover:opacity-100 transition-opacity"
-          onclick={handleCancel}
-          disabled={cancelling}
-          title="Cancel"
-        >
-          {#if cancelling}
-            <span class="loading loading-spinner loading-xs"></span>
-          {:else}
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
-            </svg>
-          {/if}
-        </button>
-      {:else if job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled'}
-        <button
-          class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
-          onclick={handleDelete}
-          disabled={deleting}
-          title="Remove"
+      <div class="flex items-center gap-0.5">
+        <a
+          href={libraryLink}
+          class="btn btn-ghost btn-xs text-primary/60 hover:text-primary transition-opacity"
+          title="View in library"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
           </svg>
-        </button>
-      {/if}
+        </a>
+        {#if job.status === 'running' || job.status === 'pending'}
+          <button
+            class="btn btn-ghost btn-xs text-warning opacity-60 hover:opacity-100 transition-opacity"
+            onclick={handleCancel}
+            disabled={cancelling}
+            title="Cancel"
+          >
+            {#if cancelling}
+              <span class="loading loading-spinner loading-xs"></span>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+              </svg>
+            {/if}
+          </button>
+        {:else if job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled'}
+          <button
+            class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
+            onclick={handleDelete}
+            disabled={deleting}
+            title="Remove"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        {/if}
+      </div>
     </div>
 
-    <p class="text-sm font-mono truncate text-base-content/80 flex items-center gap-1.5" title={job.file_path}>
-      <span class="truncate">{fileName}</span>
-      <a
-        href={libraryLink}
-        class="shrink-0 text-base-content/25 hover:text-primary transition-colors"
-        title="View in library"
-        onclick={(e) => e.stopPropagation()}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-        </svg>
-      </a>
-    </p>
+    <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
 
     {#if job.status === 'running'}
       <div class="space-y-1">
