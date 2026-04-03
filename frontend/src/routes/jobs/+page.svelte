@@ -1,11 +1,23 @@
 <script lang="ts">
+import { page } from '$app/stores';
 import { cancelAllJobs, cancelAllPending, deleteJob, getJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
 import type { Job, JobStatus } from '$lib/types';
 
 let jobs: Job[] = $state([]);
 let loading = $state(true);
-let filter: JobStatus | 'all' = $state('all');
+const validFilters: Array<JobStatus | 'all'> = [
+  'all',
+  'running',
+  'pending',
+  'completed',
+  'failed',
+  'cancelled',
+];
+const urlFilter = $page.url.searchParams.get('filter') ?? 'all';
+let filter: JobStatus | 'all' = $state(
+  validFilters.includes(urlFilter as JobStatus | 'all') ? (urlFilter as JobStatus | 'all') : 'all',
+);
 let search: string = $state('');
 
 const filtered = $derived.by(() => {
