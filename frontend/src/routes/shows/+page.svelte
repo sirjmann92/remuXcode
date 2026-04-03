@@ -229,8 +229,10 @@ const filtered = $derived.by(() => {
   switch (sortBy) {
     case 'needsWork':
       result = result.toSorted((a, b) => {
-        const aw = (a.audio_convert_count ?? 0) + (a.cleanup_count ?? 0);
-        const bw = (b.audio_convert_count ?? 0) + (b.cleanup_count ?? 0);
+        const aw =
+          (a.audio_convert_count ?? 0) + (a.video_convert_count ?? 0) + (a.cleanup_count ?? 0);
+        const bw =
+          (b.audio_convert_count ?? 0) + (b.video_convert_count ?? 0) + (b.cleanup_count ?? 0);
         return bw - aw || a.title.localeCompare(b.title);
       });
       break;
@@ -250,9 +252,10 @@ const filtered = $derived.by(() => {
 const listSummary = $derived.by(() => {
   const total = filtered.length;
   const audioEps = filtered.reduce((s, r) => s + (r.audio_convert_count ?? 0), 0);
+  const videoEps = filtered.reduce((s, r) => s + (r.video_convert_count ?? 0), 0);
   const cleanupEps = filtered.reduce((s, r) => s + (r.cleanup_count ?? 0), 0);
-  const needsWorkEps = audioEps + cleanupEps;
-  return { total, audioEps, cleanupEps, needsWorkEps };
+  const needsWorkEps = audioEps + videoEps + cleanupEps;
+  return { total, audioEps, videoEps, cleanupEps, needsWorkEps };
 });
 
 async function doFetchSeries() {
@@ -359,7 +362,10 @@ async function queueAllSeries() {
 
 async function queueAllFiltered() {
   const items = filtered.filter(
-    (s) => (s.audio_convert_count ?? 0) > 0 || (s.cleanup_count ?? 0) > 0,
+    (s) =>
+      (s.audio_convert_count ?? 0) > 0 ||
+      (s.video_convert_count ?? 0) > 0 ||
+      (s.cleanup_count ?? 0) > 0,
   );
   if (items.length === 0) return;
   queueingAll = true;
@@ -382,7 +388,7 @@ async function queueAllFiltered() {
 }
 
 function episodeNeedsWork(ep: EpisodeFile): boolean {
-  return !!ep.needs_audio_conversion || ep.needs_cleanup;
+  return !!ep.needs_audio_conversion || !!ep.needs_video_conversion || ep.needs_cleanup;
 }
 
 function toggleEpSelect(path: string) {
@@ -446,7 +452,9 @@ const filteredSeasons = $derived.by(() => {
         ...season,
         episode_count: eps.length,
         needs_audio: eps.filter((ep) => !!ep.needs_audio_conversion).length,
-        needs_work: eps.filter((ep) => !!ep.needs_audio_conversion || ep.needs_cleanup).length,
+        needs_work: eps.filter(
+          (ep) => !!ep.needs_audio_conversion || !!ep.needs_video_conversion || ep.needs_cleanup,
+        ).length,
         size: eps.reduce((sum, ep) => sum + (ep.size ?? 0), 0),
         episodes: eps,
       };
@@ -693,6 +701,9 @@ const sortOptions: { value: string; label: string }[] = [
                     {/if}
                     {#if ep.resolution}
                       <span class="badge badge-ghost badge-xs">{ep.resolution}</span>
+                    {/if}
+                    {#if ep.needs_video_conversion}
+                      <span class="badge badge-error badge-xs">Video</span>
                     {/if}
                     {#if ep.needs_audio_conversion}
                       <span class="badge badge-warning badge-xs">Audio</span>
@@ -968,6 +979,9 @@ const sortOptions: { value: string; label: string }[] = [
                     <span class="loading loading-spinner loading-xs text-primary"></span>
                     <span class="text-xs text-primary">{seriesActiveCount(series.path)}</span>
                   </span>
+                {/if}
+                {#if (series.video_convert_count ?? 0) > 0}
+                  <span class="badge badge-error badge-sm">{series.video_convert_count} video</span>
                 {/if}
                 {#if (series.audio_convert_count ?? 0) > 0}
                   <span class="badge badge-warning badge-sm">{series.audio_convert_count} audio</span>

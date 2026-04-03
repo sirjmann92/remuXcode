@@ -579,6 +579,9 @@ const sortOptions: { value: string; label: string }[] = [
                 {/if}
               </div>
               <div class="flex flex-col gap-1 items-end">
+                {#if movie.needs_video_conversion}
+                  <span class="badge badge-error badge-xs">Video</span>
+                {/if}
                 {#if movie.needs_audio_conversion}
                   <span class="badge badge-warning badge-xs">Audio</span>
                 {/if}
@@ -681,7 +684,7 @@ const sortOptions: { value: string; label: string }[] = [
           {#if detailMovie.needs_audio_conversion}
             <div class="flex items-start gap-2">
               <span class="badge badge-warning badge-sm shrink-0">Audio</span>
-              <p class="text-sm">{detailMovie.audio_codec} will be converted</p>
+              <p class="text-sm">{detailMovie.audio_codecs_to_convert?.length ? detailMovie.audio_codecs_to_convert.join(', ') : detailMovie.audio_codec} will be converted</p>
             </div>
           {/if}
 
