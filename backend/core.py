@@ -104,6 +104,7 @@ class ConversionJob:
     error: str | None = None
     source: str = "webhook"
     cancel_event: threading.Event | None = None
+    last_progress_at: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for API responses."""
@@ -139,6 +140,9 @@ class JobQueue:
         self.running = False
         self.max_workers = max_workers
         self.job_store = job_store
+        self._watchdog_thread: threading.Thread | None = None
+        # Stale job timeout in seconds (no progress update for this long → fail)
+        self.stale_timeout: int = 15 * 60  # 15 minutes
 
     def start(self) -> None:
         """Start worker threads."""
@@ -147,13 +151,19 @@ class JobQueue:
             worker = threading.Thread(target=self._worker_loop, name=f"Worker-{i}", daemon=True)
             worker.start()
             self.workers.append(worker)
-        logger.info("Started %d job worker(s)", self.max_workers)
+        self._watchdog_thread = threading.Thread(
+            target=self._watchdog_loop, name="Watchdog", daemon=True
+        )
+        self._watchdog_thread.start()
+        logger.info("Started %d job worker(s) + watchdog", self.max_workers)
 
     def stop(self) -> None:
         """Stop all worker threads."""
         self.running = False
         for worker in self.workers:
             worker.join(timeout=5)
+        if self._watchdog_thread:
+            self._watchdog_thread.join(timeout=5)
 
     def add_job(self, job: ConversionJob) -> str:
         """Add a job to the queue and return its ID."""
@@ -339,6 +349,63 @@ class JobQueue:
             source=row.get("source", "webhook"),
         )
 
+    def _watchdog_loop(self) -> None:
+        """Periodically check for stale running jobs and fail them."""
+        while self.running:
+            try:
+                time.sleep(30)  # Check every 30 seconds
+                now = time.time()
+                with self.lock:
+                    running_jobs = [
+                        j for j in self.jobs.values() if j.status == JobStatus.RUNNING
+                    ]
+                for job in running_jobs:
+                    last_update = job.last_progress_at or job.started_at or job.created_at
+                    stale_seconds = now - last_update
+                    if stale_seconds < self.stale_timeout:
+                        continue
+
+                    stale_min = stale_seconds / 60
+                    logger.error(
+                        "Watchdog: job %s has had no progress for %.0f minutes "
+                        "(last progress: %.1f%%) — marking as failed. "
+                        "The worker thread may be stuck in a blocking I/O call.",
+                        job.id,
+                        stale_min,
+                        job.progress,
+                    )
+
+                    job.status = JobStatus.FAILED
+                    job.completed_at = now
+                    job.error = (
+                        f"Stale job detected: no progress for {stale_min:.0f} minutes "
+                        f"(stuck at {job.progress:.1f}%). "
+                        "The worker may have been blocked by a network I/O issue."
+                    )
+                    if job.cancel_event:
+                        job.cancel_event.set()
+                    if self.job_store:
+                        self._save_job_to_store(job)
+
+                    # If all worker threads are stuck, spawn a replacement
+                    alive_workers = [w for w in self.workers if w.is_alive()]
+                    # A stuck thread is alive but not making progress — spawn
+                    # a replacement so the queue keeps draining.
+                    if len(alive_workers) >= self.max_workers:
+                        idx = len(self.workers)
+                        replacement = threading.Thread(
+                            target=self._worker_loop,
+                            name=f"Worker-{idx}",
+                            daemon=True,
+                        )
+                        replacement.start()
+                        self.workers.append(replacement)
+                        logger.warning(
+                            "Watchdog: spawned replacement worker thread Worker-%d", idx
+                        )
+            except Exception as exc:
+                logger.error("Watchdog error: %s", exc)
+
     def _worker_loop(self) -> None:
         while self.running:
             try:
@@ -362,11 +429,13 @@ class JobQueue:
 
         job.status = JobStatus.RUNNING
         job.started_at = time.time()
+        job.last_progress_at = time.time()
         if self.job_store:
             self._save_job_to_store(job)
 
         def _update_progress(pct: float) -> None:
             job.progress = pct
+            job.last_progress_at = time.time()
 
         try:
             result = process_file(

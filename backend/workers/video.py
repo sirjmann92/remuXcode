@@ -19,6 +19,7 @@ from backend.utils.anime_detect import AnimeDetector, ContentType
 from backend.utils.config import VideoConfig
 from backend.utils.ffprobe import FFProbe
 from backend.workers._progress import run_ffmpeg_with_progress
+from backend.workers._safe_move import safe_replace
 
 logger = logging.getLogger(__name__)
 
@@ -311,10 +312,9 @@ class VideoConverter:
                         output_path,
                     )
                 elif replace_input:
-                    pass  # Don't unlink — shutil.move overwrites in-place,
-                    # preserving the file's location on mergerfs setups.
+                    pass  # safe_replace handles backup + move atomically
 
-                shutil.move(str(temp_file), str(output_path))
+                safe_replace(temp_file, output_path)
 
                 # Clean up temp directory after successful move
                 try:

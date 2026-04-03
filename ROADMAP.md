@@ -295,6 +295,7 @@ services:
 ## Phase 3: Community & Distribution
 
 ### Features
+- **Event Viewer / Notification Center** - Real-time activity log in the UI showing conversion events, data protection alerts, watchdog actions, and worker lifecycle events with filterable severity levels (info, warning, error, critical)
 - **Unraid Plugin** - Native Unraid Community Apps support
 - **Multi-user support** - Role-based access
 - **Hardware acceleration** - GPU encoding support
