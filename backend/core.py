@@ -980,18 +980,21 @@ def initialize_components() -> None:
         config=config.audio,
         ffprobe=ffprobe,
         get_volume_root=get_volume_root,
+        ffmpeg_threads=config.effective_ffmpeg_threads,
     )
     video_converter = VideoConverter(
         config=config.video,
         ffprobe=ffprobe,
         anime_detector=anime_detector,
         get_volume_root=get_volume_root,
+        ffmpeg_threads=config.effective_ffmpeg_threads,
     )
     stream_cleanup = StreamCleanup(
         config=config.cleanup,
         ffprobe=ffprobe,
         language_detector=language_detector,
         get_volume_root=get_volume_root,
+        ffmpeg_threads=config.effective_ffmpeg_threads,
     )
 
     db_path = os.getenv("REMUXCODE_DB_PATH", str(Path(__file__).parent / "jobs.db"))

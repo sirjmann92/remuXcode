@@ -127,8 +127,14 @@ export interface ConfigSummary {
   };
   path_mappings: { container: string; host: string }[];
   workers: number;
+  ffmpeg_threads: number;
+  effective_ffmpeg_threads: number;
   job_history_days: number;
   api_key: string;
+}
+
+export interface SystemInfo {
+  cpu_count: number;
 }
 
 export interface HealthStatus {
