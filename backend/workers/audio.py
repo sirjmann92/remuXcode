@@ -99,6 +99,25 @@ class AudioConverter:
         self.ffprobe = ffprobe or FFProbe()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
 
+    @staticmethod
+    def _has_compatible_companion(lang: str, compatible_langs: set[str]) -> bool:
+        """Check if a stream's language already has a compatible (non-DTS/TrueHD) track.
+
+        When keep_original* is enabled, the converted companion persists alongside
+        the original.  Detecting that avoids re-processing already-converted files.
+        """
+        if lang == "und":
+            return bool(compatible_langs)
+        return lang in compatible_langs
+
+    def _compatible_languages(self, info: MediaInfo) -> set[str]:
+        """Build set of languages that have a compatible (non-DTS, non-TrueHD) track."""
+        return {
+            (s.language or "und").lower()
+            for s in info.audio_streams
+            if not s.is_dts and not s.is_truehd
+        }
+
     def should_convert(self, file_path: str, *, is_anime: bool = False) -> bool:
         """Check if a file has audio that needs conversion."""
         if not self.config.enabled:
@@ -112,17 +131,29 @@ class AudioConverter:
         if info is None:
             return False
 
-        # Check for regular DTS streams (excluding DTS:X)
-        if self.config.convert_dts and any(s.is_dts and not s.is_dts_x for s in info.audio_streams):
-            return True
+        # When keep_original* is enabled, a converted companion track persists
+        # alongside the original.  Detect same-language compatible tracks so we
+        # don't re-flag files that were already processed.
+        compat = (
+            self._compatible_languages(info)
+            if (self.config.keep_original or self.config.keep_original_dts_x)
+            else set()
+        )
 
-        # Check for DTS:X streams
-        if self.config.convert_dts_x and info.has_dts_x:
-            return True
-
-        # Check for TrueHD streams
-        if self.config.convert_truehd and info.has_truehd:
-            return True
+        for s in info.audio_streams:
+            lang = (s.language or "und").lower()
+            if self.config.convert_dts and s.is_dts and not s.is_dts_x:
+                if self.config.keep_original and self._has_compatible_companion(lang, compat):
+                    continue
+                return True
+            if self.config.convert_dts_x and s.is_dts_x:
+                if self.config.keep_original_dts_x and self._has_compatible_companion(lang, compat):
+                    continue
+                return True
+            if self.config.convert_truehd and s.is_truehd:
+                if self.config.keep_original and self._has_compatible_companion(lang, compat):
+                    continue
+                return True
 
         return False
 
@@ -195,17 +226,35 @@ class AudioConverter:
                 error="Failed to analyze input file",
             )
 
-        # Find streams to convert
-        streams_to_convert = []
+        # Find streams to convert (skip streams with existing companions
+        # when keep_original* is enabled to avoid re-processing)
+        streams_to_convert: list[AudioStream] = []
+        compat = (
+            self._compatible_languages(info)
+            if (self.config.keep_original or self.config.keep_original_dts_x)
+            else set()
+        )
 
         if self.config.convert_dts:
-            streams_to_convert.extend(self.get_dts_streams(info))
+            for s in self.get_dts_streams(info):
+                lang = (s.language or "und").lower()
+                if self.config.keep_original and self._has_compatible_companion(lang, compat):
+                    continue
+                streams_to_convert.append(s)
 
         if self.config.convert_dts_x:
-            streams_to_convert.extend(self.get_dts_x_streams(info))
+            for s in self.get_dts_x_streams(info):
+                lang = (s.language or "und").lower()
+                if self.config.keep_original_dts_x and self._has_compatible_companion(lang, compat):
+                    continue
+                streams_to_convert.append(s)
 
         if self.config.convert_truehd:
-            streams_to_convert.extend(self.get_truehd_streams(info))
+            for s in self.get_truehd_streams(info):
+                lang = (s.language or "und").lower()
+                if self.config.keep_original and self._has_compatible_companion(lang, compat):
+                    continue
+                streams_to_convert.append(s)
 
         if not streams_to_convert:
             return AudioConversionResult(

@@ -57,16 +57,125 @@ def invalidate_cache(key: str | None = None) -> None:
 router = APIRouter(tags=["browse"])
 
 
+def _has_compatible_companion(lang: str, compatible_langs: set[str]) -> bool:
+    """Check if a stream's language already has a compatible (non-DTS/TrueHD) track.
+
+    When keep_original* is enabled, the converted companion track persists
+    alongside the original.  This detects that situation to avoid re-flagging
+    already-processed files.
+    """
+    if lang == "und":
+        return bool(compatible_langs)
+    return lang in compatible_langs
+
+
+def _compatible_track_languages(streams: Any, *, use_dicts: bool = False) -> set[str]:
+    """Build set of languages that have a compatible (non-DTS, non-TrueHD) track."""
+    langs: set[str] = set()
+    for s in streams:
+        if use_dicts:
+            if not s.get("is_dts", False) and not s.get("is_truehd", False):
+                langs.add((s.get("language") or "und").lower())
+        elif not s.is_dts and not s.is_truehd:
+            langs.add((s.language or "und").lower())
+    return langs
+
+
 def _needs_audio_conversion(info: Any) -> bool:
-    """Config-aware check whether this file needs audio conversion."""
+    """Config-aware check whether this file needs audio conversion.
+
+    Mirrors AudioConverter.should_convert() logic: regular DTS (excluding
+    DTS:X) is checked separately from DTS:X so that keeping an original
+    DTS:X track doesn't trigger a false positive.  When keep_original* is
+    enabled, streams that already have a compatible companion track in the
+    same language are considered "already converted" and skipped.
+    """
     cfg = core.config.audio if core.config else None
     if not cfg:
         return False
-    if cfg.convert_dts and info.has_dts:
-        return True
-    if cfg.convert_truehd and info.has_truehd:
-        return True
+    # Build companion-language set for keep_original detection
+    compat = (
+        _compatible_track_languages(info.audio_streams)
+        if (cfg.keep_original or cfg.keep_original_dts_x)
+        else set()
+    )
+    for s in info.audio_streams:
+        lang = (s.language or "und").lower()
+        if cfg.convert_dts and s.is_dts and not s.is_dts_x:
+            if cfg.keep_original and _has_compatible_companion(lang, compat):
+                continue
+            return True
+        if cfg.convert_dts_x and s.is_dts_x:
+            if cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+                continue
+            return True
+        if cfg.convert_truehd and s.is_truehd:
+            if cfg.keep_original and _has_compatible_companion(lang, compat):
+                continue
+            return True
     return False
+
+
+def _needs_audio_conversion_from_streams(streams: list[dict[str, Any]]) -> bool:
+    """Stream-level check using cached analysis data (from media.db)."""
+    cfg = core.config.audio if core.config else None
+    if not cfg:
+        return False
+    compat = (
+        _compatible_track_languages(streams, use_dicts=True)
+        if (cfg.keep_original or cfg.keep_original_dts_x)
+        else set()
+    )
+    for s in streams:
+        is_dts = s.get("is_dts", False)
+        is_dts_x = s.get("is_dts_x", False)
+        is_truehd = s.get("is_truehd", False)
+        lang = (s.get("language") or "und").lower()
+        if cfg.convert_dts and is_dts and not is_dts_x:
+            if cfg.keep_original and _has_compatible_companion(lang, compat):
+                continue
+            return True
+        if cfg.convert_dts_x and is_dts_x:
+            if cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+                continue
+            return True
+        if cfg.convert_truehd and is_truehd:
+            if cfg.keep_original and _has_compatible_companion(lang, compat):
+                continue
+            return True
+    return False
+
+
+def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
+    """Return list of codec names that need conversion (for detail display)."""
+    cfg = core.config.audio if core.config else None
+    if not cfg:
+        return []
+    compat = (
+        _compatible_track_languages(streams, use_dicts=True)
+        if (cfg.keep_original or cfg.keep_original_dts_x)
+        else set()
+    )
+    codecs: list[str] = []
+    for s in streams:
+        is_dts = s.get("is_dts", False)
+        is_dts_x = s.get("is_dts_x", False)
+        is_truehd = s.get("is_truehd", False)
+        codec = s.get("codec", "")
+        lang = (s.get("language") or "und").lower()
+        if cfg.convert_dts and is_dts and not is_dts_x:
+            if cfg.keep_original and _has_compatible_companion(lang, compat):
+                continue
+            codecs.append(codec.upper() or "DTS")
+        elif cfg.convert_dts_x and is_dts_x:
+            if cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+                continue
+            codecs.append("DTS:X")
+        elif cfg.convert_truehd and is_truehd:
+            if cfg.keep_original and _has_compatible_companion(lang, compat):
+                continue
+            codecs.append(codec.upper() or "TrueHD")
+    return codecs
 
 
 def _needs_video_conversion(info: Any, is_anime: bool) -> bool:
@@ -488,7 +597,8 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
         if mf_id is not None:
             movie_file_ids.append(mf_id)
 
-        # Config-aware audio detection from mediaInfo (overridden by ffprobe if analyzed)
+        # Config-aware audio detection from mediaInfo (overridden by ffprobe/cache if available)
+        # Radarr mediaInfo only reports the primary track codec, so this is approximate.
         cfg_audio = core.config.audio if core.config else None
         if cfg_audio:
             if cfg_audio.convert_dts and item["has_dts"]:
@@ -496,6 +606,19 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
             if cfg_audio.convert_truehd and item["has_truehd"]:
                 item["needs_audio_conversion"] = True
         item.setdefault("needs_audio_conversion", False)
+
+        # Config-aware video detection from Radarr mediaInfo (overridden by ffprobe if analyzed)
+        cfg_video_m = core.config.video if core.config else None
+        if cfg_video_m:
+            vc_m = media_info.get("videoCodec", "").lower()
+            vbd_m = media_info.get("videoBitDepth", 8) or 8
+            is_h264_m = any(x in vc_m for x in ("x264", "avc", "h264"))
+            if not cfg_video_m.anime_only or movie_is_anime:
+                if (cfg_video_m.convert_10bit_x264 and is_h264_m and vbd_m >= 10) or (
+                    cfg_video_m.convert_8bit_x264 and is_h264_m and vbd_m < 10
+                ):
+                    item["needs_video_conversion"] = True
+        item.setdefault("needs_video_conversion", False)
 
         item["is_anime"] = movie_is_anime
 
@@ -558,8 +681,31 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     item["has_dts"] = a.get("has_dts", item["has_dts"])
                     item["has_truehd"] = a.get("has_truehd", item["has_truehd"])
                     item["analyzed"] = True
-                    # Re-evaluate cleanup using stream-level data if titles are available
+                    # Re-evaluate audio conversion with stream-level data from cache
                     cached_streams = a.get("audio_streams", [])
+                    if cached_streams:
+                        item["needs_audio_conversion"] = _needs_audio_conversion_from_streams(
+                            cached_streams
+                        )
+                        item["audio_codecs_to_convert"] = _audio_codecs_to_convert(cached_streams)
+                    else:
+                        # Fallback: re-evaluate with updated DTS/TrueHD flags
+                        # Use has_dts_x to avoid false positive when only DTS:X present
+                        cfg_audio_cache = core.config.audio if core.config else None
+                        if cfg_audio_cache:
+                            audio_needs = False
+                            has_regular_dts = item["has_dts"] and not item.get("has_dts_x")
+                            if cfg_audio_cache.convert_dts and has_regular_dts:
+                                audio_needs = True
+                            if cfg_audio_cache.convert_dts_x and item.get("has_dts_x"):
+                                audio_needs = True
+                            if cfg_audio_cache.convert_truehd and item["has_truehd"]:
+                                audio_needs = True
+                            item["needs_audio_conversion"] = audio_needs
+                    # Use cached ffprobe result for video conversion if available
+                    if "needs_video_conversion" in a:
+                        item["needs_video_conversion"] = a["needs_video_conversion"]
+                    # Re-evaluate cleanup using stream-level data if titles are available
                     if cached_streams:
                         item["needs_cleanup"] = _needs_cleanup_from_streams(
                             cached_streams,
@@ -751,9 +897,11 @@ def _build_series_results(
             if ep_response.status_code == 200:
                 episode_files = ep_response.json()
                 audio_count = 0
+                video_count = 0
                 cleanup_count = 0
                 dts_x_count = 0
                 cfg_audio = core.config.audio if core.config else None
+                cfg_video = core.config.video if core.config else None
                 audio_codecs_set: set[str] = set()
                 video_codecs_set: set[str] = set()
 
@@ -766,19 +914,44 @@ def _build_series_results(
                 for ef in episode_files:
                     mi = ef.get("mediaInfo", {})
                     ac = mi.get("audioCodec", "").upper()
-                    has_audio_issue = False
-                    if cfg_audio:
-                        if cfg_audio.convert_dts and "DTS" in ac:
-                            has_audio_issue = True
-                        if cfg_audio.convert_truehd and "TRUEHD" in ac:
-                            has_audio_issue = True
+                    # Check analysis cache for has_dts/has_truehd — Sonarr mediaInfo only
+                    # reports the primary audio track codec, so a secondary DTS track would
+                    # be missed. The ffprobe cache sees all tracks.
+                    ep_entry = analysis_map.get(ef.get("id")) if ef.get("id") else None
+                    ep_analysis = ep_entry.get("analysis", {}) if ep_entry else {}
+                    ep_cached_streams = ep_analysis.get("audio_streams", [])
+                    # Use stream-level cache for accurate audio detection when available
+                    if ep_cached_streams:
+                        has_audio_issue = _needs_audio_conversion_from_streams(ep_cached_streams)
+                    else:
+                        # Fallback: use Sonarr mediaInfo primary codec
+                        has_dts_ep = ep_analysis.get("has_dts", "DTS" in ac)
+                        has_truehd_ep = ep_analysis.get("has_truehd", "TRUEHD" in ac)
+                        has_dts_x_ep = ep_analysis.get("has_dts_x", False)
+                        has_audio_issue = False
+                        if cfg_audio:
+                            has_regular_dts = has_dts_ep and not has_dts_x_ep
+                            if cfg_audio.convert_dts and has_regular_dts:
+                                has_audio_issue = True
+                            if cfg_audio.convert_dts_x and has_dts_x_ep:
+                                has_audio_issue = True
+                            if cfg_audio.convert_truehd and has_truehd_ep:
+                                has_audio_issue = True
                     if has_audio_issue:
                         audio_count += 1
+                    # Video conversion check from Sonarr mediaInfo
+                    if cfg_video:
+                        vc = mi.get("videoCodec", "").lower()
+                        vbd = mi.get("videoBitDepth", 8) or 8
+                        is_h264_ep = any(x in vc for x in ("x264", "avc", "h264"))
+                        is_anime_ep = item.get("is_anime", False)
+                        if not cfg_video.anime_only or is_anime_ep:
+                            if (cfg_video.convert_10bit_x264 and is_h264_ep and vbd >= 10) or (
+                                cfg_video.convert_8bit_x264 and is_h264_ep and vbd < 10
+                            ):
+                                video_count += 1
                     # Use stream-level data for precise cleanup check when available
-                    entry = analysis_map.get(ef.get("id")) if ef.get("id") else None
-                    cached_streams = (
-                        entry.get("analysis", {}).get("audio_streams", []) if entry else []
-                    )
+                    cached_streams = ep_analysis.get("audio_streams", [])
                     if cached_streams:
                         ep_sub_langs = item.get("subtitles", []) or [
                             s.lower() for s in _split_slash_field(mi.get("subtitles", ""))
@@ -799,11 +972,11 @@ def _build_series_results(
                     if vc_raw:
                         video_codecs_set.add(vc_raw)
                     # Check for DTS:X from analysis cache
-                    entry = analysis_map.get(ef.get("id")) if ef.get("id") else None
-                    if entry and entry.get("analysis", {}).get("has_dts_x"):
+                    if ep_analysis.get("has_dts_x"):
                         dts_x_count += 1
                         audio_codecs_set.add("DTS:X")
                 item["audio_convert_count"] = audio_count
+                item["video_convert_count"] = video_count
                 item["cleanup_count"] = cleanup_count
                 item["dts_x_count"] = dts_x_count
                 item["audio_codecs"] = sorted(audio_codecs_set)
@@ -991,14 +1164,40 @@ def get_series_detail(
                     is_anime=series_is_anime,
                 )
 
-        # Config-aware audio detection from mediaInfo
-        cfg_audio = core.config.audio if core.config else None
-        ep_item["needs_audio_conversion"] = False
-        if cfg_audio:
-            if cfg_audio.convert_dts and ep_item["has_dts"]:
-                ep_item["needs_audio_conversion"] = True
-            if cfg_audio.convert_truehd and ep_item["has_truehd"]:
-                ep_item["needs_audio_conversion"] = True
+        # Config-aware audio detection — use stream-level cache when available
+        cached_ep_streams = []
+        if entry:
+            a_cache = entry.get("analysis", {})
+            cached_ep_streams = a_cache.get("audio_streams", [])
+        if cached_ep_streams:
+            ep_item["needs_audio_conversion"] = _needs_audio_conversion_from_streams(
+                cached_ep_streams
+            )
+            ep_item["audio_codecs_to_convert"] = _audio_codecs_to_convert(cached_ep_streams)
+        else:
+            # Fallback: use Sonarr mediaInfo primary codec
+            cfg_audio = core.config.audio if core.config else None
+            ep_item["needs_audio_conversion"] = False
+            if cfg_audio:
+                has_regular_dts = ep_item["has_dts"] and not ep_item.get("has_dts_x")
+                if cfg_audio.convert_dts and has_regular_dts:
+                    ep_item["needs_audio_conversion"] = True
+                if cfg_audio.convert_dts_x and ep_item.get("has_dts_x"):
+                    ep_item["needs_audio_conversion"] = True
+                if cfg_audio.convert_truehd and ep_item["has_truehd"]:
+                    ep_item["needs_audio_conversion"] = True
+
+        cfg_video_ep = core.config.video if core.config else None
+        ep_item["needs_video_conversion"] = False
+        if cfg_video_ep:
+            vc = mi.get("videoCodec", "").lower()
+            vbd = mi.get("videoBitDepth", 8) or 8
+            is_h264_item = any(x in vc for x in ("x264", "avc", "h264"))
+            if not cfg_video_ep.anime_only or series_is_anime:
+                if (cfg_video_ep.convert_10bit_x264 and is_h264_item and vbd >= 10) or (
+                    cfg_video_ep.convert_8bit_x264 and is_h264_item and vbd < 10
+                ):
+                    ep_item["needs_video_conversion"] = True
 
         # Deep ffprobe analysis if requested
         if analyze and Path(host_path).exists() and core.ffprobe:
@@ -1038,7 +1237,11 @@ def get_series_detail(
                 "needs_audio": sum(1 for e in eps if e.get("needs_audio_conversion")),
                 "needs_cleanup": sum(1 for e in eps if e.get("needs_cleanup")),
                 "needs_work": sum(
-                    1 for e in eps if e.get("needs_audio_conversion") or e.get("needs_cleanup")
+                    1
+                    for e in eps
+                    if e.get("needs_audio_conversion")
+                    or e.get("needs_video_conversion")
+                    or e.get("needs_cleanup")
                 ),
                 "size": sum(e.get("size", 0) or 0 for e in eps),
                 "episodes": eps,
