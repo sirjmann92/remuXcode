@@ -19,6 +19,7 @@ from backend.utils.config import CleanupConfig
 from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo, SubtitleStream
 from backend.utils.language import LanguageDetector
 from backend.workers._progress import run_ffmpeg_with_progress
+from backend.workers._safe_move import safe_replace
 
 logger = logging.getLogger(__name__)
 
@@ -370,10 +371,9 @@ class StreamCleanup:
                         output_path,
                     )
                 elif replace_input:
-                    pass  # Don't unlink — shutil.move overwrites in-place,
-                    # preserving the file's location on mergerfs setups.
+                    pass  # safe_replace handles backup + move atomically
 
-                shutil.move(str(temp_output), str(output_path))
+                safe_replace(temp_output, output_path)
 
                 # Clean up temp directory after successful move
                 try:
