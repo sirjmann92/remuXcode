@@ -12,7 +12,7 @@ RUN npm run build \
     && rm -rf node_modules src package*.json
 
 # Stage 2: Backend (FastAPI)
-FROM python:3.13-alpine AS backend
+FROM python:3.14-alpine AS backend
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
