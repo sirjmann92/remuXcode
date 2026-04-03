@@ -295,6 +295,7 @@ services:
 ## Phase 3: Community & Distribution
 
 ### Features
+- **Hardware Acceleration (QSV/VAAPI)** - Intel Quick Sync and VAAPI GPU encoding support with auto-detection, configurable encoder selection, and quality presets. Requires base image change (Alpine → Debian/Ubuntu with Intel media drivers) and Docker GPU device passthrough
 - **Event Viewer / Notification Center** - Real-time activity log in the UI showing conversion events, data protection alerts, watchdog actions, and worker lifecycle events with filterable severity levels (info, warning, error, critical)
 - **Unraid Plugin** - Native Unraid Community Apps support
 - **Multi-user support** - Role-based access
