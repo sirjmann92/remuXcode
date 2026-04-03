@@ -44,22 +44,22 @@ $effect(() => {
 <div class="space-y-6">
   <!-- Stats -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="card-glass rounded-box p-4 stat-card">
-      <div class="text-xs text-base-content/40 uppercase tracking-wider mb-1">Active</div>
+    <a href="/jobs?filter=running" class="card-glass rounded-box p-4 stat-card hover:ring-1 hover:ring-info/40 transition-all">
+      <div class="text-xs text-base-content/40 uppercase tracking-wider mb-1">Running</div>
       <div class="text-3xl font-bold text-info">{activeJobs.length}</div>
-    </div>
-    <div class="card-glass rounded-box p-4 stat-card">
-      <div class="text-xs text-base-content/40 uppercase tracking-wider mb-1">Queued</div>
+    </a>
+    <a href="/jobs?filter=pending" class="card-glass rounded-box p-4 stat-card hover:ring-1 hover:ring-warning/40 transition-all">
+      <div class="text-xs text-base-content/40 uppercase tracking-wider mb-1">Pending</div>
       <div class="text-3xl font-bold text-warning">{pendingJobs.length}</div>
-    </div>
-    <div class="card-glass rounded-box p-4 stat-card">
+    </a>
+    <a href="/jobs?filter=completed" class="card-glass rounded-box p-4 stat-card hover:ring-1 hover:ring-success/40 transition-all">
       <div class="text-xs text-base-content/40 uppercase tracking-wider mb-1">Completed</div>
       <div class="text-3xl font-bold text-success">{totalCompleted}</div>
-    </div>
-    <div class="card-glass rounded-box p-4 stat-card">
+    </a>
+    <a href="/jobs?filter=failed" class="card-glass rounded-box p-4 stat-card hover:ring-1 hover:ring-error/40 transition-all">
       <div class="text-xs text-base-content/40 uppercase tracking-wider mb-1">Failed</div>
       <div class="text-3xl font-bold text-error">{totalFailed}</div>
-    </div>
+    </a>
   </div>
 
   <!-- Config status -->
