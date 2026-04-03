@@ -67,6 +67,7 @@ class VideoConverter:
         ffprobe: FFProbe | None = None,
         anime_detector: AnimeDetector | None = None,
         get_volume_root: Callable[[str], str] | None = None,
+        ffmpeg_threads: int = 0,
     ):
         """Initialize video converter.
 
@@ -75,9 +76,11 @@ class VideoConverter:
             ffprobe: FFProbe instance (created if not provided)
             anime_detector: AnimeDetector instance (created if not provided)
             get_volume_root: Function to get volume root for temp files (uses /tmp if not provided)
+            ffmpeg_threads: Thread limit for ffmpeg (0 = unlimited)
         """
         self.config = config
         self.ffprobe = ffprobe or FFProbe()
+        self.ffmpeg_threads = ffmpeg_threads
         self.anime_detector = anime_detector or AnimeDetector()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
 
@@ -424,6 +427,12 @@ class VideoConverter:
             "-loglevel",
             "warning",
             "-stats",
+        ]
+
+        if self.ffmpeg_threads > 0:
+            cmd.extend(["-threads", str(self.ffmpeg_threads)])
+
+        cmd.extend([
             "-analyzeduration",
             "10M",
             "-probesize",
@@ -444,7 +453,7 @@ class VideoConverter:
             self.config.level,
             "-preset",
             preset,
-        ]
+        ])
 
         # Add tune if specified
         if tune:
@@ -519,6 +528,12 @@ class VideoConverter:
             "-loglevel",
             "warning",
             "-stats",
+        ]
+
+        if self.ffmpeg_threads > 0:
+            cmd.extend(["-threads", str(self.ffmpeg_threads)])
+
+        cmd.extend([
             "-analyzeduration",
             "10M",
             "-probesize",
@@ -537,7 +552,7 @@ class VideoConverter:
             str(crf),
             "-preset",
             str(preset),
-        ]
+        ])
 
         # Add SVT-AV1 params
         cmd.extend(["-svtav1-params", ":".join(svtav1_params)])

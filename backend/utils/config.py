@@ -152,6 +152,18 @@ class Config:
         self.job_history_days = int(
             os.getenv("JOB_HISTORY_DAYS", self._get("general.job_history_days", 30))
         )
+        # FFmpeg thread limit: 0 = auto (~80% of available CPUs)
+        self.ffmpeg_threads = int(
+            os.getenv("FFMPEG_THREADS", self._get("processing.ffmpeg_threads", 0))
+        )
+
+    @property
+    def effective_ffmpeg_threads(self) -> int:
+        """Resolve ffmpeg_threads: 0 → ~80% of available CPUs, else the explicit value."""
+        if self.ffmpeg_threads > 0:
+            return self.ffmpeg_threads
+        cpu_count = os.cpu_count() or 4
+        return max(1, int(cpu_count * 0.8))
 
     def _find_config_path(self, provided_path: str | None) -> Path | None:
         """Find configuration file from provided path or defaults."""
@@ -408,6 +420,7 @@ class Config:
 
         self._raw_config.setdefault("processing", {})
         self._raw_config["processing"]["max_concurrent_jobs"] = self.workers
+        self._raw_config["processing"]["ffmpeg_threads"] = self.ffmpeg_threads
 
         self._raw_config.setdefault("general", {})
         self._raw_config["general"]["job_history_days"] = self.job_history_days

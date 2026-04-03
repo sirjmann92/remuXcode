@@ -1,9 +1,10 @@
 <script lang="ts">
-import { getConfig, regenerateApiKey, updateConfig } from '$lib/api';
+import { getConfig, getSystemInfo, regenerateApiKey, updateConfig } from '$lib/api';
 import LanguageSelect from '$lib/components/LanguageSelect.svelte';
 import type { ConfigSummary } from '$lib/types';
 
 let config: ConfigSummary | null = $state(null);
+let cpuCount = $state(0);
 let loading = $state(true);
 let error = $state('');
 let keyCopied = $state(false);
@@ -16,7 +17,9 @@ async function fetchConfig() {
   loading = true;
   error = '';
   try {
-    config = await getConfig();
+    const [cfg, sys] = await Promise.all([getConfig(), getSystemInfo()]);
+    config = cfg;
+    cpuCount = sys.cpu_count;
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load config';
   } finally {
@@ -598,6 +601,34 @@ $effect(() => {
                 value={config.workers}
                 onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 1, 16); config!.workers = v; saveTop('workers', v); }}
               />
+            </div>
+            <div title="Limit CPU threads ffmpeg uses for encoding. 0 = auto (~80% of available CPUs). Lower values leave more CPU for other tasks.">
+              <div class="flex items-center justify-between">
+                <span class="text-xs">FFmpeg Threads<span class="block text-xs text-base-content/30 font-normal">{config.ffmpeg_threads === 0 ? `Auto (${config.effective_ffmpeg_threads} of ${cpuCount} CPUs)` : `${config.ffmpeg_threads} of ${cpuCount} CPUs`}</span></span>
+                <input
+                  type="number"
+                  class="input input-xs input-bordered w-16 text-center font-mono"
+                  min="0"
+                  max={cpuCount || 128}
+                  value={config.ffmpeg_threads}
+                  onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, cpuCount || 128); config!.ffmpeg_threads = v; saveTop('ffmpeg_threads', v); }}
+                />
+              </div>
+              {#if cpuCount > 0}
+                <input
+                  type="range"
+                  class="range range-xs range-primary mt-1"
+                  min="0"
+                  max={cpuCount}
+                  value={config.ffmpeg_threads}
+                  oninput={(e) => { const v = parseInt(e.currentTarget.value, 10); config!.ffmpeg_threads = v; }}
+                  onchange={(e) => { const v = parseInt(e.currentTarget.value, 10); config!.ffmpeg_threads = v; saveTop('ffmpeg_threads', v); }}
+                />
+                <div class="flex justify-between text-[0.6rem] text-base-content/25 px-0.5">
+                  <span>Auto</span>
+                  <span>{cpuCount}</span>
+                </div>
+              {/if}
             </div>
             <div class="flex items-center justify-between" title="Completed and failed jobs are removed after this many days">
               <span class="text-xs">Job History<span class="block text-xs text-base-content/30 font-normal">Days to retain completed job records (1–365)</span></span>

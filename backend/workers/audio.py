@@ -88,6 +88,7 @@ class AudioConverter:
         config: AudioConfig,
         ffprobe: FFProbe | None = None,
         get_volume_root: Callable[[str], str] | None = None,
+        ffmpeg_threads: int = 0,
     ):
         """Initialize audio converter.
 
@@ -95,10 +96,12 @@ class AudioConverter:
             config: Audio conversion configuration
             ffprobe: FFProbe instance (created if not provided)
             get_volume_root: Function to get volume root for temp files (uses /tmp if not provided)
+            ffmpeg_threads: Thread limit for ffmpeg (0 = unlimited)
         """
         self.config = config
         self.ffprobe = ffprobe or FFProbe()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
+        self.ffmpeg_threads = ffmpeg_threads
 
     @staticmethod
     def _has_compatible_companion(lang: str, compatible_langs: set[str]) -> bool:
@@ -573,6 +576,9 @@ class AudioConverter:
         """
 
         cmd = ["ffmpeg", "-i", input_file, "-y"]
+
+        if self.ffmpeg_threads > 0:
+            cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
         convert_indices = {s.index for s in streams_to_convert}
 

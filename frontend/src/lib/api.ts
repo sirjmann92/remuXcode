@@ -80,6 +80,10 @@ export async function getConfig(): Promise<ConfigSummary> {
   return request('/api/config');
 }
 
+export async function getSystemInfo(): Promise<import('$lib/types').SystemInfo> {
+  return request('/api/system/info');
+}
+
 export async function updateConfig(patch: Record<string, unknown>): Promise<{ message: string }> {
   return request('/api/config', {
     method: 'PATCH',

@@ -57,6 +57,7 @@ class StreamCleanup:
         ffprobe: FFProbe | None = None,
         language_detector: LanguageDetector | None = None,
         get_volume_root: Callable[[str], str] | None = None,
+        ffmpeg_threads: int = 0,
     ):
         """Initialize stream cleanup worker.
 
@@ -65,11 +66,13 @@ class StreamCleanup:
             ffprobe: FFProbe instance
             language_detector: LanguageDetector instance
             get_volume_root: Function to get volume root for temp files (uses /tmp if not provided)
+            ffmpeg_threads: Thread limit for ffmpeg (0 = unlimited)
         """
         self.config = config
         self.ffprobe = ffprobe or FFProbe()
         self.language_detector = language_detector or LanguageDetector()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
+        self.ffmpeg_threads = ffmpeg_threads
 
     def should_cleanup(self, file_path: str, *, is_anime: bool = False) -> bool:
         """Check if file has streams that should be removed."""
@@ -585,6 +588,9 @@ class StreamCleanup:
         """Build ffmpeg command for stream removal."""
 
         cmd = ["ffmpeg", "-i", input_file, "-y"]
+
+        if self.ffmpeg_threads > 0:
+            cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
         # Map video streams
         if info.video_streams:

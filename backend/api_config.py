@@ -92,8 +92,21 @@ async def get_config_summary() -> dict[str, Any]:
         },
         "path_mappings": [{"container": c, "host": h} for c, h in core.PATH_MAPPINGS],
         "workers": cfg.workers,
+        "ffmpeg_threads": cfg.ffmpeg_threads,
+        "effective_ffmpeg_threads": cfg.effective_ffmpeg_threads,
         "job_history_days": cfg.job_history_days,
         "api_key": get_api_key(),
+    }
+
+
+@router.get("/system/info")
+async def get_system_info() -> dict[str, Any]:
+    """Return host system info for UI controls (CPU count, etc.)."""
+    import os
+
+    cpu_count = os.cpu_count() or 1
+    return {
+        "cpu_count": cpu_count,
     }
 
 
@@ -232,6 +245,7 @@ class ConfigUpdate(BaseModel):
     sonarr: SonarrUpdate | None = None
     radarr: RadarrUpdate | None = None
     workers: int | None = Field(None, ge=1, le=16)
+    ffmpeg_threads: int | None = Field(None, ge=0, le=128)
     job_history_days: int | None = Field(None, ge=1, le=365)
 
 
@@ -261,6 +275,17 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
 
     if body.workers is not None:
         cfg.workers = body.workers
+
+    if body.ffmpeg_threads is not None:
+        cfg.ffmpeg_threads = body.ffmpeg_threads
+        # Propagate to running worker instances
+        effective = cfg.effective_ffmpeg_threads
+        if core.audio_converter:
+            core.audio_converter.ffmpeg_threads = effective
+        if core.video_converter:
+            core.video_converter.ffmpeg_threads = effective
+        if core.stream_cleanup:
+            core.stream_cleanup.ffmpeg_threads = effective
 
     if body.job_history_days is not None:
         cfg.job_history_days = body.job_history_days
