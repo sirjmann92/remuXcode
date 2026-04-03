@@ -159,6 +159,7 @@ export interface BrowseMovie {
   needs_cleanup: boolean;
   needs_audio_conversion?: boolean;
   needs_video_conversion?: boolean;
+  audio_codecs_to_convert?: string[];
   is_anime?: boolean;
   analyzed?: boolean;
   video?: { codec: string | null; bit_depth: number | null };
@@ -225,6 +226,7 @@ export interface EpisodeFile {
   analyzed?: boolean;
   needs_audio_conversion?: boolean;
   needs_video_conversion?: boolean;
+  audio_codecs_to_convert?: string[];
   is_anime?: boolean;
 }
 
