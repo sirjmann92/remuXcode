@@ -1,7 +1,7 @@
 <script lang="ts">
 import { cancelJob, deleteJob } from '$lib/api';
 import { channelLabel } from '$lib/format';
-import type { Job } from '$lib/types';
+import type { Job, JobPhase } from '$lib/types';
 import StatusBadge from './StatusBadge.svelte';
 
 interface Props {
@@ -39,6 +39,18 @@ function codecLabel(codec: string): string {
   };
   return map[codec.toLowerCase()] ?? codec.toUpperCase();
 }
+
+const phaseColors: Record<JobPhase, string> = {
+  audio: 'badge-warning',
+  video: 'badge-secondary',
+  cleanup: 'badge-info',
+};
+
+const phaseLabels: Record<JobPhase, string> = {
+  audio: 'Audio',
+  video: 'Video',
+  cleanup: 'Cleanup',
+};
 
 async function handleDelete() {
   deleting = true;
@@ -119,7 +131,26 @@ async function handleCancel() {
     <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
 
     {#if job.status === 'running'}
-      <div class="space-y-1">
+      <div class="space-y-1.5">
+        {#if job.planned_phases?.length}
+          <div class="flex gap-1.5 flex-wrap items-center">
+            {#each job.planned_phases as phase}
+              {@const isDone = job.completed_phases?.includes(phase)}
+              {@const isCurrent = job.current_phase === phase && !isDone}
+              <span class="badge {phaseColors[phase]} badge-xs gap-0.5 {isCurrent ? '' : isDone ? 'opacity-80' : 'opacity-30'}">
+                {#if isDone}
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                {:else if isCurrent}
+                  <span class="loading loading-spinner" style="width: 0.625rem; height: 0.625rem;"></span>
+                {/if}
+                {phaseLabels[phase]}
+              </span>
+            {/each}
+          </div>
+        {/if}
+        {#if job.status_detail && detailed}
+          <p class="text-xs text-base-content/50 italic truncate" title={job.status_detail}>{job.status_detail}</p>
+        {/if}
         <div class="flex justify-between items-center">
           <span class="text-xs text-base-content/40">{job.progress.toFixed(1)}%</span>
           {#if elapsed}

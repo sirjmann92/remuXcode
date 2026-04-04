@@ -130,6 +130,7 @@ class StreamCleanup:
         *,
         is_anime: bool = False,
         cancel_event: threading.Event | None = None,
+        detail_callback: Callable[[str], None] | None = None,
     ) -> CleanupResult:
         """Remove unwanted streams from a media file.
 
@@ -271,6 +272,19 @@ class StreamCleanup:
             tag_note,
         )
 
+        # Build detail message for UI
+        if detail_callback:
+            parts = []
+            if audio_to_remove > 0:
+                parts.append(f"Removing {audio_to_remove} audio (keeping {len(audio_keep)})")
+            if subs_to_remove > 0:
+                parts.append(f"Removing {subs_to_remove} sub{'s' if subs_to_remove != 1 else ''} (keeping {len(subtitle_keep)})")
+            if needs_reorder:
+                parts.append("Reordering audio")
+            if needs_tagging:
+                parts.append("Tagging streams")
+            detail_callback(" \u00b7 ".join(parts) if parts else "Remuxing streams")
+
         # Prepare paths
         replace_input = output_file is None
         if output_file is None:
@@ -376,6 +390,8 @@ class StreamCleanup:
                 elif replace_input:
                     pass  # safe_replace handles backup + move atomically
 
+                if detail_callback:
+                    detail_callback("Replacing file safely...")
                 safe_replace(temp_output, output_path)
 
                 # Clean up temp directory after successful move

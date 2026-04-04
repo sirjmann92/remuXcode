@@ -102,11 +102,10 @@ async def get_config_summary() -> dict[str, Any]:
 @router.get("/system/info")
 async def get_system_info() -> dict[str, Any]:
     """Return host system info for UI controls (CPU count, etc.)."""
-    import os
+    from backend.utils.config import get_available_cpus
 
-    cpu_count = os.cpu_count() or 1
     return {
-        "cpu_count": cpu_count,
+        "cpu_count": get_available_cpus(),
     }
 
 

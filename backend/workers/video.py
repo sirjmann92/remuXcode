@@ -141,6 +141,7 @@ class VideoConverter:
         job_id: str | None = None,
         progress_callback: Callable[[float], None] | None = None,
         cancel_event: threading.Event | None = None,
+        detail_callback: Callable[[str], None] | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -217,6 +218,11 @@ class VideoConverter:
             codec_label,
             content_type.value,
         )
+
+        if detail_callback:
+            detail_callback(
+                f"Encoding {video.codec_name} {video.bit_depth}-bit \u2192 {codec_label} ({content_type.value})"
+            )
 
         # Prepare output path
         replace_input = output_file is None
@@ -317,6 +323,8 @@ class VideoConverter:
                 elif replace_input:
                     pass  # safe_replace handles backup + move atomically
 
+                if detail_callback:
+                    detail_callback("Replacing file safely...")
                 safe_replace(temp_file, output_path)
 
                 # Clean up temp directory after successful move

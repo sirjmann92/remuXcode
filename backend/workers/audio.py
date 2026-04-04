@@ -189,6 +189,7 @@ class AudioConverter:
         job_id: str | None = None,
         progress_callback: Callable[[float], None] | None = None,
         cancel_event: threading.Event | None = None,
+        detail_callback: Callable[[str], None] | None = None,
     ) -> AudioConversionResult:
         """Convert incompatible audio in a media file.
 
@@ -275,6 +276,19 @@ class AudioConverter:
         logger.info(
             "Converting %d audio stream(s) in: %s", len(streams_to_convert), input_path.name
         )
+
+        # Build detail message for UI
+        if detail_callback:
+            descriptions = []
+            for s in streams_to_convert:
+                target_codec, _, _ = self._determine_target_format(
+                    s.channels, s.bitrate // 1000 if s.bitrate else 0
+                )
+                ch = f"{s.channels}ch" if s.channels else ""
+                descriptions.append(f"{s.codec_name.upper()} {ch} \u2192 {target_codec.upper()}")
+            detail_callback(
+                f"Converting {len(streams_to_convert)} stream{'s' if len(streams_to_convert) != 1 else ''}: {' \u00b7 '.join(descriptions)}"
+            )
 
         # Prepare paths
         replace_input = output_file is None
@@ -374,6 +388,8 @@ class AudioConverter:
                 elif replace_input:
                     pass  # safe_replace handles backup + move atomically
 
+                if detail_callback:
+                    detail_callback("Replacing file safely...")
                 safe_replace(temp_output, output_path)
 
                 # Clean up temp directory after successful move
