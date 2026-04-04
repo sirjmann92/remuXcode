@@ -273,12 +273,23 @@ class VideoConverter:
             cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type)
             logger.debug("Running: %s", " ".join(cmd))
 
+            # Estimate total frames for progress when out_time_us is N/A
+            # (common with HW encoders like QSV).
+            _total_frames: float | None = None
+            if info.duration and video.frame_rate:
+                try:
+                    num, den = video.frame_rate.split("/")
+                    _total_frames = info.duration * int(num) / int(den)
+                except (ValueError, ZeroDivisionError):
+                    pass
+
             returncode, stderr_text = run_ffmpeg_with_progress(
                 cmd,
                 duration_secs=info.duration,
                 progress_cb=progress_callback,
                 timeout=self.config.job_timeout or None,  # 0 = no timeout
                 cancel_event=cancel_event,
+                total_frames=_total_frames,
             )
 
             if returncode != 0:
@@ -662,9 +673,20 @@ class VideoConverter:
         *,
         codec: str = "hevc",
     ) -> list[str]:
-        """Build ffmpeg command for Intel QSV encoding (HEVC or AV1)."""
+        """Build ffmpeg command for Intel QSV encoding (HEVC or AV1).
+
+        Uses software decoding + QSV hardware encoding.  Full HW-decode
+        via ``-hwaccel qsv`` fails on many Intel GPUs for inputs the QSV
+        decoder doesn't support (e.g. H.264 High 10 profile).  Letting the
+        CPU decode and the GPU encode avoids those errors with negligible
+        speed impact (encoding is the bottleneck, not decoding).
+        """
         quality, framerate = self._get_quality_params(content_type)
         encoder = "hevc_qsv" if codec == "hevc" else "av1_qsv"
+
+        # Pick upload pixel format:  p010le for 10-bit output, nv12 for 8-bit.
+        is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        upload_fmt = "p010le" if is_10bit else "nv12"
 
         cmd = [
             "ffmpeg",
@@ -672,10 +694,12 @@ class VideoConverter:
             "-loglevel",
             "warning",
             "-stats",
-            "-hwaccel",
-            "qsv",
-            "-hwaccel_output_format",
-            "qsv",
+            # Initialise QSV device for encoding — decoding stays in software
+            # so every input codec/profile is supported.
+            "-init_hw_device",
+            "qsv=hw",
+            "-filter_hw_device",
+            "hw",
         ]
 
         if self.ffmpeg_threads > 0:
@@ -693,6 +717,9 @@ class VideoConverter:
                 "0",
                 "-map_chapters",
                 "0",
+                # Upload SW-decoded frames to QSV surface for HW encoding
+                "-vf",
+                f"format={upload_fmt},hwupload=extra_hw_frames=64",
                 "-c:v",
                 encoder,
                 "-global_quality",
@@ -703,7 +730,11 @@ class VideoConverter:
         )
 
         if codec == "hevc":
-            cmd.extend(["-profile:v", self.config.profile])
+            # QSV auto-selects the correct profile (main/main10) based on the
+            # input pixel format.  Explicitly setting -profile:v can conflict
+            # when the format doesn't match, so only set it for 8-bit main.
+            if not is_10bit:
+                cmd.extend(["-profile:v", "main"])
             cmd.extend(["-look_ahead", "1", "-look_ahead_depth", "40"])
 
         cmd.extend(["-fps_mode", "cfr"])
@@ -722,12 +753,22 @@ class VideoConverter:
         *,
         codec: str = "hevc",
     ) -> list[str]:
-        """Build ffmpeg command for VAAPI encoding (HEVC or AV1)."""
+        """Build ffmpeg command for VAAPI encoding (HEVC or AV1).
+
+        Uses software decoding + VAAPI hardware encoding.  Full HW-decode
+        via ``-hwaccel vaapi`` fails when the VAAPI driver can't decode the
+        input format (e.g. H.264 High 10 on many Intel/AMD GPUs).  SW decode
+        + HW encode avoids those errors reliably.
+        """
         quality, framerate = self._get_quality_params(content_type)
         encoder = "hevc_vaapi" if codec == "hevc" else "av1_vaapi"
         device = "/dev/dri/renderD128"
         if self.hw_caps and self.hw_caps.render_devices:
             device = self.hw_caps.render_devices[0]
+
+        # Pick upload pixel format:  p010 for 10-bit output, nv12 for 8-bit.
+        is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        upload_fmt = "p010" if is_10bit else "nv12"
 
         cmd = [
             "ffmpeg",
@@ -735,12 +776,12 @@ class VideoConverter:
             "-loglevel",
             "warning",
             "-stats",
-            "-hwaccel",
-            "vaapi",
-            "-hwaccel_device",
-            device,
-            "-hwaccel_output_format",
-            "vaapi",
+            # Initialise VAAPI device for encoding — decoding stays in software
+            # so every input codec/profile is supported.
+            "-init_hw_device",
+            f"vaapi=hw:{device}",
+            "-filter_hw_device",
+            "hw",
         ]
 
         if self.ffmpeg_threads > 0:
@@ -758,6 +799,9 @@ class VideoConverter:
                 "0",
                 "-map_chapters",
                 "0",
+                # Upload SW-decoded frames to VAAPI surface for HW encoding
+                "-vf",
+                f"format={upload_fmt},hwupload",
                 "-c:v",
                 encoder,
                 "-rc_mode",
@@ -768,7 +812,10 @@ class VideoConverter:
         )
 
         if codec == "hevc":
-            cmd.extend(["-profile:v", self.config.profile])
+            # VAAPI auto-selects main/main10 from the surface format.
+            # Only set profile explicitly for 8-bit to avoid mismatches.
+            if not is_10bit:
+                cmd.extend(["-profile:v", "main"])
 
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:
@@ -786,9 +833,19 @@ class VideoConverter:
         *,
         codec: str = "hevc",
     ) -> list[str]:
-        """Build ffmpeg command for NVENC encoding (HEVC or AV1)."""
+        """Build ffmpeg command for NVENC encoding (HEVC or AV1).
+
+        Uses software decoding + NVENC hardware encoding.  Full HW-decode
+        via ``-hwaccel cuda`` fails when CUVID can't decode the input format
+        (e.g. some 10-bit H.264 profiles).  SW decode + HW encode is safe
+        for every input.
+        """
         quality, framerate = self._get_quality_params(content_type)
         encoder = "hevc_nvenc" if codec == "hevc" else "av1_nvenc"
+
+        # Pick upload pixel format:  p010le for 10-bit output, nv12 for 8-bit.
+        is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        upload_fmt = "p010le" if is_10bit else "nv12"
 
         cmd = [
             "ffmpeg",
@@ -796,10 +853,12 @@ class VideoConverter:
             "-loglevel",
             "warning",
             "-stats",
-            "-hwaccel",
-            "cuda",
-            "-hwaccel_output_format",
-            "cuda",
+            # Initialise CUDA device for encoding — decoding stays in software
+            # so every input codec/profile is supported.
+            "-init_hw_device",
+            "cuda=hw",
+            "-filter_hw_device",
+            "hw",
         ]
 
         if self.ffmpeg_threads > 0:
@@ -817,6 +876,9 @@ class VideoConverter:
                 "0",
                 "-map_chapters",
                 "0",
+                # Upload SW-decoded frames to CUDA surface for HW encoding
+                "-vf",
+                f"format={upload_fmt},hwupload_cuda",
                 "-c:v",
                 encoder,
                 "-cq",
@@ -827,7 +889,11 @@ class VideoConverter:
         )
 
         if codec == "hevc":
-            cmd.extend(["-profile:v", self.config.profile])
+            # NVENC handles main10 correctly when receiving P010 surfaces.
+            if is_10bit:
+                cmd.extend(["-profile:v", "main10"])
+            else:
+                cmd.extend(["-profile:v", "main"])
 
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:

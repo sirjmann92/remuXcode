@@ -21,6 +21,24 @@ export interface Job {
   planned_phases: JobPhase[] | null;
 }
 
+export interface JobsCounts {
+  all: number;
+  pending: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+}
+
+export interface JobsResponse {
+  jobs: Job[];
+  total?: number;
+  offset?: number;
+  limit?: number | null;
+  has_more?: boolean;
+  counts?: JobsCounts;
+}
+
 export interface JobResult {
   file: string;
   audio: ConversionResult | null;
@@ -32,6 +50,8 @@ export interface ConversionResult {
   success: boolean;
   streams_converted?: number;
   converted_streams?: ConvertedStream[] | null;
+  original_size?: number;
+  new_size?: number;
   error: string | null;
 }
 
@@ -49,6 +69,8 @@ export interface VideoResult {
   codec_from: string | null;
   codec_to: string | null;
   content_type: string | null;
+  original_size?: number;
+  new_size?: number;
   size_change_percent: number | null;
   error: string | null;
 }
@@ -59,6 +81,8 @@ export interface CleanupResult {
   audio_kept: number;
   subtitle_removed: number;
   subtitle_kept: number;
+  original_size?: number;
+  new_size?: number;
   original_language: string | null;
   error: string | null;
 }

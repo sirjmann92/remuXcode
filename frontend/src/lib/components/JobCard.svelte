@@ -1,6 +1,6 @@
 <script lang="ts">
 import { cancelJob, deleteJob } from '$lib/api';
-import { channelLabel } from '$lib/format';
+import { channelLabel, formatSize } from '$lib/format';
 import type { Job, JobPhase } from '$lib/types';
 import StatusBadge from './StatusBadge.svelte';
 
@@ -38,6 +38,12 @@ function codecLabel(codec: string): string {
     truehd: 'TrueHD',
   };
   return map[codec.toLowerCase()] ?? codec.toUpperCase();
+}
+
+function sizeDetail(original?: number, newSize?: number): string | null {
+  if (!original || !newSize || original === 0) return null;
+  const pct = ((newSize - original) / original) * 100;
+  return `${formatSize(original)} → ${formatSize(newSize)} (${pct > 0 ? '+' : ''}${pct.toFixed(0)}%)`;
 }
 
 const phaseColors: Record<JobPhase, string> = {
@@ -131,20 +137,239 @@ async function handleCancel() {
     <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
 
     {#if job.planned_phases?.length && (job.status === 'running' || job.status === 'completed' || job.status === 'failed')}
-      <div class="flex gap-1.5 flex-wrap items-center">
-        {#each job.planned_phases as phase}
-          {@const isDone = job.completed_phases?.includes(phase) || job.status !== 'running'}
-          {@const isCurrent = job.status === 'running' && job.current_phase === phase && !job.completed_phases?.includes(phase)}
-          <span class="badge {phaseColors[phase]} badge-xs gap-0.5 {isCurrent ? '' : isDone ? 'opacity-80' : 'opacity-30'}">
-            {#if isDone}
+      {#if detailed}
+        <div class="space-y-1.5">
+          {#each job.planned_phases as phase}
+            {@const isDone = job.completed_phases?.includes(phase) || job.status !== 'running'}
+            {@const isCurrent = job.status === 'running' && job.current_phase === phase && !job.completed_phases?.includes(phase)}
+            {@const phaseResult = phase === 'audio' ? job.result?.audio : phase === 'video' ? job.result?.video : job.result?.cleanup}
+            {@const phaseSucceeded = isDone && phaseResult?.success === true}
+            {@const phaseFailed = isDone && phaseResult != null && phaseResult.success === false}
+            <div class="flex items-center gap-2">
+              <span class="badge {phaseFailed ? 'badge-error' : phaseColors[phase]} badge-xs gap-0.5 shrink-0 {isCurrent ? '' : isDone ? 'opacity-80' : 'opacity-30'}">
+                {#if phaseSucceeded}
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                {:else if phaseFailed}
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                {:else if isCurrent}
+                  <span class="loading loading-spinner" style="width: 0.625rem; height: 0.625rem;"></span>
+                {/if}
+                {phaseLabels[phase]}
+              </span>
+              {#if phaseSucceeded && phase === 'audio' && job.result?.audio}
+                <div class="text-xs text-base-content/60">
+                  {#if job.result.audio.converted_streams?.length}
+                    {#each job.result.audio.converted_streams as stream, i}
+                      <span>{codecLabel(stream.from_codec)} {channelLabel(stream.channels)} → {codecLabel(stream.to_codec)} {channelLabel(stream.channels)}</span>
+                      {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/30"> · </span>{/if}
+                    {/each}
+                  {:else}
+                    {job.result.audio.streams_converted} stream{(job.result.audio.streams_converted ?? 0) !== 1 ? 's' : ''} converted
+                  {/if}
+                  {#if sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}
+                    <span class="text-base-content/30"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
+                  {/if}
+                </div>
+              {:else if phaseSucceeded && phase === 'video' && job.result?.video}
+                <span class="text-xs text-base-content/60">
+                  {job.result.video.codec_from} → {job.result.video.codec_to}
+                  {#if job.result.video.content_type}
+                    <span class="text-base-content/30">({job.result.video.content_type})</span>
+                  {/if}
+                  {#if sizeDetail(job.result.video.original_size, job.result.video.new_size)}
+                    <span class="text-base-content/30"> · {sizeDetail(job.result.video.original_size, job.result.video.new_size)}</span>
+                  {/if}
+                </span>
+              {:else if phaseSucceeded && phase === 'cleanup' && job.result?.cleanup}
+                <span class="text-xs text-base-content/60">
+                  {#if job.result.cleanup.subtitle_removed > 0 || job.result.cleanup.audio_removed > 0}
+                    {#if job.result.cleanup.subtitle_removed > 0}
+                      Removed {job.result.cleanup.subtitle_removed} sub{job.result.cleanup.subtitle_removed !== 1 ? 's' : ''}
+                      {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/30">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
+                    {/if}
+                    {#if job.result.cleanup.subtitle_removed > 0 && job.result.cleanup.audio_removed > 0}
+                      <span class="text-base-content/30"> · </span>
+                    {/if}
+                    {#if job.result.cleanup.audio_removed > 0}
+                      Removed {job.result.cleanup.audio_removed} audio
+                      {#if job.result.cleanup.audio_kept}<span class="text-base-content/30">(kept {job.result.cleanup.audio_kept})</span>{/if}
+                    {/if}
+                  {:else}
+                    No streams removed
+                  {/if}
+                  {#if sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}
+                    <span class="text-base-content/30"> · {sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}</span>
+                  {/if}
+                </span>
+              {/if}
+              {#if phaseFailed && phaseResult?.error}
+                <span class="text-xs text-error/70 truncate" title={phaseResult.error}>{phaseResult.error}</span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="flex gap-1.5 flex-wrap items-center">
+          {#each job.planned_phases as phase}
+            {@const isDone = job.completed_phases?.includes(phase) || job.status !== 'running'}
+            {@const isCurrent = job.status === 'running' && job.current_phase === phase && !job.completed_phases?.includes(phase)}
+            {@const phaseResult = phase === 'audio' ? job.result?.audio : phase === 'video' ? job.result?.video : job.result?.cleanup}
+            {@const phaseSucceeded = isDone && phaseResult?.success === true}
+            {@const phaseFailed = isDone && phaseResult != null && phaseResult.success === false}
+            <span class="badge {phaseFailed ? 'badge-error' : phaseColors[phase]} badge-xs gap-0.5 {isCurrent ? '' : isDone ? 'opacity-80' : 'opacity-30'}">
+              {#if phaseSucceeded}
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              {:else if phaseFailed}
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+              {:else if isCurrent}
+                <span class="loading loading-spinner" style="width: 0.625rem; height: 0.625rem;"></span>
+              {/if}
+              {phaseLabels[phase]}
+            </span>
+          {/each}
+        </div>
+      {/if}
+    {:else if job.result}
+      <!-- Legacy jobs without planned_phases -->
+      {#if detailed}
+        <div class="space-y-1.5">
+          {#if job.result.audio?.success}
+            <div class="flex items-center gap-2">
+              <span class="badge badge-warning badge-xs gap-0.5 shrink-0 opacity-80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                Audio
+              </span>
+              <div class="text-xs text-base-content/60">
+                {#if job.result.audio.converted_streams?.length}
+                  {#each job.result.audio.converted_streams as stream, i}
+                    <span>{codecLabel(stream.from_codec)} {channelLabel(stream.channels)} → {codecLabel(stream.to_codec)} {channelLabel(stream.channels)}</span>
+                    {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/30"> · </span>{/if}
+                  {/each}
+                {:else}
+                  {job.result.audio.streams_converted} stream{(job.result.audio.streams_converted ?? 0) !== 1 ? 's' : ''} converted
+                {/if}
+                {#if sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}
+                  <span class="text-base-content/30"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
+          {#if job.result.video?.success}
+            <div class="flex items-center gap-2">
+              <span class="badge badge-secondary badge-xs gap-0.5 shrink-0 opacity-80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                Video
+              </span>
+              <span class="text-xs text-base-content/60">
+                {job.result.video.codec_from} → {job.result.video.codec_to}
+                {#if job.result.video.content_type}
+                  <span class="text-base-content/30">({job.result.video.content_type})</span>
+                {/if}
+                {#if sizeDetail(job.result.video.original_size, job.result.video.new_size)}
+                  <span class="text-base-content/30"> · {sizeDetail(job.result.video.original_size, job.result.video.new_size)}</span>
+                {/if}
+              </span>
+            </div>
+          {/if}
+          {#if job.result.cleanup?.success}
+            <div class="flex items-center gap-2">
+              <span class="badge badge-info badge-xs gap-0.5 shrink-0 opacity-80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                Cleanup
+              </span>
+              <span class="text-xs text-base-content/60">
+                {#if job.result.cleanup.subtitle_removed > 0 || job.result.cleanup.audio_removed > 0}
+                  {#if job.result.cleanup.subtitle_removed > 0}
+                    Removed {job.result.cleanup.subtitle_removed} sub{job.result.cleanup.subtitle_removed !== 1 ? 's' : ''}
+                    {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/30">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
+                  {/if}
+                  {#if job.result.cleanup.subtitle_removed > 0 && job.result.cleanup.audio_removed > 0}
+                    <span class="text-base-content/30"> · </span>
+                  {/if}
+                  {#if job.result.cleanup.audio_removed > 0}
+                    Removed {job.result.cleanup.audio_removed} audio
+                    {#if job.result.cleanup.audio_kept}<span class="text-base-content/30">(kept {job.result.cleanup.audio_kept})</span>{/if}
+                  {/if}
+                {:else}
+                  No streams removed
+                {/if}
+                {#if sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}
+                  <span class="text-base-content/30"> · {sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}</span>
+                {/if}
+              </span>
+            </div>
+          {/if}
+          {#if job.result.audio && !job.result.audio.success}
+            <div class="flex items-center gap-2">
+              <span class="badge badge-error badge-xs gap-0.5 shrink-0 opacity-80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                Audio
+              </span>
+              {#if job.result.audio.error}
+                <span class="text-xs text-error/70 truncate" title={job.result.audio.error}>{job.result.audio.error}</span>
+              {/if}
+            </div>
+          {/if}
+          {#if job.result.video && !job.result.video.success}
+            <div class="flex items-center gap-2">
+              <span class="badge badge-error badge-xs gap-0.5 shrink-0 opacity-80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                Video
+              </span>
+              {#if job.result.video.error}
+                <span class="text-xs text-error/70 truncate" title={job.result.video.error}>{job.result.video.error}</span>
+              {/if}
+            </div>
+          {/if}
+          {#if job.result.cleanup && !job.result.cleanup.success}
+            <div class="flex items-center gap-2">
+              <span class="badge badge-error badge-xs gap-0.5 shrink-0 opacity-80">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                Cleanup
+              </span>
+              {#if job.result.cleanup.error}
+                <span class="text-xs text-error/70 truncate" title={job.result.cleanup.error}>{job.result.cleanup.error}</span>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <div class="flex gap-1.5 flex-wrap">
+          {#if job.result.audio?.success}
+            <span class="badge badge-warning badge-xs gap-0.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-            {:else if isCurrent}
-              <span class="loading loading-spinner" style="width: 0.625rem; height: 0.625rem;"></span>
-            {/if}
-            {phaseLabels[phase]}
-          </span>
-        {/each}
-      </div>
+              Audio
+            </span>
+          {:else if job.result.audio && !job.result.audio.success}
+            <span class="badge badge-error badge-xs gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+              Audio
+            </span>
+          {/if}
+          {#if job.result.video?.success}
+            <span class="badge badge-secondary badge-xs gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              Video
+            </span>
+          {:else if job.result.video && !job.result.video.success}
+            <span class="badge badge-error badge-xs gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+              Video
+            </span>
+          {/if}
+          {#if job.result.cleanup?.success}
+            <span class="badge badge-info badge-xs gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              Cleanup
+            </span>
+          {:else if job.result.cleanup && !job.result.cleanup.success}
+            <span class="badge badge-error badge-xs gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+              Cleanup
+            </span>
+          {/if}
+        </div>
+      {/if}
     {/if}
 
     {#if job.status === 'running'}
@@ -181,96 +406,6 @@ async function handleCancel() {
         </div>
       {:else}
         <p class="text-xs text-error/80">{job.error}</p>
-      {/if}
-    {/if}
-
-    {#if job.result}
-      {#if detailed}
-        <!-- Detailed view for Jobs page -->
-        <div class="space-y-1.5 pt-1">
-          {#if job.result.audio?.success}
-            <div class="flex items-start gap-2">
-              <span class="badge badge-warning badge-xs gap-0.5 shrink-0 mt-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                Audio
-              </span>
-              <div class="text-xs text-base-content/60">
-                {#if job.result.audio.converted_streams?.length}
-                  {#each job.result.audio.converted_streams as stream, i}
-                    <span>{codecLabel(stream.from_codec)} {channelLabel(stream.channels)} → {codecLabel(stream.to_codec)} {channelLabel(stream.channels)}</span>
-                    {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/30"> · </span>{/if}
-                  {/each}
-                {:else}
-                  {job.result.audio.streams_converted} stream{(job.result.audio.streams_converted ?? 0) !== 1 ? 's' : ''} converted
-                {/if}
-              </div>
-            </div>
-          {/if}
-          {#if job.result.video?.success}
-            <div class="flex items-start gap-2">
-              <span class="badge badge-secondary badge-xs gap-0.5 shrink-0 mt-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                Video
-              </span>
-              <span class="text-xs text-base-content/60">
-                {job.result.video.codec_from} → {job.result.video.codec_to}
-                {#if job.result.video.content_type}
-                  <span class="text-base-content/30">({job.result.video.content_type})</span>
-                {/if}
-                {#if job.result.video.size_change_percent != null}
-                  <span class="text-base-content/30">({job.result.video.size_change_percent > 0 ? '+' : ''}{job.result.video.size_change_percent.toFixed(0)}%)</span>
-                {/if}
-              </span>
-            </div>
-          {/if}
-          {#if job.result.cleanup?.success}
-            <div class="flex items-start gap-2">
-              <span class="badge badge-info badge-xs gap-0.5 shrink-0 mt-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                Cleanup
-              </span>
-              <span class="text-xs text-base-content/60">
-                {#if job.result.cleanup.subtitle_removed > 0 || job.result.cleanup.audio_removed > 0}
-                  {#if job.result.cleanup.subtitle_removed > 0}
-                    Removed {job.result.cleanup.subtitle_removed} sub{job.result.cleanup.subtitle_removed !== 1 ? 's' : ''}
-                    {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/30">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
-                  {/if}
-                  {#if job.result.cleanup.subtitle_removed > 0 && job.result.cleanup.audio_removed > 0}
-                    <span class="text-base-content/30"> · </span>
-                  {/if}
-                  {#if job.result.cleanup.audio_removed > 0}
-                    Removed {job.result.cleanup.audio_removed} audio
-                    {#if job.result.cleanup.audio_kept}<span class="text-base-content/30">(kept {job.result.cleanup.audio_kept})</span>{/if}
-                  {/if}
-                {:else}
-                  No streams removed
-                {/if}
-              </span>
-            </div>
-          {/if}
-        </div>
-      {:else if !job.planned_phases?.length}
-        <!-- Fallback compact badges for legacy jobs without planned_phases -->
-        <div class="flex gap-1.5 flex-wrap">
-          {#if job.result.audio?.success}
-            <span class="badge badge-warning badge-xs gap-0.5">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-              Audio
-            </span>
-          {/if}
-          {#if job.result.video?.success}
-            <span class="badge badge-secondary badge-xs gap-0.5">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-              Video
-            </span>
-          {/if}
-          {#if job.result.cleanup?.success}
-            <span class="badge badge-info badge-xs gap-0.5">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-              Cleanup
-            </span>
-          {/if}
-        </div>
       {/if}
     {/if}
   </div>
