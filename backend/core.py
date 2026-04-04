@@ -364,9 +364,7 @@ class JobQueue:
                 time.sleep(30)  # Check every 30 seconds
                 now = time.time()
                 with self.lock:
-                    running_jobs = [
-                        j for j in self.jobs.values() if j.status == JobStatus.RUNNING
-                    ]
+                    running_jobs = [j for j in self.jobs.values() if j.status == JobStatus.RUNNING]
                 for job in running_jobs:
                     last_update = job.last_progress_at or job.started_at or job.created_at
                     stale_seconds = now - last_update
@@ -408,9 +406,7 @@ class JobQueue:
                         )
                         replacement.start()
                         self.workers.append(replacement)
-                        logger.warning(
-                            "Watchdog: spawned replacement worker thread Worker-%d", idx
-                        )
+                        logger.warning("Watchdog: spawned replacement worker thread Worker-%d", idx)
             except Exception as exc:
                 logger.error("Watchdog error: %s", exc)
 

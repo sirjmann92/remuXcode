@@ -441,28 +441,30 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        cmd.extend([
-            "-analyzeduration",
-            "10M",
-            "-probesize",
-            "10M",
-            "-i",
-            input_file,
-            "-map",
-            "0",
-            "-map_chapters",
-            "0",
-            "-c:v",
-            "libx265",
-            "-pix_fmt",
-            self.config.pix_fmt,
-            "-profile:v",
-            self.config.profile,
-            "-level:v",
-            self.config.level,
-            "-preset",
-            preset,
-        ])
+        cmd.extend(
+            [
+                "-analyzeduration",
+                "10M",
+                "-probesize",
+                "10M",
+                "-i",
+                input_file,
+                "-map",
+                "0",
+                "-map_chapters",
+                "0",
+                "-c:v",
+                "libx265",
+                "-pix_fmt",
+                self.config.pix_fmt,
+                "-profile:v",
+                self.config.profile,
+                "-level:v",
+                self.config.level,
+                "-preset",
+                preset,
+            ]
+        )
 
         # Add tune if specified
         if tune:
@@ -542,26 +544,28 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        cmd.extend([
-            "-analyzeduration",
-            "10M",
-            "-probesize",
-            "10M",
-            "-i",
-            input_file,
-            "-map",
-            "0",
-            "-map_chapters",
-            "0",
-            "-c:v",
-            "libsvtav1",
-            "-pix_fmt",
-            "yuv420p10le",  # AV1 10-bit
-            "-crf",
-            str(crf),
-            "-preset",
-            str(preset),
-        ])
+        cmd.extend(
+            [
+                "-analyzeduration",
+                "10M",
+                "-probesize",
+                "10M",
+                "-i",
+                input_file,
+                "-map",
+                "0",
+                "-map_chapters",
+                "0",
+                "-c:v",
+                "libsvtav1",
+                "-pix_fmt",
+                "yuv420p10le",  # AV1 10-bit
+                "-crf",
+                str(crf),
+                "-preset",
+                str(preset),
+            ]
+        )
 
         # Add SVT-AV1 params
         cmd.extend(["-svtav1-params", ":".join(svtav1_params)])
