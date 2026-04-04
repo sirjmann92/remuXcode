@@ -54,7 +54,7 @@ def run_ffmpeg_with_progress(
     os.mkfifo(fifo_path)
 
     # Inject -progress <fifo> before the last argument (the output path)
-    progress_cmd = [*cmd[:-1], "-progress", fifo_path, cmd[-1]]
+    progress_cmd = [*cmd[:-1], "-progress", str(fifo_path), cmd[-1]]
 
     stderr_chunks: list[str] = []
     cancelled = threading.Event()
