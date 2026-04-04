@@ -343,6 +343,11 @@ class JobQueue:
 
         created = self._parse_iso_ts(row.get("created_at")) or time.time()
 
+        # Reconstruct planned/completed phases from result data
+        phases: list[str] | None = None
+        if result:
+            phases = [p for p in ("audio", "video", "cleanup") if result.get(p)]
+
         return ConversionJob(
             id=row["id"],
             job_type=job_type,
@@ -355,6 +360,8 @@ class JobQueue:
             result=result,
             error=row.get("error"),
             source=row.get("source", "webhook"),
+            planned_phases=phases,
+            completed_phases=phases,
         )
 
     def _watchdog_loop(self) -> None:
@@ -639,6 +646,8 @@ def process_file(
             "success": audio_result.success,
             "streams_converted": audio_result.streams_converted,
             "converted_streams": audio_result.converted_streams,
+            "original_size": audio_result.original_size,
+            "new_size": audio_result.new_size,
             "error": audio_result.error,
         }
         if not audio_result.success:
@@ -662,6 +671,8 @@ def process_file(
             "codec_from": video_result.codec_from,
             "codec_to": video_result.codec_to,
             "content_type": video_result.content_type,
+            "original_size": video_result.original_size,
+            "new_size": video_result.new_size,
             "size_change_percent": video_result.size_change_percent,
             "error": video_result.error,
         }
@@ -687,6 +698,8 @@ def process_file(
             "audio_kept": cleanup_result.audio_kept,
             "subtitle_removed": cleanup_result.subtitle_removed,
             "subtitle_kept": cleanup_result.subtitle_kept,
+            "original_size": cleanup_result.original_size,
+            "new_size": cleanup_result.new_size,
             "original_language": cleanup_result.original_language,
             "error": cleanup_result.error,
         }

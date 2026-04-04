@@ -3,25 +3,32 @@ import { getConfig, getJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
 import type { ConfigSummary, Job } from '$lib/types';
 
-let jobs: Job[] = $state([]);
+let activeJobs: Job[] = $state([]);
+let pendingJobs: Job[] = $state([]);
+let recentJobs: Job[] = $state([]);
+let totalCompleted = $state(0);
+let totalFailed = $state(0);
 let config: ConfigSummary | null = $state(null);
 let loading = $state(true);
 
-const activeJobs = $derived(jobs.filter((j) => j.status === 'running'));
-const pendingJobs = $derived(jobs.filter((j) => j.status === 'pending'));
-const recentJobs = $derived(
-  jobs
-    .filter((j) => j.status === 'completed' || j.status === 'failed')
-    .toSorted((a, b) => (b.completed_at ?? 0) - (a.completed_at ?? 0))
-    .slice(0, 5),
-);
-const totalCompleted = $derived(jobs.filter((j) => j.status === 'completed').length);
-const totalFailed = $derived(jobs.filter((j) => j.status === 'failed').length);
-
 async function fetchData() {
   try {
-    const [jobsData, configData] = await Promise.all([getJobs(), getConfig()]);
-    jobs = jobsData.jobs;
+    const [overview, running, pending, completed, failed, configData] = await Promise.all([
+      getJobs({ limit: 1 }),
+      getJobs({ status: 'running', limit: 25 }),
+      getJobs({ status: 'pending', limit: 25 }),
+      getJobs({ status: 'completed', limit: 5 }),
+      getJobs({ status: 'failed', limit: 5 }),
+      getConfig(),
+    ]);
+
+    activeJobs = running.jobs;
+    pendingJobs = pending.jobs;
+    recentJobs = [...completed.jobs, ...failed.jobs]
+      .toSorted((a, b) => (b.completed_at ?? 0) - (a.completed_at ?? 0))
+      .slice(0, 5);
+    totalCompleted = overview.counts?.completed ?? completed.total ?? completed.jobs.length;
+    totalFailed = overview.counts?.failed ?? failed.total ?? failed.jobs.length;
     config = configData;
   } catch {
     // keep stale data
