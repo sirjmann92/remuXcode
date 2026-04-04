@@ -1031,6 +1031,7 @@ def initialize_components() -> None:
         anime_detector=anime_detector,
         get_volume_root=get_volume_root,
         ffmpeg_threads=config.effective_ffmpeg_threads,
+        hw_accel=config.video.hw_accel,
     )
     stream_cleanup = StreamCleanup(
         config=config.cleanup,

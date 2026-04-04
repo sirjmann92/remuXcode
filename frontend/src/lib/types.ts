@@ -91,6 +91,7 @@ export interface ConfigSummary {
     level: string;
     profile: string;
     pix_fmt: string;
+    hw_accel: string;
   };
   audio: {
     enabled: boolean;
@@ -139,8 +140,19 @@ export interface ConfigSummary {
   api_key: string;
 }
 
+export interface HWAccelCaps {
+  render_devices: string[];
+  gpu_vendor: string;
+  vaapi_available: boolean;
+  qsv_available: boolean;
+  nvenc_available: boolean;
+  hevc_encoders: string[];
+  av1_encoders: string[];
+}
+
 export interface SystemInfo {
   cpu_count: number;
+  hw_accel: HWAccelCaps;
 }
 
 export interface HealthStatus {

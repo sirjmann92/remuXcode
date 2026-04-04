@@ -135,6 +135,7 @@ class VideoConfig:
     level: str = "4.1"
     profile: str = "main10"
     pix_fmt: str = "yuv420p10le"
+    hw_accel: str = "none"  # none, auto, qsv, vaapi, nvenc
     job_timeout: int = 7200  # seconds (0 = no timeout)
 
 
@@ -340,6 +341,7 @@ class Config:
             level=self._get("video.level", "4.1"),
             profile=self._get("video.profile", "main10"),
             pix_fmt=self._get("video.pix_fmt", "yuv420p10le"),
+            hw_accel=self._get("video.hw_accel", "none"),
             job_timeout=self._get("processing.job_timeout", 7200),
         )
 
@@ -422,6 +424,7 @@ class Config:
             "level",
             "profile",
             "pix_fmt",
+            "hw_accel",
         ):
             self._raw_config["video"][key] = getattr(self.video, key)
 

@@ -14,13 +14,13 @@ GROUPNAME=appgroup
 # Recreate user/group if UID/GID changed
 if [ "$(id -u "$USERNAME" 2>/dev/null)" != "$PUID" ] || [ "$(id -g "$USERNAME" 2>/dev/null)" != "$PGID" ]; then
 	if id "$USERNAME" >/dev/null 2>&1; then
-		deluser "$USERNAME"
+		userdel "$USERNAME"
 	fi
 fi
 
 if [ "$(getent group "$GROUPNAME" | cut -d: -f3 2>/dev/null)" != "$PGID" ]; then
 	if getent group "$GROUPNAME" >/dev/null 2>&1; then
-		delgroup "$GROUPNAME"
+		groupdel "$GROUPNAME"
 	fi
 fi
 
@@ -28,11 +28,11 @@ fi
 EXISTING_GROUP=$(getent group "$PGID" | cut -d: -f1 2>/dev/null)
 if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "$GROUPNAME" ]; then
 	if [ "$EXISTING_GROUP" = "users" ] && [ "$PGID" = "100" ]; then
-		log_info "Removing Alpine's 'users' group to use GID 100"
+		log_info "Removing system 'users' group to use GID 100"
 		getent passwd | grep ":100:" | cut -d: -f1 | while read -r username; do
 			usermod -g nobody "$username" 2>/dev/null || true
 		done
-		delgroup users 2>/dev/null || exit 1
+		groupdel users 2>/dev/null || exit 1
 	else
 		log_info "Error: GID $PGID is in use by system group '$EXISTING_GROUP'"
 		exit 1
@@ -41,16 +41,31 @@ fi
 
 # Create group and user
 if ! getent group "$GROUPNAME" >/dev/null 2>&1; then
-	addgroup -g "$PGID" "$GROUPNAME"
+	groupadd -g "$PGID" "$GROUPNAME"
 fi
 
 if ! id "$USERNAME" >/dev/null 2>&1; then
-	adduser -u "$PUID" -G "$GROUPNAME" -D -s /bin/sh "$USERNAME"
+	useradd -u "$PUID" -g "$GROUPNAME" -s /bin/sh -M "$USERNAME"
 fi
 
 FINAL_UID=$(id -u "$USERNAME" 2>/dev/null)
 FINAL_GID=$(id -g "$USERNAME" 2>/dev/null)
 log_info "User '$USERNAME' configured with PUID:$FINAL_UID PGID:$FINAL_GID"
+
+# Add user to render/video groups for GPU access (/dev/dri)
+for dev in /dev/dri/renderD* /dev/dri/card*; do
+	[ -e "$dev" ] || continue
+	DEV_GID=$(stat -c '%g' "$dev")
+	DEV_GROUP=$(getent group "$DEV_GID" | cut -d: -f1 2>/dev/null)
+	if [ -z "$DEV_GROUP" ]; then
+		DEV_GROUP="devgid${DEV_GID}"
+		groupadd -g "$DEV_GID" "$DEV_GROUP" 2>/dev/null || true
+	fi
+	if ! id -nG "$USERNAME" 2>/dev/null | grep -qw "$DEV_GROUP"; then
+		usermod -aG "$DEV_GROUP" "$USERNAME"
+		log_info "Added '$USERNAME' to group '$DEV_GROUP' (GID $DEV_GID) for GPU access"
+	fi
+done
 
 # Fix ownership
 chown -R "$PUID":"$PGID" /app/logs 2>/dev/null || true
@@ -73,7 +88,7 @@ case "${LOG_LEVEL:-info}" in
 	*) uvicorn_loglevel=info ;;
 esac
 
-exec su-exec "$USERNAME" uvicorn backend.app:app \
+exec gosu "$USERNAME" uvicorn backend.app:app \
     --host 0.0.0.0 \
     --port "${PORT:-7889}" \
     --no-access-log \
