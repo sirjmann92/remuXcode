@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from backend import core
 
@@ -13,12 +13,73 @@ router = APIRouter(tags=["jobs"])
 
 
 @router.get("/jobs")
-async def list_jobs() -> dict[str, Any]:
-    """List all jobs."""
+async def list_jobs(
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    status: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """List jobs with optional paging, filtering, and search.
+
+    Returns `jobs` for backwards compatibility and includes metadata when
+    paging/filter options are used.
+    """
     if not core.job_queue:
         return {"jobs": []}
-    jobs = [j.to_dict() for j in core.job_queue.get_all_jobs()]
-    return {"jobs": jobs}
+
+    all_jobs = core.job_queue.get_all_jobs()
+
+    counts: dict[str, int] = {
+        "all": len(all_jobs),
+        "pending": 0,
+        "running": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+    }
+    for job in all_jobs:
+        if job.status.value in counts:
+            counts[job.status.value] += 1
+
+    filtered = all_jobs
+    if status and status != "all":
+        filtered = [j for j in filtered if j.status.value == status]
+
+    if search:
+        needle = search.lower()
+        filtered = [j for j in filtered if needle in j.file_path.lower()]
+
+    status_order = {
+        "running": 0,
+        "pending": 1,
+        "completed": 2,
+        "failed": 3,
+        "cancelled": 4,
+    }
+    filtered.sort(
+        key=lambda j: (
+            status_order.get(j.status.value, 9),
+            -(j.created_at or 0),
+        )
+    )
+
+    total = len(filtered)
+    if limit is not None:
+        page = filtered[offset : offset + limit]
+    else:
+        page = filtered
+
+    jobs = [j.to_dict() for j in page]
+    has_more = limit is not None and (offset + len(page)) < total
+
+    return {
+        "jobs": jobs,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "has_more": has_more,
+        "counts": counts,
+    }
 
 
 @router.get("/jobs/active")

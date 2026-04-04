@@ -292,14 +292,47 @@ services:
 - [x] **Fully Editable Settings Page** — All settings including Sonarr/Radarr URLs, API keys, worker count, job retention, and all advanced options editable from the UI
 - [x] **Code Audit & Cleanup** — Removed dead code, unused dependencies, deduplicated frontend utilities into shared `format.ts`, optimized Dockerfile
 
+## Phase 2.6: Hardware Acceleration & Progress Reporting ✓ (COMPLETED)
+
+### Goal
+Add GPU-accelerated encoding and reliable real-time progress tracking for all encoder types.
+
+### Completed Features
+- [x] **Hardware Acceleration (QSV/VAAPI/NVENC)**
+  - Auto-detection of Intel QSV, Intel VAAPI, and NVIDIA NVENC at startup
+  - Automatic encoder selection with software fallback (`libx265`/`libsvtav1`)
+  - SW decode + HW encode pattern for maximum compatibility
+  - 10-bit pixel format handling per acceleration method (p010le for QSV/VAAPI, p010 for NVENC)
+  - GPU render device passthrough (`/dev/dri`)
+  - Dockerfile migrated from Alpine to Debian Trixie with Intel media drivers (libmfx, VAAPI)
+  - AV1 hardware encoding support (QSV, VAAPI, NVENC)
+
+- [x] **FIFO-Based Progress Reporting**
+  - Replaced `pipe:1` progress output with Unix FIFO to avoid stdout full-buffering
+  - Non-blocking FIFO open (`O_RDONLY | O_NONBLOCK`) before spawning ffmpeg to prevent deadlocks
+  - `select()` with timeout for efficient reading and cancellation support
+  - Raw `os.read()` to bypass Python's buffered I/O read-ahead on FIFOs
+
+- [x] **Frame-Based Progress Fallback**
+  - Hardware encoders (QSV, VAAPI, NVENC) report `out_time_us=N/A` instead of numeric timestamps
+  - Automatic fallback to `frame=` parsing with `total_frames` calculated from `duration × framerate`
+  - Progress displays correctly for both software and hardware encoders
+
+- [x] **File Size Tracking**
+  - Before/after file sizes with percentage change displayed per conversion phase
+  - Shown in the Jobs UI for audio, video, and cleanup phases
+
+- [x] **Code Audit & Cleanup**
+  - Removed dead code (duplicate exception handler in safe-move)
+  - Tightened progress calculation guards
+  - Full audit of all backend and frontend files
+
 ## Phase 3: Community & Distribution
 
 ### Features
-- **Hardware Acceleration (QSV/VAAPI)** - Intel Quick Sync and VAAPI GPU encoding support with auto-detection, configurable encoder selection, and quality presets. Requires base image change (Alpine → Debian/Ubuntu with Intel media drivers) and Docker GPU device passthrough
 - **Event Viewer / Notification Center** - Real-time activity log in the UI showing conversion events, data protection alerts, watchdog actions, and worker lifecycle events with filterable severity levels (info, warning, error, critical)
 - **Unraid Plugin** - Native Unraid Community Apps support
 - **Multi-user support** - Role-based access
-- **Hardware acceleration** - GPU encoding support
 - **Cloud storage support** - S3, GCS, etc.
 - **Plex/Jellyfin Webhooks** *(nice-to-have, low priority)* - Support users without Sonarr/Radarr; metadata sourcing would be a significant undertaking
 

@@ -2,10 +2,26 @@
 import { page } from '$app/stores';
 import { cancelAllJobs, cancelAllPending, deleteJob, getJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
-import type { Job, JobStatus } from '$lib/types';
+import type { Job, JobsCounts, JobStatus } from '$lib/types';
 
 let jobs: Job[] = $state([]);
-let loading = $state(true);
+let initialLoad = $state(true);
+let loadingMore = $state(false);
+let autoRefreshEnabled = $state(true);
+let total = $state(0);
+let hasMore = $state(false);
+let requestId = 0;
+const PAGE_SIZE = 100;
+
+let counts: JobsCounts = $state({
+  all: 0,
+  pending: 0,
+  running: 0,
+  completed: 0,
+  failed: 0,
+  cancelled: 0,
+});
+
 const validFilters: Array<JobStatus | 'all'> = [
   'all',
   'running',
@@ -20,58 +36,84 @@ let filter: JobStatus | 'all' = $state(
 );
 let search: string = $state('');
 
-const filtered = $derived.by(() => {
-  let result = jobs;
-  if (filter !== 'all') {
-    result = result.filter((j) => j.status === filter);
-  }
-  if (search) {
-    const q = search.toLowerCase();
-    result = result.filter((j) => j.file_path.toLowerCase().includes(q));
-  }
-  // Running jobs first, then pending, then the rest by creation time
-  const statusOrder: Record<string, number> = {
-    running: 0,
-    pending: 1,
-    completed: 2,
-    failed: 3,
-    cancelled: 4,
-  };
-  return result.toSorted((a, b) => {
-    const sa = statusOrder[a.status] ?? 9;
-    const sb = statusOrder[b.status] ?? 9;
-    if (sa !== sb) return sa - sb;
-    return b.created_at - a.created_at;
-  });
-});
-
-const counts = $derived({
-  all: jobs.length,
-  pending: jobs.filter((j) => j.status === 'pending').length,
-  running: jobs.filter((j) => j.status === 'running').length,
-  completed: jobs.filter((j) => j.status === 'completed').length,
-  failed: jobs.filter((j) => j.status === 'failed').length,
-  cancelled: jobs.filter((j) => j.status === 'cancelled').length,
-});
-
 let loadError = $state(false);
-async function fetchJobs() {
+
+async function fetchJobs(reset = true) {
+  const rid = ++requestId;
+  if (reset && initialLoad) {
+    // Only show loading spinner on the very first load
+  } else if (!reset) {
+    loadingMore = true;
+  }
+
   try {
-    const res = await getJobs();
-    jobs = res.jobs;
+    const res = await getJobs({
+      limit: PAGE_SIZE,
+      offset: reset ? 0 : jobs.length,
+      status: filter,
+      search: search.trim() || undefined,
+    });
+
+    if (rid !== requestId) return;
+
+    if (reset) {
+      jobs = res.jobs;
+      autoRefreshEnabled = true;
+    } else {
+      const seen = new Set(jobs.map((j) => j.id));
+      const append = res.jobs.filter((j) => !seen.has(j.id));
+      jobs = [...jobs, ...append];
+      autoRefreshEnabled = false;
+    }
+
+    total = res.total ?? jobs.length;
+    hasMore = Boolean(res.has_more);
+    if (res.counts) {
+      counts = res.counts;
+    }
     loadError = false;
   } catch {
     loadError = true;
   } finally {
-    loading = false;
+    initialLoad = false;
+    loadingMore = false;
   }
 }
 
+// Single reactive effect: re-fetch when filter or search changes,
+// and poll on a 5-second interval for background updates.
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 $effect(() => {
-  fetchJobs();
-  const id = setInterval(fetchJobs, 3000);
-  return () => clearInterval(id);
+  // Track reactive deps
+  const _filter = filter;
+  const q = search;
+
+  // Re-enable auto-refresh when filter/search changes
+  autoRefreshEnabled = true;
+
+  // Debounce search, immediate for filter changes
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    fetchJobs(true);
+  }, q ? 250 : 0);
+
+  // Set up polling interval
+  const id = setInterval(() => {
+    if (autoRefreshEnabled) {
+      fetchJobs(true);
+    }
+  }, 5000);
+
+  return () => {
+    if (searchDebounce) clearTimeout(searchDebounce);
+    clearInterval(id);
+  };
 });
+
+async function loadMore() {
+  if (!hasMore || loadingMore) return;
+  await fetchJobs(false);
+}
 
 async function clearCompleted() {
   const completed = jobs.filter(
@@ -84,7 +126,7 @@ async function clearCompleted() {
       // ignore individual failures
     }
   }
-  await fetchJobs();
+  await fetchJobs(true);
 }
 
 async function handleCancelPending() {
@@ -93,7 +135,7 @@ async function handleCancelPending() {
   } catch {
     // ignore
   }
-  await fetchJobs();
+  await fetchJobs(true);
 }
 
 async function handleStopAll() {
@@ -102,7 +144,7 @@ async function handleStopAll() {
   } catch {
     // ignore
   }
-  await fetchJobs();
+  await fetchJobs(true);
 }
 
 const filters: { value: JobStatus | 'all'; label: string }[] = [
@@ -111,6 +153,7 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'completed', label: 'Completed' },
   { value: 'failed', label: 'Failed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 </script>
 
@@ -149,7 +192,7 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
 
   <div class="flex items-center justify-between">
     <div class="text-sm text-base-content/50">
-      {filtered.length} job{filtered.length !== 1 ? 's' : ''}
+      Showing {jobs.length} of {total} job{total !== 1 ? 's' : ''}
     </div>
     <div class="flex items-center gap-2">
       {#if counts.running > 0 || counts.pending > 0}
@@ -170,7 +213,7 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
   </div>
 
   <!-- Job list -->
-  {#if loading}
+  {#if initialLoad}
     <div class="flex justify-center py-12">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
@@ -182,7 +225,7 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
       <p class="text-base text-error/80">Failed to load jobs</p>
       <p class="text-sm text-base-content/40 mt-1">Check backend logs or try again later.</p>
     </div>
-  {:else if filtered.length === 0}
+  {:else if jobs.length === 0}
     <div class="card-glass rounded-box p-12 text-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-4 text-base-content/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
@@ -192,9 +235,19 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
     </div>
   {:else}
     <div class="space-y-2">
-      {#each filtered as job (job.id)}
+      {#each jobs as job (job.id)}
         <JobCard {job} onRemoved={fetchJobs} detailed={true} />
       {/each}
     </div>
+    {#if hasMore}
+      <div class="flex justify-center pt-2">
+        <button class="btn btn-sm btn-outline" onclick={loadMore} disabled={loadingMore}>
+          {#if loadingMore}
+            <span class="loading loading-spinner loading-xs"></span>
+          {/if}
+          Load more
+        </button>
+      </div>
+    {/if}
   {/if}
 </div>

@@ -212,7 +212,11 @@ def _detect_gpu_vendor() -> str:
 
 
 def _test_qsv() -> bool:
-    """Quick test: can QSV initialise on this machine."""
+    """Quick test: can QSV initialise and encode on this machine.
+
+    Uses ``-init_hw_device qsv`` + software-decoded synthetic input to
+    match the actual encoding pipeline (SW decode → QSV encode).
+    """
     try:
         result = subprocess.run(
             [
@@ -222,10 +226,14 @@ def _test_qsv() -> bool:
                 "error",
                 "-init_hw_device",
                 "qsv=hw",
+                "-filter_hw_device",
+                "hw",
                 "-f",
                 "lavfi",
                 "-i",
                 "nullsrc=s=256x256:d=0.1",
+                "-vf",
+                "format=nv12,hwupload=extra_hw_frames=64",
                 "-frames:v",
                 "1",
                 "-c:v",

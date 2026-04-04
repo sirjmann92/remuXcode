@@ -5,6 +5,7 @@ import type {
   ConfigSummary,
   HealthStatus,
   Job,
+  JobsResponse,
   MoviesResponse,
   ScanProgress,
   SeriesDetail,
@@ -44,8 +45,22 @@ export async function getHealth(): Promise<HealthStatus> {
 }
 
 // Jobs
-export async function getJobs(): Promise<{ jobs: Job[] }> {
-  return request('/api/jobs');
+export async function getJobs(options?: {
+  limit?: number;
+  offset?: number;
+  status?: 'all' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  search?: string;
+}): Promise<JobsResponse> {
+  if (!options) return request('/api/jobs');
+
+  const params = new URLSearchParams();
+  if (options.limit != null) params.set('limit', String(options.limit));
+  if (options.offset != null) params.set('offset', String(options.offset));
+  if (options.status && options.status !== 'all') params.set('status', options.status);
+  if (options.search) params.set('search', options.search);
+
+  const qs = params.toString();
+  return request(`/api/jobs${qs ? `?${qs}` : ''}`);
 }
 
 export async function deleteJob(id: string): Promise<{ message: string }> {

@@ -11,6 +11,7 @@ The application also supports manually updating and maintaining existing Sonarr/
 - 🎯 **Smart Format Selection**: AC3 for surround (5.1+), AAC for stereo/7.1+
 - 🔊 **DTS:X Awareness**: Separate controls for regular DTS vs object-based DTS:X
 - 🎬 **HEVC/AV1 Encoding**: Convert 10-bit H.264 to HEVC or AV1 (configurable)
+- ⚡ **Hardware Acceleration**: Intel QSV, VAAPI, and NVIDIA NVENC with automatic detection and fallback to software encoding
 - 🌸 **Anime Detection**: Auto-detects anime for optimized encoding (`-tune animation`)
 - 🎌 **Per-Worker Anime Only**: Independent anime-only toggle for video, audio, and cleanup
 - 🌍 **Language Cleanup**: Keep only original language + English tracks
@@ -18,7 +19,9 @@ The application also supports manually updating and maintaining existing Sonarr/
 - 🔄 **Automatic Renaming**: Triggers Sonarr/Radarr to update filenames after processing
 - 🌐 **Webhook-Based**: Triggered by containerized Sonarr/Radarr, runs against your mounts
 - 📋 **Job Queue**: Track conversion progress with persistent job status
-- 💾 **SQLite Persistence**: Jobs survive restarts, resume interrupted conversions
+- � **Real-Time Progress**: Live encoding progress via FIFO-based FFmpeg monitoring with frame-based fallback for hardware encoders
+- 📦 **Size Tracking**: Before/after file sizes with percentage change shown per conversion phase
+- �💾 **SQLite Persistence**: Jobs survive restarts, resume interrupted conversions
 - 🛑 **Job Cancellation**: Cancel pending or running jobs via API
 - 🖥️ **Web UI**: Built-in SvelteKit dashboard with library browsing, job management, and config
 - 🎞️ **Library Browse**: Movies & Shows pages with poster grids, filters, and processing previews
@@ -49,6 +52,8 @@ services:
       - ./config:/app/config
       - ./logs:/app/logs
       - /mnt/yournas:/share:rw       # match Sonarr/Radarr's internal path
+    devices:
+      - /dev/dri:/dev/dri             # optional — Intel QSV/VAAPI GPU passthrough
     environment:
       - TZ=America/Chicago
     restart: unless-stopped
@@ -109,6 +114,8 @@ On first run, a default `config/config.yaml` is created automatically. You can a
 | Output | HEVC 10-bit | HEVC 10-bit |
 
 AV1 mode is also available (set codec to `av1` in Settings) — ~30% better compression, slower encoding, less hardware decoder support.
+
+**Hardware acceleration** is auto-detected on startup. If an Intel GPU (QSV/VAAPI) or NVIDIA GPU (NVENC) is available and passed through to the container, encoding will use the GPU automatically. Software encoding (`libx265`/`libsvtav1`) is the fallback when no GPU is detected.
 
 > Video conversion is **anime-only** by default. Audio conversion and stream cleanup process all content by default. Each worker has its own Anime Only toggle in the Settings page.
 
@@ -224,10 +231,13 @@ backend/
 │   ├── config.py         # YAML config loader with env var substitution
 │   ├── language.py       # Original language detection
 │   ├── anime_detect.py   # Content type detection
+│   ├── hwaccel.py        # GPU detection (QSV/VAAPI/NVENC)
 │   └── job_store.py      # SQLite job persistence
 └── workers/
+    ├── _progress.py      # FIFO-based FFmpeg progress reporting
+    ├── _safe_move.py     # Safe file replacement with backup/restore
     ├── audio.py          # DTS → AC3/AAC
-    ├── video.py          # H.264 → HEVC/AV1
+    ├── video.py          # H.264 → HEVC/AV1 (SW + HW encode)
     └── cleanup.py        # Stream removal/reorder
 
 config/                   # Docker volume — created on first run
