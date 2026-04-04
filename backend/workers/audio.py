@@ -199,6 +199,7 @@ class AudioConverter:
             job_id: Unique job ID for temp directory
             progress_callback: Optional callback receiving progress 0-100.
             cancel_event: Event to signal cancellation (kills ffmpeg).
+            detail_callback: Optional callback receiving status detail strings.
 
         Returns:
             AudioConversionResult with conversion details

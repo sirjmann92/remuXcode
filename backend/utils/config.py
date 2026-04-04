@@ -26,7 +26,7 @@ def get_available_cpus() -> int:
     """
     # cgroup v2: /sys/fs/cgroup/cpu.max contains "quota period" (e.g. "1600000 100000" = 16 CPUs)
     try:
-        with open("/sys/fs/cgroup/cpu.max") as f:
+        with Path("/sys/fs/cgroup/cpu.max").open() as f:
             parts = f.read().strip().split()
             if parts[0] != "max":
                 return max(1, int(int(parts[0]) / int(parts[1])))
@@ -35,10 +35,10 @@ def get_available_cpus() -> int:
 
     # cgroup v1: separate quota and period files
     try:
-        with open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") as f:
+        with Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").open() as f:
             quota = int(f.read().strip())
         if quota > 0:
-            with open("/sys/fs/cgroup/cpu/cpu.cfs_period_us") as f:
+            with Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").open() as f:
                 period = int(f.read().strip())
             return max(1, int(quota / period))
     except (OSError, ValueError):
