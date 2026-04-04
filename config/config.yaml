@@ -24,6 +24,7 @@ video:
   level: '4.1'
   vbv_maxrate: 5000
   vbv_bufsize: 10000
+  hw_accel: qsv
 audio:
   enabled: true
   anime_only: false

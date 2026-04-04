@@ -1,10 +1,11 @@
 <script lang="ts">
 import { getConfig, getSystemInfo, regenerateApiKey, updateConfig } from '$lib/api';
 import LanguageSelect from '$lib/components/LanguageSelect.svelte';
-import type { ConfigSummary } from '$lib/types';
+import type { ConfigSummary, HWAccelCaps } from '$lib/types';
 
 let config: ConfigSummary | null = $state(null);
 let cpuCount = $state(0);
+let hwAccel: HWAccelCaps | null = $state(null);
 let loading = $state(true);
 let error = $state('');
 let keyCopied = $state(false);
@@ -20,6 +21,7 @@ async function fetchConfig() {
     const [cfg, sys] = await Promise.all([getConfig(), getSystemInfo()]);
     config = cfg;
     cpuCount = sys.cpu_count;
+    hwAccel = sys.hw_accel;
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load config';
   } finally {
@@ -199,6 +201,62 @@ $effect(() => {
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M21.015 4.356v4.992" /></svg>
             {/if}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hardware Acceleration -->
+    <div class="card-glass rounded-box">
+      <div class="p-5">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Hardware Acceleration</h2>
+        <p class="text-xs text-base-content/40 mb-3">Use GPU hardware encoding for faster video conversion. Requires <code class="bg-base-300 px-1 rounded">/dev/dri</code> passthrough in your compose file.</p>
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center justify-between">
+            <span>Mode<span class="block text-xs text-base-content/30 font-normal">
+              {#if !hwAccel?.render_devices?.length}
+                No GPU detected — mount <code class="bg-base-300 px-0.5 rounded">/dev/dri</code> to enable
+              {:else if hwAccel.gpu_vendor}
+                {hwAccel.gpu_vendor.charAt(0).toUpperCase() + hwAccel.gpu_vendor.slice(1)} GPU detected
+              {:else}
+                GPU detected
+              {/if}
+            </span></span>
+            <select
+              class="select select-xs select-bordered w-28"
+              value={config.video.hw_accel}
+              onchange={(e) => { config!.video.hw_accel = e.currentTarget.value; save('video', 'hw_accel', e.currentTarget.value); }}
+            >
+              <option value="none">None (CPU)</option>
+              <option value="auto" disabled={!hwAccel?.qsv_available && !hwAccel?.vaapi_available && !hwAccel?.nvenc_available}>Auto</option>
+              <option value="qsv" disabled={!hwAccel?.qsv_available}>QSV (Intel)</option>
+              <option value="vaapi" disabled={!hwAccel?.vaapi_available}>VAAPI</option>
+              <option value="nvenc" disabled={!hwAccel?.nvenc_available}>NVENC (NVIDIA)</option>
+            </select>
+          </div>
+          {#if hwAccel?.render_devices?.length}
+            <div class="flex flex-wrap gap-1 mt-1">
+              {#if hwAccel.qsv_available}
+                <span class="badge badge-xs badge-success">QSV</span>
+              {/if}
+              {#if hwAccel.vaapi_available}
+                <span class="badge badge-xs badge-success">VAAPI</span>
+              {/if}
+              {#if hwAccel.nvenc_available}
+                <span class="badge badge-xs badge-success">NVENC</span>
+              {/if}
+              {#if !hwAccel.qsv_available && !hwAccel.vaapi_available && !hwAccel.nvenc_available}
+                <span class="badge badge-xs badge-warning">No HW encoders available</span>
+              {/if}
+            </div>
+            <details class="border-t border-base-content/10 pt-2 mt-2">
+              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Details</summary>
+              <div class="mt-2 space-y-1 text-xs text-base-content/50">
+                <div><span class="font-medium">Devices:</span> {hwAccel.render_devices.join(', ')}</div>
+                <div><span class="font-medium">HEVC encoders:</span> {hwAccel.hevc_encoders.join(', ') || 'none'}</div>
+                <div><span class="font-medium">AV1 encoders:</span> {hwAccel.av1_encoders.join(', ') || 'none'}</div>
+              </div>
+            </details>
+          {/if}
         </div>
       </div>
     </div>
