@@ -36,14 +36,12 @@ RUN set -eux; \
     sed -i 's/Components: main/Components: main non-free non-free-firmware/' \
         /etc/apt/sources.list.d/debian.sources; \
     apt-get update; \
+    # gosu: entrypoint user switching
+    # ffmpeg: transcoding with QSV/VAAPI/NVENC encoders
+    # intel-media-va-driver-non-free: Intel iGPU VAAPI + QSV encode (HEVC/AV1)
+    # libvpl2 + libmfx-gen1.2: Intel oneVPL runtime for QSV
     apt-get install -y --no-install-recommends \
-        gosu \
-        # FFmpeg with QSV (libvpl), VAAPI, and NVENC encoders
-        ffmpeg \
-        # Intel VAAPI + QSV encoding (non-free enables HEVC/AV1 encode)
-        intel-media-va-driver-non-free \
-        libvpl2 libmfx-gen1.2 \
-    ; \
+        gosu ffmpeg intel-media-va-driver-non-free libvpl2 libmfx-gen1.2; \
     # ── Trim ~192 MB of Mesa/LLVM deps that are dlopen'd, never linked ──
     # SDL→GBM→Mesa→gallium→LLVM→z3 chain: only for OpenGL display output.
     # Verified NOT in ldd chain of ffmpeg/ffprobe.
