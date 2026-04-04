@@ -16,6 +16,36 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+
+def get_available_cpus() -> int:
+    """Detect available CPUs, respecting Docker/cgroup limits.
+
+    Checks cgroup v2 then v1 CPU quotas before falling back to os.cpu_count().
+    When Docker 'cpus: 16' is set, os.cpu_count() still reports host CPUs,
+    but the cgroup quota correctly reflects the container limit.
+    """
+    # cgroup v2: /sys/fs/cgroup/cpu.max contains "quota period" (e.g. "1600000 100000" = 16 CPUs)
+    try:
+        with open("/sys/fs/cgroup/cpu.max") as f:
+            parts = f.read().strip().split()
+            if parts[0] != "max":
+                return max(1, int(int(parts[0]) / int(parts[1])))
+    except (OSError, ValueError, IndexError):
+        pass
+
+    # cgroup v1: separate quota and period files
+    try:
+        with open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") as f:
+            quota = int(f.read().strip())
+        if quota > 0:
+            with open("/sys/fs/cgroup/cpu/cpu.cfs_period_us") as f:
+                period = int(f.read().strip())
+            return max(1, int(quota / period))
+    except (OSError, ValueError):
+        pass
+
+    return os.cpu_count() or 4
+
 # Default configuration file locations (in order of priority)
 DEFAULT_CONFIG_PATHS = [
     Path("/etc/remuxcode/config.yaml"),
@@ -162,8 +192,7 @@ class Config:
         """Resolve ffmpeg_threads: 0 → ~80% of available CPUs, else the explicit value."""
         if self.ffmpeg_threads > 0:
             return self.ffmpeg_threads
-        cpu_count = os.cpu_count() or 4
-        return max(1, int(cpu_count * 0.8))
+        return max(1, int(get_available_cpus() * 0.8))
 
     def _find_config_path(self, provided_path: str | None) -> Path | None:
         """Find configuration file from provided path or defaults."""
