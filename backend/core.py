@@ -529,16 +529,28 @@ def translate_path(container_path: str) -> str:
 
 
 def get_volume_root(file_path: str) -> str:
-    """Get volume root for temp directory."""
+    """Return the directory to create temp files in.
+
+    By default this is the **parent directory** of *file_path* so the temp
+    dir lives on the same underlying device / mergerfs branch as the source
+    file.  This avoids cross-device copies that trigger mergerfs create-
+    policy routing (which can land files on the wrong branch, e.g. NVMe
+    instead of HDD).
+
+    Set the ``TEMP_DIR`` env-var to override (e.g. to a fast NVMe path).
+    """
     temp_dir_override = os.getenv("TEMP_DIR", "").strip()
     if temp_dir_override:
         return temp_dir_override
+    parent = str(Path(file_path).parent)
+    if parent and os.access(parent, os.W_OK):
+        return parent
+    # Fallback: volume root, then system temp
     for _, host_prefix in PATH_MAPPINGS:
         if file_path.startswith(host_prefix):
             if os.access(host_prefix, os.W_OK):
                 return host_prefix
-            logger.warning("Volume root %r is not writable, falling back to temp dir", host_prefix)
-            return tempfile.gettempdir()
+            break
     return tempfile.gettempdir()
 
 
@@ -1119,7 +1131,8 @@ def cleanup_temp_dirs() -> None:
         if not Path(volume).exists():
             continue
         for pattern in patterns:
-            for path in Path(volume).glob(pattern):
+            # Search recursively — temp dirs may be next to source files
+            for path in Path(volume).rglob(pattern):
                 try:
                     if path.is_dir():
                         shutil.rmtree(path)
