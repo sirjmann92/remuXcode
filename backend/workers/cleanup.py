@@ -142,6 +142,7 @@ class StreamCleanup:
             progress_callback: Optional callback receiving progress 0-100.
             is_anime: Whether the content is anime (affects audio language keep logic).
             cancel_event: Event to signal cancellation (kills ffmpeg).
+            detail_callback: Optional callback receiving status detail strings.
 
         Returns:
             CleanupResult with details of streams removed
