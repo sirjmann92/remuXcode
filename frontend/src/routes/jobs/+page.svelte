@@ -2,7 +2,7 @@
 import { page } from '$app/stores';
 import { cancelAllJobs, cancelAllPending, deleteJob, getJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
-import type { Job, JobsCounts, JobStatus } from '$lib/types';
+import type { Job, JobStatus, JobsCounts } from '$lib/types';
 
 let jobs: Job[] = $state([]);
 let initialLoad = $state(true);
@@ -93,9 +93,12 @@ $effect(() => {
 
   // Debounce search, immediate for filter changes
   if (searchDebounce) clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => {
-    fetchJobs(true);
-  }, q ? 250 : 0);
+  searchDebounce = setTimeout(
+    () => {
+      fetchJobs(true);
+    },
+    q ? 250 : 0,
+  );
 
   // Set up polling interval
   const id = setInterval(() => {
