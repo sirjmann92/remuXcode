@@ -1,6 +1,8 @@
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 export type JobType = 'audio' | 'video' | 'cleanup' | 'full';
 
+export type JobPhase = 'audio' | 'video' | 'cleanup';
+
 export interface Job {
   id: string;
   job_type: JobType;
@@ -13,6 +15,10 @@ export interface Job {
   result: JobResult | null;
   error: string | null;
   source: string;
+  current_phase: JobPhase | null;
+  status_detail: string | null;
+  completed_phases: JobPhase[] | null;
+  planned_phases: JobPhase[] | null;
 }
 
 export interface JobResult {

@@ -105,6 +105,10 @@ class ConversionJob:
     source: str = "webhook"
     cancel_event: threading.Event | None = None
     last_progress_at: float | None = None
+    current_phase: str | None = None
+    status_detail: str | None = None
+    completed_phases: list[str] | None = None
+    planned_phases: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for API responses."""
@@ -120,6 +124,10 @@ class ConversionJob:
             "result": self.result,
             "error": self.error,
             "source": self.source,
+            "current_phase": self.current_phase,
+            "status_detail": self.status_detail,
+            "completed_phases": self.completed_phases,
+            "planned_phases": self.planned_phases,
         }
 
 
@@ -437,6 +445,10 @@ class JobQueue:
             job.progress = pct
             job.last_progress_at = time.time()
 
+        def _update_detail(phase: str, detail: str) -> None:
+            job.current_phase = phase
+            job.status_detail = detail
+
         try:
             result = process_file(
                 job.file_path,
@@ -444,6 +456,8 @@ class JobQueue:
                 job.id,
                 progress_callback=_update_progress,
                 cancel_event=job.cancel_event,
+                detail_callback=_update_detail,
+                job=job,
             )
             if job.status == JobStatus.CANCELLED:
                 logger.info("Job %s was cancelled during processing", job_id)
@@ -543,6 +557,8 @@ def process_file(
     job_id: str | None = None,
     progress_callback: Callable[[float], None] | None = None,
     cancel_event: threading.Event | None = None,
+    detail_callback: Callable[[str, str], None] | None = None,
+    job: ConversionJob | None = None,
 ) -> dict[str, Any]:
     """Process a single file with the specified conversion type."""
     results: dict[str, Any] = {"file": file_path, "audio": None, "video": None, "cleanup": None}
@@ -572,6 +588,18 @@ def process_file(
         and stream_cleanup.should_cleanup(file_path, is_anime=file_is_anime)
     )
 
+    # Build planned phases list for the UI
+    planned: list[str] = []
+    if will_audio:
+        planned.append("audio")
+    if will_video:
+        planned.append("video")
+    if will_cleanup:
+        planned.append("cleanup")
+    if job:
+        job.planned_phases = planned
+        job.completed_phases = []
+
     active_phases = [p for p in (will_audio, will_video, will_cleanup) if p]
     n_phases = len(active_phases) or 1
     phase_size = 100.0 / n_phases
@@ -588,7 +616,18 @@ def process_file(
 
         return cb
 
+    def _set_phase(phase: str, detail: str) -> None:
+        if detail_callback:
+            detail_callback(phase, detail)
+
+    def _complete_phase(phase: str) -> None:
+        if job and job.completed_phases is not None:
+            job.completed_phases.append(phase)
+        if detail_callback:
+            detail_callback(phase, "")
+
     if will_audio:
+        _set_phase("audio", "Analyzing audio streams...")
         logger.info("Converting audio: %s", Path(file_path).name)
         assert audio_converter is not None
         audio_result = audio_converter.convert(
@@ -596,7 +635,9 @@ def process_file(
             job_id=job_id,
             progress_callback=make_phase_cb(phase_idx),
             cancel_event=cancel_event,
+            detail_callback=lambda detail: _set_phase("audio", detail),
         )
+        _complete_phase("audio")
         phase_idx += 1
         results["audio"] = {
             "success": audio_result.success,
@@ -608,6 +649,7 @@ def process_file(
             logger.error("Audio conversion failed: %s", audio_result.error)
 
     if will_video:
+        _set_phase("video", "Analyzing video streams...")
         logger.info("Converting video: %s", Path(file_path).name)
         assert video_converter is not None
         video_result = video_converter.convert(
@@ -615,7 +657,9 @@ def process_file(
             job_id=job_id,
             progress_callback=make_phase_cb(phase_idx),
             cancel_event=cancel_event,
+            detail_callback=lambda detail: _set_phase("video", detail),
         )
+        _complete_phase("video")
         phase_idx += 1
         results["video"] = {
             "success": video_result.success,
@@ -629,6 +673,7 @@ def process_file(
             logger.error("Video conversion failed: %s", video_result.error)
 
     if will_cleanup:
+        _set_phase("cleanup", "Analyzing streams...")
         logger.info("Cleaning streams: %s", Path(file_path).name)
         assert stream_cleanup is not None
         cleanup_result = stream_cleanup.cleanup(
@@ -637,7 +682,9 @@ def process_file(
             progress_callback=make_phase_cb(phase_idx),
             is_anime=file_is_anime,
             cancel_event=cancel_event,
+            detail_callback=lambda detail: _set_phase("cleanup", detail),
         )
+        _complete_phase("cleanup")
         results["cleanup"] = {
             "success": cleanup_result.success,
             "audio_removed": cleanup_result.audio_removed,
