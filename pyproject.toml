@@ -54,7 +54,7 @@ packages = ["backend", "backend.utils", "backend.workers"]
 # ---------------------------------------------------------------------------
 [tool.codespell]
 skip = ".git,node_modules,frontend/build,*.svg,**/package-lock.json"
-ignore-words-list = "tha,vie,wit,ans,sade,nd,wel"
+ignore-words-list = "tha,vie,wit,ans,sade,nd,wel,renderD"
 quiet-level = 3
 
 # ---------------------------------------------------------------------------
