@@ -4,7 +4,6 @@ import type {
   AnalyzeResult,
   ConfigSummary,
   HealthStatus,
-  Job,
   JobsResponse,
   MoviesResponse,
   ScanProgress,
