@@ -130,24 +130,25 @@ async function handleCancel() {
 
     <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
 
+    {#if job.planned_phases?.length && (job.status === 'running' || job.status === 'completed' || job.status === 'failed')}
+      <div class="flex gap-1.5 flex-wrap items-center">
+        {#each job.planned_phases as phase}
+          {@const isDone = job.completed_phases?.includes(phase) || job.status !== 'running'}
+          {@const isCurrent = job.status === 'running' && job.current_phase === phase && !job.completed_phases?.includes(phase)}
+          <span class="badge {phaseColors[phase]} badge-xs gap-0.5 {isCurrent ? '' : isDone ? 'opacity-80' : 'opacity-30'}">
+            {#if isDone}
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+            {:else if isCurrent}
+              <span class="loading loading-spinner" style="width: 0.625rem; height: 0.625rem;"></span>
+            {/if}
+            {phaseLabels[phase]}
+          </span>
+        {/each}
+      </div>
+    {/if}
+
     {#if job.status === 'running'}
       <div class="space-y-1.5">
-        {#if job.planned_phases?.length}
-          <div class="flex gap-1.5 flex-wrap items-center">
-            {#each job.planned_phases as phase}
-              {@const isDone = job.completed_phases?.includes(phase)}
-              {@const isCurrent = job.current_phase === phase && !isDone}
-              <span class="badge {phaseColors[phase]} badge-xs gap-0.5 {isCurrent ? '' : isDone ? 'opacity-80' : 'opacity-30'}">
-                {#if isDone}
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                {:else if isCurrent}
-                  <span class="loading loading-spinner" style="width: 0.625rem; height: 0.625rem;"></span>
-                {/if}
-                {phaseLabels[phase]}
-              </span>
-            {/each}
-          </div>
-        {/if}
         {#if job.status_detail && detailed}
           <p class="text-xs text-base-content/50 italic truncate" title={job.status_detail}>{job.status_detail}</p>
         {/if}
@@ -248,8 +249,8 @@ async function handleCancel() {
             </div>
           {/if}
         </div>
-      {:else}
-        <!-- Compact badges for Dashboard -->
+      {:else if !job.planned_phases?.length}
+        <!-- Fallback compact badges for legacy jobs without planned_phases -->
         <div class="flex gap-1.5 flex-wrap">
           {#if job.result.audio?.success}
             <span class="badge badge-warning badge-xs gap-0.5">

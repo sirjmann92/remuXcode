@@ -50,6 +50,7 @@ async def get_config_summary() -> dict[str, Any]:
             "level": cfg.video.level,
             "profile": cfg.video.profile,
             "pix_fmt": cfg.video.pix_fmt,
+            "hw_accel": cfg.video.hw_accel,
         },
         "audio": {
             "enabled": cfg.audio.enabled,
@@ -101,11 +102,14 @@ async def get_config_summary() -> dict[str, Any]:
 
 @router.get("/system/info")
 async def get_system_info() -> dict[str, Any]:
-    """Return host system info for UI controls (CPU count, etc.)."""
+    """Return host system info for UI controls (CPU count, HW accel capabilities)."""
     from backend.utils.config import get_available_cpus
+    from backend.utils.hwaccel import detect_hw_capabilities
 
+    caps = detect_hw_capabilities()
     return {
         "cpu_count": get_available_cpus(),
+        "hw_accel": caps.to_dict(),
     }
 
 
@@ -186,6 +190,7 @@ class VideoUpdate(BaseModel):
     level: str | None = None
     profile: str | None = None
     pix_fmt: str | None = None
+    hw_accel: Literal["none", "auto", "qsv", "vaapi", "nvenc"] | None = None
 
 
 class CleanupUpdate(BaseModel):
@@ -263,6 +268,9 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
     if body.video:
         for field, val in body.video.model_dump(exclude_none=True).items():
             setattr(cfg.video, field, val)
+        # Propagate hw_accel to running converter
+        if body.video.hw_accel is not None and core.video_converter:
+            core.video_converter.hw_accel = cfg.video.hw_accel
 
     if body.sonarr:
         for field, val in body.sonarr.model_dump(exclude_none=True).items():
