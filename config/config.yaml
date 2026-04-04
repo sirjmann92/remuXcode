@@ -83,7 +83,7 @@ processing:
   retry_enabled: true
   max_retries: 3
   retry_delay: 60
-  ffmpeg_threads: 12
+  ffmpeg_threads: 16
 webhook:
   port: 8765
   bind: 0.0.0.0

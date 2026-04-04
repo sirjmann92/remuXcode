@@ -152,6 +152,7 @@ class VideoConverter:
             job_id: Unique job identifier (used for temp directory naming)
             progress_callback: Optional callback receiving progress 0-100.
             cancel_event: Event to signal cancellation (kills ffmpeg).
+            detail_callback: Optional callback receiving status detail strings.
 
         Returns:
             VideoConversionResult with conversion details

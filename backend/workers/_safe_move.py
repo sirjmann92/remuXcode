@@ -19,9 +19,8 @@ irreversibly destroyed.
 from __future__ import annotations
 
 import logging
-import os
-import shutil
 from pathlib import Path
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +83,7 @@ def safe_replace(
         if backup_path.exists():
             backup_path.unlink()
 
-        os.rename(str(destination), str(backup_path))
+        destination.rename(backup_path)
         has_backup = True
         logger.debug("Backed up original: %s → %s", destination.name, backup_path.name)
 
@@ -107,14 +106,14 @@ def safe_replace(
     # ------------------------------------------------------------------
     try:
         landed_size = destination.stat().st_size
-    except OSError:
+    except OSError as exc:
         logger.error("Cannot stat destination after move: %s", destination)
         if has_backup:
             _restore_backup(backup_path, destination)
             raise SafeMoveError(
                 f"Destination missing after move — original file preserved: {destination.name}"
-            )
-        raise SafeMoveError(f"Destination missing after move: {destination}")
+            ) from exc
+        raise SafeMoveError(f"Destination missing after move: {destination}") from exc
 
     if landed_size != expected_size:
         logger.error(
@@ -151,7 +150,7 @@ def _restore_backup(backup_path: Path, destination: Path) -> None:
         # Remove the mangled destination if it exists
         if destination.exists():
             destination.unlink()
-        os.rename(str(backup_path), str(destination))
+        backup_path.rename(destination)
         logger.info("Restored original from backup: %s", destination)
     except OSError as exc:
         logger.critical(
