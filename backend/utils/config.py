@@ -46,6 +46,7 @@ def get_available_cpus() -> int:
 
     return os.cpu_count() or 4
 
+
 # Default configuration file locations (in order of priority)
 DEFAULT_CONFIG_PATHS = [
     Path("/etc/remuxcode/config.yaml"),
