@@ -4,6 +4,7 @@ from collections.abc import Callable
 import contextlib
 import logging
 import os
+from pathlib import Path
 import select
 import subprocess
 import tempfile
@@ -48,8 +49,8 @@ def run_ffmpeg_with_progress(
         )
 
     # Create a temporary FIFO for progress output.
-    fifo_dir = tempfile.mkdtemp(prefix=".remuxcode-progress-")
-    fifo_path = os.path.join(fifo_dir, "progress.fifo")
+    fifo_dir = Path(tempfile.mkdtemp(prefix=".remuxcode-progress-"))
+    fifo_path = fifo_dir / "progress.fifo"
     os.mkfifo(fifo_path)
 
     # Inject -progress <fifo> before the last argument (the output path)
@@ -149,9 +150,9 @@ def run_ffmpeg_with_progress(
         os.close(fifo_fd)
         # Clean up the FIFO
         with contextlib.suppress(OSError):
-            os.unlink(fifo_path)
+            fifo_path.unlink()
         with contextlib.suppress(OSError):
-            os.rmdir(fifo_dir)
+            fifo_dir.rmdir()
 
     if cancelled.is_set():
         proc.kill()
