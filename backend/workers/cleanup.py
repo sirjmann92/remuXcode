@@ -279,7 +279,9 @@ class StreamCleanup:
             if audio_to_remove > 0:
                 parts.append(f"Removing {audio_to_remove} audio (keeping {len(audio_keep)})")
             if subs_to_remove > 0:
-                parts.append(f"Removing {subs_to_remove} sub{'s' if subs_to_remove != 1 else ''} (keeping {len(subtitle_keep)})")
+                parts.append(
+                    f"Removing {subs_to_remove} sub{'s' if subs_to_remove != 1 else ''} (keeping {len(subtitle_keep)})"
+                )
             if needs_reorder:
                 parts.append("Reordering audio")
             if needs_tagging:
