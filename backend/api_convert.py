@@ -29,7 +29,7 @@ async def convert_file(data: dict[str, Any]) -> dict[str, Any]:
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}") from None
 
-    job = create_job(file_path, job_type, source="api")
+    job = create_job(file_path, job_type, source="api", poster_url=data.get("poster_url"))
     return {
         "message": "Job queued",
         "job_id": job.id,

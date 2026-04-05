@@ -58,6 +58,22 @@ const phaseLabels: Record<JobPhase, string> = {
   cleanup: 'Cleanup',
 };
 
+/** Compute overall size reduction across all completed phases. */
+const overallSize = $derived.by(() => {
+  const r = job.result;
+  if (!r) return null;
+  const phases = [r.audio, r.video, r.cleanup].filter(
+    (p): p is NonNullable<typeof p> => p != null && p.success === true,
+  );
+  if (phases.length < 2) return null;
+  const first = phases.find((p) => p.original_size != null && p.original_size > 0);
+  const last = [...phases].reverse().find((p) => p.new_size != null && p.new_size > 0);
+  if (!first?.original_size || !last?.new_size) return null;
+  if (first.original_size === last.new_size) return null;
+  const pct = ((last.new_size - first.original_size) / first.original_size) * 100;
+  return `${formatSize(first.original_size)} → ${formatSize(last.new_size)} (${pct > 0 ? '+' : ''}${pct.toFixed(0)}%)`;
+});
+
 async function handleDelete() {
   deleting = true;
   try {
@@ -84,7 +100,18 @@ async function handleCancel() {
 </script>
 
 <div class="card-glass rounded-box">
-  <div class="p-4 space-y-2">
+  <div class="flex">
+    {#if job.poster_url}
+      <div class="shrink-0 {job.status === 'running' ? 'w-16' : 'w-12'} overflow-hidden rounded-l-box">
+        <img
+          src={job.poster_url}
+          alt=""
+          class="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
+    {/if}
+  <div class="flex-1 min-w-0 p-4 space-y-2">
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
         <StatusBadge status={job.status} />
@@ -408,5 +435,13 @@ async function handleCancel() {
         <p class="text-xs text-error/80">{job.error}</p>
       {/if}
     {/if}
+
+    {#if overallSize}
+      <div class="flex items-center gap-1.5 pt-1 border-t border-base-content/5">
+        <span class="text-xs font-medium text-base-content/50">Total</span>
+        <span class="text-xs text-base-content/40">{overallSize}</span>
+      </div>
+    {/if}
+  </div>
   </div>
 </div>

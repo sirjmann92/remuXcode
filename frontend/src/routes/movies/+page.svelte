@@ -241,7 +241,7 @@ async function reloadMovies() {
 async function queueMovie(movie: BrowseMovie) {
   queueing[movie.id] = true;
   try {
-    await convertFile(movie.path, 'full');
+    await convertFile(movie.path, 'full', movie.poster);
   } catch {
     // ignore
   } finally {
@@ -259,7 +259,7 @@ async function queueAllFiltered() {
   queueingAll = true;
   try {
     for (const m of items) {
-      await convertFile(m.path, 'full');
+      await convertFile(m.path, 'full', m.poster);
     }
   } catch {
     // ignore
@@ -289,7 +289,7 @@ async function queueSelected() {
   queueingSelected = true;
   try {
     for (const m of items) {
-      await convertFile(m.path, 'full');
+      await convertFile(m.path, 'full', m.poster);
     }
   } catch {
     // ignore

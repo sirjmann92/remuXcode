@@ -55,11 +55,22 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
         )
         return {"message": "No files to process"}
 
+    # Extract poster URL from payload for job display
+    poster_url: str | None = None
+    if "movie" in data:
+        movie_id = data.get("movie", {}).get("id")
+        if movie_id:
+            poster_url = f"/api/poster/radarr/{movie_id}"
+    elif "series" in data:
+        series_id = data.get("series", {}).get("id")
+        if series_id:
+            poster_url = f"/api/poster/sonarr/{series_id}"
+
     # Queue jobs
     job_ids = []
     for file_path in files:
         if Path(file_path).exists():
-            job = create_job(file_path, JobType.FULL, source="webhook")
+            job = create_job(file_path, JobType.FULL, source="webhook", poster_url=poster_url)
             job_ids.append(job.id)
             logger.info("Queued job %s for %s", job.id, Path(file_path).name)
         else:
