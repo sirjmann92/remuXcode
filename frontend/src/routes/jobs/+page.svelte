@@ -229,7 +229,7 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
     <div class="flex flex-wrap items-end gap-3 px-1">
       <label class="form-control w-auto">
         <span class="label-text text-xs text-base-content/40 pb-0.5">Worker</span>
-        <select class="select select-xs select-bordered font-mono" bind:value={jobTypeFilter}>
+        <select class="select select-xs select-bordered font-mono w-28" bind:value={jobTypeFilter}>
           <option value="all">All</option>
           <option value="video">Video</option>
           <option value="audio">Audio</option>
@@ -238,7 +238,7 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
       </label>
       <label class="form-control w-auto">
         <span class="label-text text-xs text-base-content/40 pb-0.5">Media</span>
-        <select class="select select-xs select-bordered font-mono" bind:value={mediaTypeFilter}>
+        <select class="select select-xs select-bordered font-mono w-28" bind:value={mediaTypeFilter}>
           <option value="all">All</option>
           <option value="movie">Movies</option>
           <option value="episode">Episodes</option>
