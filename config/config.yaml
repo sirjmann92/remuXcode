@@ -25,6 +25,14 @@ video:
   vbv_maxrate: 5000
   vbv_bufsize: 10000
   hw_accel: qsv
+  qsv_anime_quality: 21
+  qsv_live_action_quality: 24
+  qsv_preset: medium
+  vaapi_anime_quality: 21
+  vaapi_live_action_quality: 24
+  nvenc_anime_quality: 21
+  nvenc_live_action_quality: 24
+  nvenc_preset: p5
 audio:
   enabled: true
   anime_only: false

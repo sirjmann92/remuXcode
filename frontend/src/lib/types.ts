@@ -117,6 +117,14 @@ export interface ConfigSummary {
     profile: string;
     pix_fmt: string;
     hw_accel: string;
+    qsv_anime_quality: number;
+    qsv_live_action_quality: number;
+    qsv_preset: string;
+    vaapi_anime_quality: number;
+    vaapi_live_action_quality: number;
+    nvenc_anime_quality: number;
+    nvenc_live_action_quality: number;
+    nvenc_preset: string;
   };
   audio: {
     enabled: boolean;
