@@ -50,11 +50,14 @@ RUN set -eux; \
     rm -f "$LIBDIR"/libLLVM*.so* \
           "$LIBDIR"/libgallium*.so* \
           "$LIBDIR"/libz3*.so*; \
-    groupadd -g 1000 appgroup; \
-    useradd -u 1000 -g appgroup -s /bin/sh -M appuser; \
-    pip install --no-cache-dir -r /app/requirements.txt; \
     apt-get clean; \
-    rm -rf /var/lib/apt/lists/* /root/.cache /tmp/*
+    rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 1000 appgroup \
+    && useradd -u 1000 -g appgroup -s /bin/sh -M appuser
+
+RUN pip install --no-cache-dir -r /app/requirements.txt \
+    && rm -rf /root/.cache /tmp/*
 
 COPY backend/ /app/backend/
 COPY --from=frontend-build /frontend/build /app/frontend/build
