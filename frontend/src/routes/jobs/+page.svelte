@@ -35,8 +35,24 @@ let filter: JobStatus | 'all' = $state(
   validFilters.includes(urlFilter as JobStatus | 'all') ? (urlFilter as JobStatus | 'all') : 'all',
 );
 let search: string = $state('');
+let jobTypeFilter: string = $state('all');
+let mediaTypeFilter: string = $state('all');
+let dateFrom: string = $state('');
+let dateTo: string = $state('');
+let showFilters = $state(false);
 
 let loadError = $state(false);
+
+const hasActiveFilters = $derived(
+  jobTypeFilter !== 'all' || mediaTypeFilter !== 'all' || dateFrom !== '' || dateTo !== '',
+);
+
+function clearFilters() {
+  jobTypeFilter = 'all';
+  mediaTypeFilter = 'all';
+  dateFrom = '';
+  dateTo = '';
+}
 
 async function fetchJobs(reset = true) {
   const rid = ++requestId;
@@ -52,6 +68,10 @@ async function fetchJobs(reset = true) {
       offset: reset ? 0 : jobs.length,
       status: filter,
       search: search.trim() || undefined,
+      job_type: jobTypeFilter !== 'all' ? jobTypeFilter : undefined,
+      media_type: mediaTypeFilter !== 'all' ? mediaTypeFilter : undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
     });
 
     if (rid !== requestId) return;
@@ -87,10 +107,10 @@ $effect(() => {
   // Track reactive deps
   const _filter = filter;
   const q = search;
-
-  // Re-enable auto-refresh when filter/search changes
-  autoRefreshEnabled = true;
-
+  const _jt = jobTypeFilter;
+  const _mt = mediaTypeFilter;
+  const _df = dateFrom;
+  const _dt = dateTo;
   // Debounce search, immediate for filter changes
   if (searchDebounce) clearTimeout(searchDebounce);
   searchDebounce = setTimeout(
@@ -189,7 +209,55 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
         bind:value={search}
       />
     </div>
+    <button
+      class="btn btn-sm btn-ghost gap-1 {showFilters || hasActiveFilters ? 'text-primary' : 'text-base-content/40'}"
+      onclick={() => (showFilters = !showFilters)}
+      title="Toggle filters"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+      </svg>
+      Filters
+      {#if hasActiveFilters}
+        <span class="badge badge-xs badge-primary"></span>
+      {/if}
+    </button>
   </div>
+
+  <!-- Advanced Filters -->
+  {#if showFilters}
+    <div class="flex flex-wrap items-end gap-3 px-1">
+      <label class="form-control w-auto">
+        <span class="label-text text-xs text-base-content/40 pb-0.5">Worker</span>
+        <select class="select select-xs select-bordered font-mono" bind:value={jobTypeFilter}>
+          <option value="all">All</option>
+          <option value="full">Full</option>
+          <option value="video">Video</option>
+          <option value="audio">Audio</option>
+          <option value="cleanup">Cleanup</option>
+        </select>
+      </label>
+      <label class="form-control w-auto">
+        <span class="label-text text-xs text-base-content/40 pb-0.5">Media</span>
+        <select class="select select-xs select-bordered font-mono" bind:value={mediaTypeFilter}>
+          <option value="all">All</option>
+          <option value="movie">Movies</option>
+          <option value="episode">Episodes</option>
+        </select>
+      </label>
+      <label class="form-control w-auto">
+        <span class="label-text text-xs text-base-content/40 pb-0.5">From</span>
+        <input type="date" class="input input-xs input-bordered font-mono w-36" bind:value={dateFrom} />
+      </label>
+      <label class="form-control w-auto">
+        <span class="label-text text-xs text-base-content/40 pb-0.5">To</span>
+        <input type="date" class="input input-xs input-bordered font-mono w-36" bind:value={dateTo} />
+      </label>
+      {#if hasActiveFilters}
+        <button class="btn btn-xs btn-ghost text-base-content/40" onclick={clearFilters}>Clear</button>
+      {/if}
+    </div>
+  {/if}
 
   <div class="flex items-center justify-between">
     <div class="text-sm text-base-content/50">

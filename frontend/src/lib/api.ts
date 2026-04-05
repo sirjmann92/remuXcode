@@ -49,6 +49,10 @@ export async function getJobs(options?: {
   offset?: number;
   status?: 'all' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   search?: string;
+  job_type?: string;
+  media_type?: string;
+  date_from?: string;
+  date_to?: string;
 }): Promise<JobsResponse> {
   if (!options) return request('/api/jobs');
 
@@ -57,6 +61,11 @@ export async function getJobs(options?: {
   if (options.offset != null) params.set('offset', String(options.offset));
   if (options.status && options.status !== 'all') params.set('status', options.status);
   if (options.search) params.set('search', options.search);
+  if (options.job_type && options.job_type !== 'all') params.set('job_type', options.job_type);
+  if (options.media_type && options.media_type !== 'all')
+    params.set('media_type', options.media_type);
+  if (options.date_from) params.set('date_from', options.date_from);
+  if (options.date_to) params.set('date_to', options.date_to);
 
   const qs = params.toString();
   return request(`/api/jobs${qs ? `?${qs}` : ''}`);

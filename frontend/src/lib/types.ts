@@ -3,6 +3,8 @@ export type JobType = 'audio' | 'video' | 'cleanup' | 'full';
 
 export type JobPhase = 'audio' | 'video' | 'cleanup';
 
+export type MediaType = 'movie' | 'episode';
+
 export interface Job {
   id: string;
   job_type: JobType;
@@ -20,6 +22,7 @@ export interface Job {
   completed_phases: JobPhase[] | null;
   planned_phases: JobPhase[] | null;
   poster_url: string | null;
+  media_type: MediaType | null;
 }
 
 export interface JobsCounts {
