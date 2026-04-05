@@ -25,6 +25,7 @@ COPY requirements.txt /app/requirements.txt
 ARG APP_VERSION=dev
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PUID=1000 \
     PGID=1000 \
     APP_VERSION=${APP_VERSION} \
@@ -45,9 +46,10 @@ RUN set -eux; \
     # ── Trim ~192 MB of Mesa/LLVM deps that are dlopen'd, never linked ──
     # SDL→GBM→Mesa→gallium→LLVM→z3 chain: only for OpenGL display output.
     # Verified NOT in ldd chain of ffmpeg/ffprobe.
-    rm -f /usr/lib/x86_64-linux-gnu/libLLVM*.so* \
-          /usr/lib/x86_64-linux-gnu/libgallium*.so* \
-          /usr/lib/x86_64-linux-gnu/libz3*.so*; \
+    LIBDIR="/usr/lib/$(dpkg --print-architecture | sed 's/amd64/x86_64-linux-gnu/;s/arm64/aarch64-linux-gnu/')"; \
+    rm -f "$LIBDIR"/libLLVM*.so* \
+          "$LIBDIR"/libgallium*.so* \
+          "$LIBDIR"/libz3*.so*; \
     groupadd -g 1000 appgroup; \
     useradd -u 1000 -g appgroup -s /bin/sh -M appuser; \
     pip install --no-cache-dir -r /app/requirements.txt; \
