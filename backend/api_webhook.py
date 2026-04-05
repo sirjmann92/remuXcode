@@ -66,11 +66,20 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
         if series_id:
             poster_url = f"/api/poster/sonarr/{series_id}"
 
+    # Determine media type from payload shape
+    media_type = "movie" if "movie" in data else "episode" if "episodes" in data else None
+
     # Queue jobs
     job_ids = []
     for file_path in files:
         if Path(file_path).exists():
-            job = create_job(file_path, JobType.FULL, source="webhook", poster_url=poster_url)
+            job = create_job(
+                file_path,
+                JobType.FULL,
+                source="webhook",
+                poster_url=poster_url,
+                media_type=media_type,
+            )
             job_ids.append(job.id)
             logger.info("Queued job %s for %s", job.id, Path(file_path).name)
         else:

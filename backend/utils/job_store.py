@@ -77,6 +77,7 @@ class JobStore:
                 "source": "TEXT DEFAULT 'webhook'",
                 "result_json": "TEXT",
                 "poster_url": "TEXT",
+                "media_type": "TEXT",
             }
             for col, typedef in migrations.items():
                 if col not in existing:
@@ -113,7 +114,8 @@ class JobStore:
                             job_type = COALESCE(?, job_type),
                             source = COALESCE(?, source),
                             result_json = COALESCE(?, result_json),
-                            poster_url = COALESCE(?, poster_url)
+                            poster_url = COALESCE(?, poster_url),
+                            media_type = COALESCE(?, media_type)
                         WHERE id = ?
                     """,
                         (
@@ -130,6 +132,7 @@ class JobStore:
                             job_data.get("source"),
                             result_json,
                             job_data.get("poster_url"),
+                            job_data.get("media_type"),
                             job_data["id"],
                         ),
                     )
@@ -140,8 +143,9 @@ class JobStore:
                             id, file_path, status, progress, error,
                             created_at, updated_at, started_at, completed_at,
                             video_converted, audio_converted, streams_cleaned,
-                            job_type, source, result_json, poster_url
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            job_type, source, result_json, poster_url,
+                            media_type
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             job_data["id"],
@@ -160,6 +164,7 @@ class JobStore:
                             job_data.get("source", "webhook"),
                             result_json,
                             job_data.get("poster_url"),
+                            job_data.get("media_type"),
                         ),
                     )
 

@@ -1,5 +1,6 @@
 """Job management API routes."""
 
+import calendar
 import logging
 from typing import Any
 
@@ -12,12 +13,23 @@ logger = logging.getLogger("remuxcode")
 router = APIRouter(tags=["jobs"])
 
 
+def _parse_date_param(date_str: str) -> float:
+    """Parse a YYYY-MM-DD date string to a UNIX timestamp (start of day UTC)."""
+    import time
+
+    return float(calendar.timegm(time.strptime(date_str, "%Y-%m-%d")))
+
+
 @router.get("/jobs")
 async def list_jobs(
     limit: int | None = Query(default=None, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    job_type: str | None = Query(default=None),
+    media_type: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
 ) -> dict[str, Any]:
     """List jobs with optional paging, filtering, and search.
 
@@ -48,6 +60,27 @@ async def list_jobs(
     if search:
         needle = search.lower()
         filtered = [j for j in filtered if needle in j.file_path.lower()]
+
+    if job_type and job_type != "all":
+        filtered = [j for j in filtered if j.job_type.value == job_type]
+
+    if media_type and media_type != "all":
+        filtered = [j for j in filtered if j.media_type == media_type]
+
+    if date_from:
+        try:
+            from_ts = _parse_date_param(date_from)
+            filtered = [j for j in filtered if j.created_at >= from_ts]
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            # End of the specified day
+            to_ts = _parse_date_param(date_to) + 86400
+            filtered = [j for j in filtered if j.created_at < to_ts]
+        except ValueError:
+            pass
 
     status_order = {
         "running": 0,
