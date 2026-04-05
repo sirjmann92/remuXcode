@@ -346,6 +346,7 @@ $effect(() => {
 const filters: { value: string; label: string }[] = [
   { value: 'any', label: 'All' },
   { value: 'needs_conversion', label: 'Needs Work' },
+  { value: 'video', label: 'Video' },
   { value: 'audio', label: 'Audio' },
   { value: 'cleanup', label: 'Cleanup' },
   { value: 'anime', label: 'Anime' },
@@ -397,17 +398,17 @@ const sortOptions: { value: string; label: string }[] = [
           </button>
         {/each}
       </div>
-      <select class="select select-sm select-bordered" bind:value={audioFormat}>
+      <select class="select select-sm select-bordered w-36" bind:value={audioFormat}>
         {#each audioOptions as af}
           <option value={af.value}>{af.label}</option>
         {/each}
       </select>
-      <select class="select select-sm select-bordered" bind:value={videoFormat}>
+      <select class="select select-sm select-bordered w-36" bind:value={videoFormat}>
         {#each videoOptions as vf}
           <option value={vf.value}>{vf.label}</option>
         {/each}
       </select>
-      <select class="select select-sm select-bordered w-auto" bind:value={sortBy}>
+      <select class="select select-sm select-bordered w-auto ml-auto" bind:value={sortBy}>
         {#each sortOptions as s}
           <option value={s.value}>{s.label}</option>
         {/each}
