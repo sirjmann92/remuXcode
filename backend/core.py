@@ -961,7 +961,9 @@ def _poll_command(
 # ---------------------------------------------------------------------------
 
 
-def create_job(file_path: str, job_type: JobType, source: str = "api", poster_url: str | None = None) -> ConversionJob:
+def create_job(
+    file_path: str, job_type: JobType, source: str = "api", poster_url: str | None = None
+) -> ConversionJob:
     """Create and queue a new conversion job."""
     job = ConversionJob(
         id=uuid.uuid4().hex[:12],
