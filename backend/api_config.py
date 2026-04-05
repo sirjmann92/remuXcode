@@ -51,6 +51,14 @@ async def get_config_summary() -> dict[str, Any]:
             "profile": cfg.video.profile,
             "pix_fmt": cfg.video.pix_fmt,
             "hw_accel": cfg.video.hw_accel,
+            "qsv_anime_quality": cfg.video.qsv_anime_quality,
+            "qsv_live_action_quality": cfg.video.qsv_live_action_quality,
+            "qsv_preset": cfg.video.qsv_preset,
+            "vaapi_anime_quality": cfg.video.vaapi_anime_quality,
+            "vaapi_live_action_quality": cfg.video.vaapi_live_action_quality,
+            "nvenc_anime_quality": cfg.video.nvenc_anime_quality,
+            "nvenc_live_action_quality": cfg.video.nvenc_live_action_quality,
+            "nvenc_preset": cfg.video.nvenc_preset,
         },
         "audio": {
             "enabled": cfg.audio.enabled,
@@ -191,6 +199,14 @@ class VideoUpdate(BaseModel):
     profile: str | None = None
     pix_fmt: str | None = None
     hw_accel: Literal["none", "auto", "qsv", "vaapi", "nvenc"] | None = None
+    qsv_anime_quality: int | None = Field(None, ge=0, le=51)
+    qsv_live_action_quality: int | None = Field(None, ge=0, le=51)
+    qsv_preset: str | None = None
+    vaapi_anime_quality: int | None = Field(None, ge=0, le=52)
+    vaapi_live_action_quality: int | None = Field(None, ge=0, le=52)
+    nvenc_anime_quality: int | None = Field(None, ge=0, le=51)
+    nvenc_live_action_quality: int | None = Field(None, ge=0, le=51)
+    nvenc_preset: str | None = None
 
 
 class CleanupUpdate(BaseModel):
