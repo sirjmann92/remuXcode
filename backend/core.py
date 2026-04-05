@@ -109,6 +109,7 @@ class ConversionJob:
     status_detail: str | None = None
     completed_phases: list[str] | None = None
     planned_phases: list[str] | None = None
+    poster_url: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for API responses."""
@@ -128,6 +129,7 @@ class ConversionJob:
             "status_detail": self.status_detail,
             "completed_phases": self.completed_phases,
             "planned_phases": self.planned_phases,
+            "poster_url": self.poster_url,
         }
 
 
@@ -248,6 +250,7 @@ class JobQueue:
                 if job.completed_at
                 else None
             ),
+            "poster_url": job.poster_url,
         }
         if job.result:
             job_data["video_converted"] = (
@@ -362,6 +365,7 @@ class JobQueue:
             source=row.get("source", "webhook"),
             planned_phases=phases,
             completed_phases=phases,
+            poster_url=row.get("poster_url"),
         )
 
     def _watchdog_loop(self) -> None:
@@ -957,7 +961,7 @@ def _poll_command(
 # ---------------------------------------------------------------------------
 
 
-def create_job(file_path: str, job_type: JobType, source: str = "api") -> ConversionJob:
+def create_job(file_path: str, job_type: JobType, source: str = "api", poster_url: str | None = None) -> ConversionJob:
     """Create and queue a new conversion job."""
     job = ConversionJob(
         id=uuid.uuid4().hex[:12],
@@ -966,6 +970,7 @@ def create_job(file_path: str, job_type: JobType, source: str = "api") -> Conver
         status=JobStatus.PENDING,
         created_at=time.time(),
         source=source,
+        poster_url=poster_url,
     )
     if job_queue:
         job_queue.add_job(job)
