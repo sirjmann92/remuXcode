@@ -46,3 +46,14 @@ export function trackSummary(tracks: string[]): string {
     .map(([name, n]) => (n > 1 ? `${name} (${n})` : name))
     .join(', ');
 }
+
+/** Format epoch timestamp as locale short datetime. */
+export function formatTimestamp(epoch: number | null | undefined): string | null {
+  if (!epoch) return null;
+  return new Date(epoch * 1000).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

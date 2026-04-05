@@ -22,11 +22,12 @@ The application also supports manually updating and maintaining existing Sonarr/
 - � **Real-Time Progress**: Live encoding progress via FIFO-based FFmpeg monitoring with frame-based fallback for hardware encoders
 - 📦 **Size Tracking**: Before/after file sizes with percentage change shown per conversion phase
 - �💾 **SQLite Persistence**: Jobs survive restarts, resume interrupted conversions
-- 🛑 **Job Cancellation**: Cancel pending or running jobs via API
+- 🛑 **Job Controls**: Stop running jobs, clear pending queue, or delete finished jobs with confirmation — granular control from the Jobs page
 - 🖥️ **Web UI**: Built-in SvelteKit dashboard with library browsing, job management, and config
 - 🎞️ **Library Browse**: Movies & Shows pages with poster grids, filters, and processing previews
 - 🔎 **File Analysis**: Full ffprobe/MediaInfo modal — video, audio, and subtitle stream details per file
-- 📡 **Live Job Status**: Pending/running indicators on movie posters and episode rows, auto-refresh on completion
+- � **Job Timestamps**: Start and completion times displayed on every job card
+- �📡 **Live Job Status**: Pending/running indicators on movie posters and episode rows, auto-refresh on completion
 - 🔃 **Manual Library Refresh**: Force Sonarr/Radarr metadata re-read from the Movies/Shows pages
 - 🎌 **Anime Dual-Audio**: Optionally keep original-language audio on anime while still cleaning subtitles
 - 🔍 **Detection Accuracy**: Config-aware audio detection, EAC3 Atmos vs TrueHD distinction

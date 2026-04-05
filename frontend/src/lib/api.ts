@@ -74,8 +74,16 @@ export async function cancelAllPending(): Promise<{ message: string; cancelled: 
   return request('/api/jobs/cancel-pending', { method: 'POST' });
 }
 
+export async function cancelRunning(): Promise<{ message: string; cancelled: number }> {
+  return request('/api/jobs/cancel-running', { method: 'POST' });
+}
+
 export async function cancelAllJobs(): Promise<{ message: string; cancelled: number }> {
   return request('/api/jobs/cancel-all', { method: 'POST' });
+}
+
+export async function deleteFinished(): Promise<{ message: string; deleted: number }> {
+  return request('/api/jobs/finished', { method: 'DELETE' });
 }
 
 // Convert
