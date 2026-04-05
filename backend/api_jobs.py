@@ -162,6 +162,21 @@ async def cancel_all_pending() -> dict[str, Any]:
     return {"message": f"Cancelled {cancelled} pending job(s)", "cancelled": cancelled}
 
 
+@router.post("/jobs/cancel-running")
+async def cancel_running_jobs() -> dict[str, Any]:
+    """Cancel only currently running jobs (kills ffmpeg)."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+    cancelled = 0
+    for job in core.job_queue.get_all_jobs():
+        if job.status.value == "running":
+            if core.job_queue.cancel_job(job.id):
+                cancelled += 1
+
+    return {"message": f"Cancelled {cancelled} running job(s)", "cancelled": cancelled}
+
+
 @router.post("/jobs/cancel-all")
 async def cancel_all_jobs() -> dict[str, Any]:
     """Cancel all pending and running jobs (kills ffmpeg for running jobs)."""
@@ -175,3 +190,18 @@ async def cancel_all_jobs() -> dict[str, Any]:
                 cancelled += 1
 
     return {"message": f"Cancelled {cancelled} job(s)", "cancelled": cancelled}
+
+
+@router.delete("/jobs/finished")
+async def delete_finished_jobs() -> dict[str, Any]:
+    """Permanently delete all completed, failed, and cancelled jobs from the database."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+    deleted = 0
+    for job in core.job_queue.get_all_jobs():
+        if job.status.value in ("completed", "failed", "cancelled"):
+            if core.job_queue.delete_job(job.id):
+                deleted += 1
+
+    return {"message": f"Deleted {deleted} finished job(s)", "deleted": deleted}

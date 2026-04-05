@@ -327,6 +327,35 @@ Add GPU-accelerated encoding and reliable real-time progress tracking for all en
   - Tightened progress calculation guards
   - Full audit of all backend and frontend files
 
+## Phase 2.7: Job Controls & Worker Fix ✓ (COMPLETED)
+
+### Goal
+Improve job management UX and fix a critical worker concurrency bug.
+
+### Completed Features
+- [x] **Worker Spawning Fix**
+  - Watchdog thread was spawning replacement worker threads when detecting stale jobs, causing concurrent workers to exceed `max_concurrent_jobs` setting
+  - Removed replacement worker spawning from watchdog — it still fails stale jobs and signals cancellation but no longer creates extra workers
+
+- [x] **Granular Job Control Buttons**
+  - Replaced "Stop All" + "Clear Finished" with three separate actions:
+  - **Stop Current** — cancels only running jobs (kills ffmpeg), leaves pending queue intact
+  - **Clear Pending** — cancels only pending/queued jobs, doesn't affect running jobs
+  - **Delete Completed** — permanently deletes finished jobs from the database with confirmation dialog
+  - Each button only appears when relevant (running > 0, pending > 0, finished > 0)
+
+- [x] **Destructive Action Confirmation**
+  - "Delete Completed" opens a modal dialog warning that deletion is permanent
+  - Shows count of affected jobs and explicit "cannot be undone" messaging
+
+- [x] **Job Timestamps**
+  - Start time and completion time displayed on every job card header
+  - Uses locale-aware short datetime format (e.g. "Apr 5, 02:30 PM")
+
+- [x] **New API Endpoints**
+  - `POST /jobs/cancel-running` — cancel only running jobs
+  - `DELETE /jobs/finished` — bulk delete all completed/failed/cancelled jobs
+
 ## Phase 3: Community & Distribution
 
 ### Features

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { page } from '$app/stores';
-import { cancelAllJobs, cancelAllPending, deleteJob, getJobs } from '$lib/api';
+import { cancelAllPending, cancelRunning, deleteFinished, getJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
 import type { Job, JobStatus, JobsCounts } from '$lib/types';
 
@@ -118,21 +118,18 @@ async function loadMore() {
   await fetchJobs(false);
 }
 
-async function clearCompleted() {
-  const completed = jobs.filter(
-    (j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled',
-  );
-  for (const job of completed) {
-    try {
-      await deleteJob(job.id);
-    } catch {
-      // ignore individual failures
-    }
+let confirmDeleteOpen = $state(false);
+
+async function handleStopCurrent() {
+  try {
+    await cancelRunning();
+  } catch {
+    // ignore
   }
   await fetchJobs(true);
 }
 
-async function handleCancelPending() {
+async function handleClearPending() {
   try {
     await cancelAllPending();
   } catch {
@@ -141,12 +138,13 @@ async function handleCancelPending() {
   await fetchJobs(true);
 }
 
-async function handleStopAll() {
+async function handleDeleteCompleted() {
   try {
-    await cancelAllJobs();
+    await deleteFinished();
   } catch {
     // ignore
   }
+  confirmDeleteOpen = false;
   await fetchJobs(true);
 }
 
@@ -198,20 +196,30 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
       Showing {jobs.length} of {total} job{total !== 1 ? 's' : ''}
     </div>
     <div class="flex items-center gap-2">
-      {#if counts.running > 0 || counts.pending > 0}
-        <button class="btn btn-sm btn-ghost text-error hover:bg-error/10" onclick={handleStopAll}>
+      {#if counts.running > 0}
+        <button class="btn btn-sm btn-ghost text-warning hover:bg-warning/10" onclick={handleStopCurrent}>
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
           </svg>
-          Stop All ({counts.running + counts.pending})
+          Stop Current ({counts.running})
         </button>
       {/if}
-      <button class="btn btn-sm btn-ghost text-error hover:bg-error/10" onclick={clearCompleted}>
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-        </svg>
-        Clear Finished
-      </button>
+      {#if counts.pending > 0}
+        <button class="btn btn-sm btn-ghost text-warning hover:bg-warning/10" onclick={handleClearPending}>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+          Clear Pending ({counts.pending})
+        </button>
+      {/if}
+      {#if counts.completed + counts.failed + counts.cancelled > 0}
+        <button class="btn btn-sm btn-ghost text-error hover:bg-error/10" onclick={() => (confirmDeleteOpen = true)}>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+          </svg>
+          Delete Completed ({counts.completed + counts.failed + counts.cancelled})
+        </button>
+      {/if}
     </div>
   </div>
 
@@ -254,3 +262,28 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
     {/if}
   {/if}
 </div>
+
+<!-- Delete Completed confirmation dialog -->
+{#if confirmDeleteOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={() => (confirmDeleteOpen = false)}>
+    <div class="card bg-base-200 shadow-xl w-96 max-w-[90vw]" onclick={(e) => e.stopPropagation()}>
+      <div class="card-body gap-4">
+        <h3 class="card-title text-error text-base">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          Delete Completed Jobs
+        </h3>
+        <p class="text-sm text-base-content/70">
+          This will permanently delete <strong>{counts.completed + counts.failed + counts.cancelled}</strong> finished job{counts.completed + counts.failed + counts.cancelled !== 1 ? 's' : ''} from the database. This cannot be undone.
+        </p>
+        <div class="card-actions justify-end gap-2">
+          <button class="btn btn-sm btn-ghost" onclick={() => (confirmDeleteOpen = false)}>Cancel</button>
+          <button class="btn btn-sm btn-error" onclick={handleDeleteCompleted}>Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}

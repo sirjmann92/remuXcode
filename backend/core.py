@@ -403,21 +403,6 @@ class JobQueue:
                         job.cancel_event.set()
                     if self.job_store:
                         self._save_job_to_store(job)
-
-                    # If all worker threads are stuck, spawn a replacement
-                    alive_workers = [w for w in self.workers if w.is_alive()]
-                    # A stuck thread is alive but not making progress — spawn
-                    # a replacement so the queue keeps draining.
-                    if len(alive_workers) >= self.max_workers:
-                        idx = len(self.workers)
-                        replacement = threading.Thread(
-                            target=self._worker_loop,
-                            name=f"Worker-{idx}",
-                            daemon=True,
-                        )
-                        replacement.start()
-                        self.workers.append(replacement)
-                        logger.warning("Watchdog: spawned replacement worker thread Worker-%d", idx)
             except Exception as exc:
                 logger.error("Watchdog error: %s", exc)
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { cancelJob, deleteJob } from '$lib/api';
-import { channelLabel, formatSize } from '$lib/format';
+import { channelLabel, formatSize, formatTimestamp } from '$lib/format';
 import type { Job, JobPhase } from '$lib/types';
 import StatusBadge from './StatusBadge.svelte';
 
@@ -119,6 +119,12 @@ async function handleCancel() {
         <span class="badge badge-outline badge-xs text-base-content/40">{job.source}</span>
         {#if elapsed && job.status !== 'running'}
           <span class="text-xs text-base-content/30">{elapsed}</span>
+        {/if}
+        {#if formatTimestamp(job.started_at) && job.status !== 'pending'}
+          <span class="text-xs text-base-content/25" title="Started">{formatTimestamp(job.started_at)}</span>
+        {/if}
+        {#if formatTimestamp(job.completed_at)}
+          <span class="text-xs text-base-content/25">→ {formatTimestamp(job.completed_at)}</span>
         {/if}
       </div>
       <div class="flex items-center gap-0.5">
