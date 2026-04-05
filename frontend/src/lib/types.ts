@@ -19,6 +19,7 @@ export interface Job {
   status_detail: string | null;
   completed_phases: JobPhase[] | null;
   planned_phases: JobPhase[] | null;
+  poster_url: string | null;
 }
 
 export interface JobsCounts {

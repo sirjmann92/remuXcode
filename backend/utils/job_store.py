@@ -76,6 +76,7 @@ class JobStore:
                 "job_type": "TEXT DEFAULT 'full'",
                 "source": "TEXT DEFAULT 'webhook'",
                 "result_json": "TEXT",
+                "poster_url": "TEXT",
             }
             for col, typedef in migrations.items():
                 if col not in existing:
@@ -111,7 +112,8 @@ class JobStore:
                             streams_cleaned = ?,
                             job_type = COALESCE(?, job_type),
                             source = COALESCE(?, source),
-                            result_json = COALESCE(?, result_json)
+                            result_json = COALESCE(?, result_json),
+                            poster_url = COALESCE(?, poster_url)
                         WHERE id = ?
                     """,
                         (
@@ -127,6 +129,7 @@ class JobStore:
                             job_data.get("job_type"),
                             job_data.get("source"),
                             result_json,
+                            job_data.get("poster_url"),
                             job_data["id"],
                         ),
                     )
@@ -137,8 +140,8 @@ class JobStore:
                             id, file_path, status, progress, error,
                             created_at, updated_at, started_at, completed_at,
                             video_converted, audio_converted, streams_cleaned,
-                            job_type, source, result_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            job_type, source, result_json, poster_url
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             job_data["id"],
@@ -156,6 +159,7 @@ class JobStore:
                             job_data.get("job_type", "full"),
                             job_data.get("source", "webhook"),
                             result_json,
+                            job_data.get("poster_url"),
                         ),
                     )
 

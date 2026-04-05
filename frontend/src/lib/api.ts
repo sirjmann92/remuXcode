@@ -82,10 +82,11 @@ export async function cancelAllJobs(): Promise<{ message: string; cancelled: num
 export async function convertFile(
   path: string,
   type: string = 'full',
+  poster_url?: string,
 ): Promise<{ message: string; job_id: string }> {
   return request('/api/convert', {
     method: 'POST',
-    body: JSON.stringify({ path, type }),
+    body: JSON.stringify({ path, type, poster_url }),
   });
 }
 
