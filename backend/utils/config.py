@@ -129,6 +129,20 @@ class VideoConfig:
     av1_live_action_preset: int = 8  # Faster preset
     av1_live_action_framerate: str = ""
 
+    # QSV encoder settings (Intel Quick Sync — ICQ mode)
+    qsv_anime_quality: int = 21
+    qsv_live_action_quality: int = 24
+    qsv_preset: str = "medium"
+
+    # VAAPI encoder settings (Constant QP mode)
+    vaapi_anime_quality: int = 21
+    vaapi_live_action_quality: int = 24
+
+    # NVENC encoder settings (NVIDIA — CQ mode)
+    nvenc_anime_quality: int = 21
+    nvenc_live_action_quality: int = 24
+    nvenc_preset: str = "p5"
+
     # Common encoding settings (HEVC-specific, not used for AV1)
     vbv_maxrate: int = 5000
     vbv_bufsize: int = 10000
@@ -336,6 +350,14 @@ class Config:
             av1_live_action_crf=self._get("video.av1_live_action_crf", 30),
             av1_live_action_preset=self._get("video.av1_live_action_preset", 8),
             av1_live_action_framerate=self._get("video.av1_live_action_framerate", ""),
+            qsv_anime_quality=self._get("video.qsv_anime_quality", 21),
+            qsv_live_action_quality=self._get("video.qsv_live_action_quality", 24),
+            qsv_preset=self._get("video.qsv_preset", "medium"),
+            vaapi_anime_quality=self._get("video.vaapi_anime_quality", 21),
+            vaapi_live_action_quality=self._get("video.vaapi_live_action_quality", 24),
+            nvenc_anime_quality=self._get("video.nvenc_anime_quality", 21),
+            nvenc_live_action_quality=self._get("video.nvenc_live_action_quality", 24),
+            nvenc_preset=self._get("video.nvenc_preset", "p5"),
             vbv_maxrate=self._get("video.vbv_maxrate", 5000),
             vbv_bufsize=self._get("video.vbv_bufsize", 10000),
             level=self._get("video.level", "4.1"),
@@ -419,6 +441,14 @@ class Config:
             "av1_live_action_crf",
             "av1_live_action_preset",
             "av1_live_action_framerate",
+            "qsv_anime_quality",
+            "qsv_live_action_quality",
+            "qsv_preset",
+            "vaapi_anime_quality",
+            "vaapi_live_action_quality",
+            "nvenc_anime_quality",
+            "nvenc_live_action_quality",
+            "nvenc_preset",
             "vbv_maxrate",
             "vbv_bufsize",
             "level",

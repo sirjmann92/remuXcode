@@ -649,16 +649,50 @@ class VideoConverter:
     # Hardware-accelerated encoder builders
     # ------------------------------------------------------------------
 
-    def _get_quality_params(self, content_type: ContentType) -> tuple[int, str]:
-        """Return (crf, framerate) for the given content type and target codec."""
-        if self.target_codec == "av1":
-            if content_type == ContentType.ANIME:
-                return self.config.av1_anime_crf, self.config.av1_anime_framerate
-            return self.config.av1_live_action_crf, self.config.av1_live_action_framerate
+    def _get_quality_params(self, content_type: ContentType, encoder: str = "") -> tuple[int, str]:
+        """Return (quality_value, framerate) for given content type and encoder.
 
-        if content_type == ContentType.ANIME:
-            return self.config.anime_crf, self.config.anime_framerate
-        return self.config.live_action_crf, self.config.live_action_framerate
+        Framerate depends on the target codec (HEVC vs AV1), not the encoder.
+        Quality depends on the encoder method — HW encoders use their own
+        config fields while SW encoders use the CRF fields.
+        """
+        is_anime = content_type == ContentType.ANIME
+
+        # Framerate: codec-dependent, not encoder-dependent
+        if self.target_codec == "av1":
+            framerate = (
+                self.config.av1_anime_framerate
+                if is_anime
+                else self.config.av1_live_action_framerate
+            )
+        else:
+            framerate = (
+                self.config.anime_framerate if is_anime else self.config.live_action_framerate
+            )
+
+        # Quality: encoder-dependent
+        if "_qsv" in encoder:
+            quality = (
+                self.config.qsv_anime_quality if is_anime else self.config.qsv_live_action_quality
+            )
+        elif "_vaapi" in encoder:
+            quality = (
+                self.config.vaapi_anime_quality
+                if is_anime
+                else self.config.vaapi_live_action_quality
+            )
+        elif "_nvenc" in encoder:
+            quality = (
+                self.config.nvenc_anime_quality
+                if is_anime
+                else self.config.nvenc_live_action_quality
+            )
+        elif self.target_codec == "av1":
+            quality = self.config.av1_anime_crf if is_anime else self.config.av1_live_action_crf
+        else:
+            quality = self.config.anime_crf if is_anime else self.config.live_action_crf
+
+        return quality, framerate
 
     @staticmethod
     def _append_copy_streams(cmd: list[str]) -> None:
@@ -681,8 +715,8 @@ class VideoConverter:
         CPU decode and the GPU encode avoids those errors with negligible
         speed impact (encoding is the bottleneck, not decoding).
         """
-        quality, framerate = self._get_quality_params(content_type)
         encoder = "hevc_qsv" if codec == "hevc" else "av1_qsv"
+        quality, framerate = self._get_quality_params(content_type, encoder)
 
         # Pick upload pixel format:  p010le for 10-bit output, nv12 for 8-bit.
         is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
@@ -725,7 +759,7 @@ class VideoConverter:
                 "-global_quality",
                 str(quality),
                 "-preset",
-                "medium",
+                self.config.qsv_preset,
             ]
         )
 
@@ -760,8 +794,8 @@ class VideoConverter:
         input format (e.g. H.264 High 10 on many Intel/AMD GPUs).  SW decode
         + HW encode avoids those errors reliably.
         """
-        quality, framerate = self._get_quality_params(content_type)
         encoder = "hevc_vaapi" if codec == "hevc" else "av1_vaapi"
+        quality, framerate = self._get_quality_params(content_type, encoder)
         device = "/dev/dri/renderD128"
         if self.hw_caps and self.hw_caps.render_devices:
             device = self.hw_caps.render_devices[0]
@@ -840,8 +874,8 @@ class VideoConverter:
         (e.g. some 10-bit H.264 profiles).  SW decode + HW encode is safe
         for every input.
         """
-        quality, framerate = self._get_quality_params(content_type)
         encoder = "hevc_nvenc" if codec == "hevc" else "av1_nvenc"
+        quality, framerate = self._get_quality_params(content_type, encoder)
 
         # Pick upload pixel format:  p010le for 10-bit output, nv12 for 8-bit.
         is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
@@ -884,7 +918,7 @@ class VideoConverter:
                 "-cq",
                 str(quality),
                 "-preset",
-                "p7",
+                self.config.nvenc_preset,
             ]
         )
 

@@ -14,6 +14,50 @@ let regenerating = $state(false);
 let saving = $state(false);
 let saveMsg = $state('');
 
+const effectiveMethod = $derived.by(() => {
+  if (!config) return 'none';
+  const mode = config.video.hw_accel;
+  if (mode === 'none') return 'none';
+  if (mode !== 'auto') return mode;
+  // Auto: prefer QSV > VAAPI > NVENC (same order as backend)
+  if (hwAccel?.qsv_available) return 'qsv';
+  if (hwAccel?.vaapi_available) return 'vaapi';
+  if (hwAccel?.nvenc_available) return 'nvenc';
+  return 'none';
+});
+
+const qualityLabel = $derived(
+  effectiveMethod === 'qsv'
+    ? 'ICQ'
+    : effectiveMethod === 'vaapi'
+      ? 'QP'
+      : effectiveMethod === 'nvenc'
+        ? 'CQ'
+        : 'CRF',
+);
+
+const animeQualityField = $derived(
+  effectiveMethod === 'qsv'
+    ? 'qsv_anime_quality'
+    : effectiveMethod === 'vaapi'
+      ? 'vaapi_anime_quality'
+      : effectiveMethod === 'nvenc'
+        ? 'nvenc_anime_quality'
+        : 'anime_crf',
+);
+
+const liveQualityField = $derived(
+  effectiveMethod === 'qsv'
+    ? 'qsv_live_action_quality'
+    : effectiveMethod === 'vaapi'
+      ? 'vaapi_live_action_quality'
+      : effectiveMethod === 'nvenc'
+        ? 'nvenc_live_action_quality'
+        : 'live_action_crf',
+);
+
+const qualityMax = $derived(effectiveMethod === 'vaapi' ? 52 : 51);
+
 async function fetchConfig() {
   loading = true;
   error = '';
@@ -233,6 +277,15 @@ $effect(() => {
               <option value="nvenc" disabled={!hwAccel?.nvenc_available}>NVENC (NVIDIA)</option>
             </select>
           </div>
+          {#if config.video.hw_accel === 'auto' && effectiveMethod !== 'none'}
+            <div class="flex items-center gap-2 mt-1">
+              <span class="badge badge-sm badge-accent gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                Using {effectiveMethod.toUpperCase()}
+              </span>
+              <span class="text-xs text-base-content/30">auto-detected</span>
+            </div>
+          {/if}
           {#if hwAccel?.render_devices?.length}
             <div class="flex flex-wrap gap-1 mt-1">
               {#if hwAccel.qsv_available}
@@ -382,27 +435,30 @@ $effect(() => {
               </label>
             {/each}
             <div class="flex items-center justify-between">
-              <span>Anime CRF<span class="block text-xs text-base-content/30 font-normal">Quality level for anime (lower = better, 15–23 typical)</span></span>
+              <span>Anime {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for anime (lower = better)</span></span>
               <input
                 type="number"
                 class="input input-xs input-bordered w-16 text-center font-mono"
                 min="0"
-                max="51"
-                value={config.video.anime_crf}
-                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, 51); config!.video.anime_crf = v; save('video', 'anime_crf', v); }}
+                max={qualityMax}
+                value={(config.video as Record<string, unknown>)[animeQualityField]}
+                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, qualityMax); (config!.video as Record<string, unknown>)[animeQualityField] = v; save('video', animeQualityField, v); }}
               />
             </div>
             <div class="flex items-center justify-between">
-              <span>Live Action CRF<span class="block text-xs text-base-content/30 font-normal">Quality level for live action (lower = better, 18–26 typical)</span></span>
+              <span>Live Action {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for live action (lower = better)</span></span>
               <input
                 type="number"
                 class="input input-xs input-bordered w-16 text-center font-mono"
                 min="0"
-                max="51"
-                value={config.video.live_action_crf}
-                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, 51); config!.video.live_action_crf = v; save('video', 'live_action_crf', v); }}
+                max={qualityMax}
+                value={(config.video as Record<string, unknown>)[liveQualityField]}
+                onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, qualityMax); (config!.video as Record<string, unknown>)[liveQualityField] = v; save('video', liveQualityField, v); }}
               />
             </div>
+            {#if effectiveMethod !== 'none'}
+              <p class="text-xs text-base-content/30 -mt-1">Using {effectiveMethod.toUpperCase()} hardware encoder</p>
+            {/if}
             <!-- Advanced -->
             <details class="border-t border-base-content/10 pt-2 mt-3">
               <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
@@ -411,8 +467,58 @@ $effect(() => {
                   <span class="text-xs">Auto-Detect Anime<span class="block text-xs text-base-content/30 font-normal">Use path patterns and metadata to identify anime</span></span>
                   <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={config.video.anime_auto_detect} onchange={() => toggleBool('video', 'anime_auto_detect')} />
                 </label>
-                <!-- HEVC Encoding -->
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">HEVC Encoding</h3>
+                <!-- HW Encoder Settings -->
+                {#if effectiveMethod === 'qsv'}
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/60 pt-2">QSV Encoder</h3>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs">Preset<span class="block text-xs text-base-content/30 font-normal">QSV encoding speed (medium recommended)</span></span>
+                    <select
+                      class="select select-xs select-bordered w-28 font-mono"
+                      value={config.video.qsv_preset}
+                      onchange={(e) => saveStr('video', 'qsv_preset', e as Event & { currentTarget: HTMLSelectElement })}
+                    >
+                      {#each ['veryfast','faster','fast','medium','slow','slower','veryslow'] as opt}
+                        <option value={opt}>{opt}</option>
+                      {/each}
+                    </select>
+                  </div>
+                {:else if effectiveMethod === 'nvenc'}
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/60 pt-2">NVENC Encoder</h3>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs">Preset<span class="block text-xs text-base-content/30 font-normal">NVENC quality preset (p1=fastest, p7=best)</span></span>
+                    <select
+                      class="select select-xs select-bordered w-28 font-mono"
+                      value={config.video.nvenc_preset}
+                      onchange={(e) => saveStr('video', 'nvenc_preset', e as Event & { currentTarget: HTMLSelectElement })}
+                    >
+                      {#each ['p1','p2','p3','p4','p5','p6','p7'] as opt}
+                        <option value={opt}>{opt}</option>
+                      {/each}
+                    </select>
+                  </div>
+                {:else if effectiveMethod === 'vaapi'}
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/60 pt-2">VAAPI Encoder</h3>
+                  <p class="text-xs text-base-content/30">Quality (QP) is configured above. VAAPI has no additional encoder settings.</p>
+                {/if}
+                <!-- Software Encoding Settings (snippet to avoid conditional tag nesting) -->
+                {#snippet swSettings()}
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">{effectiveMethod !== 'none' ? 'HEVC (x265)' : 'HEVC Encoding'}</h3>
+                {#each [
+                  { field: 'anime_crf', label: 'Anime CRF', type: 'number', hint: 'Quality for anime (0–51, lower = better)', min: 0, max: 51 },
+                  { field: 'live_action_crf', label: 'Live Action CRF', type: 'number', hint: 'Quality for live action (0–51)', min: 0, max: 51 },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="number"
+                      class="input input-xs input-bordered w-16 text-center font-mono"
+                      min={item.min}
+                      max={item.max}
+                      value={(config!.video as Record<string, unknown>)[item.field]}
+                      onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min!, item.max!); (config!.video as Record<string, unknown>)[item.field] = v; save('video', item.field, v); }}
+                    />
+                  </div>
+                {/each}
                 {#each [
                   { field: 'anime_preset', label: 'Anime Preset', type: 'select', options: ['ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow','placebo'], hint: 'Encoding speed vs quality for anime' },
                   { field: 'anime_tune', label: 'Anime Tune', type: 'select', options: ['','animation','grain','psnr','ssim','fastdecode','zerolatency'], hint: 'x265 tuning profile (empty = none)' },
@@ -426,7 +532,7 @@ $effect(() => {
                     {#if item.type === 'select'}
                       <select
                         class="select select-xs select-bordered w-28 font-mono"
-                        value={(config.video as Record<string, unknown>)[item.field] as string}
+                        value={(config!.video as Record<string, unknown>)[item.field] as string}
                         onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLSelectElement })}
                       >
                         {#each item.options! as opt}
@@ -437,48 +543,13 @@ $effect(() => {
                       <input
                         type="text"
                         class="input input-xs input-bordered w-28 font-mono text-xs"
-                        value={(config.video as Record<string, unknown>)[item.field] as string}
+                        value={(config!.video as Record<string, unknown>)[item.field] as string}
                         onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
                       />
                     {/if}
                   </div>
                 {/each}
-                <!-- AV1 Encoding -->
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">AV1 Encoding (SVT-AV1)</h3>
-                {#each [
-                  { field: 'av1_anime_crf', label: 'Anime CRF', hint: 'Quality for anime (0–63, lower = better)', min: 0, max: 63 },
-                  { field: 'av1_anime_preset', label: 'Anime Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
-                  { field: 'av1_live_action_crf', label: 'Live Action CRF', hint: 'Quality for live action (0–63)', min: 0, max: 63 },
-                  { field: 'av1_live_action_preset', label: 'Live Action Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
-                ] as item}
-                  <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
-                    <input
-                      type="number"
-                      class="input input-xs input-bordered w-16 text-center font-mono"
-                      min={item.min}
-                      max={item.max}
-                      value={(config.video as Record<string, unknown>)[item.field]}
-                      onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min, item.max); (config!.video as Record<string, unknown>)[item.field] = v; save('video', item.field, v); }}
-                    />
-                  </div>
-                {/each}
-                {#each [
-                  { field: 'av1_anime_framerate', label: 'Anime Framerate', hint: 'e.g. 24000/1001 (empty = auto)' },
-                  { field: 'av1_live_action_framerate', label: 'Live Action Framerate', hint: 'Framerate override (empty = auto)' },
-                ] as item}
-                  <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
-                    <input
-                      type="text"
-                      class="input input-xs input-bordered w-28 font-mono text-xs"
-                      value={(config.video as Record<string, unknown>)[item.field] as string}
-                      onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
-                    />
-                  </div>
-                {/each}
-                <!-- Output Format -->
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">Output Format (HEVC)</h3>
+                <!-- VBV / Output Format -->
                 {#each [
                   { field: 'vbv_maxrate', label: 'VBV Max Rate', hint: 'Max bitrate in kbps for rate control', min: 0, max: 100000 },
                   { field: 'vbv_bufsize', label: 'VBV Buffer Size', hint: 'Buffer size in kbps for rate control', min: 0, max: 200000 },
@@ -490,7 +561,7 @@ $effect(() => {
                       class="input input-xs input-bordered w-20 text-center font-mono"
                       min={item.min}
                       max={item.max}
-                      value={(config.video as Record<string, unknown>)[item.field]}
+                      value={(config!.video as Record<string, unknown>)[item.field]}
                       onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min, item.max); (config!.video as Record<string, unknown>)[item.field] = v; save('video', item.field, v); }}
                     />
                   </div>
@@ -505,11 +576,57 @@ $effect(() => {
                     <input
                       type="text"
                       class="input input-xs input-bordered w-28 font-mono text-xs"
-                      value={(config.video as Record<string, unknown>)[item.field] as string}
+                      value={(config!.video as Record<string, unknown>)[item.field] as string}
                       onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
                     />
                   </div>
                 {/each}
+                <!-- AV1 -->
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">{effectiveMethod !== 'none' ? 'AV1 (SVT-AV1)' : 'AV1 Encoding (SVT-AV1)'}</h3>
+                {#each [
+                  { field: 'av1_anime_crf', label: 'Anime CRF', hint: 'Quality for anime (0–63, lower = better)', min: 0, max: 63 },
+                  { field: 'av1_anime_preset', label: 'Anime Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                  { field: 'av1_live_action_crf', label: 'Live Action CRF', hint: 'Quality for live action (0–63)', min: 0, max: 63 },
+                  { field: 'av1_live_action_preset', label: 'Live Action Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="number"
+                      class="input input-xs input-bordered w-16 text-center font-mono"
+                      min={item.min}
+                      max={item.max}
+                      value={(config!.video as Record<string, unknown>)[item.field]}
+                      onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, item.min, item.max); (config!.video as Record<string, unknown>)[item.field] = v; save('video', item.field, v); }}
+                    />
+                  </div>
+                {/each}
+                {#each [
+                  { field: 'av1_anime_framerate', label: 'Anime Framerate', hint: 'e.g. 24000/1001 (empty = auto)' },
+                  { field: 'av1_live_action_framerate', label: 'Live Action Framerate', hint: 'Framerate override (empty = auto)' },
+                ] as item}
+                  <div class="flex items-center justify-between" title={item.hint}>
+                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <input
+                      type="text"
+                      class="input input-xs input-bordered w-28 font-mono text-xs"
+                      value={(config!.video as Record<string, unknown>)[item.field] as string}
+                      onchange={(e) => saveStr('video', item.field, e as Event & { currentTarget: HTMLInputElement })}
+                    />
+                  </div>
+                {/each}
+                {/snippet}
+                {#if effectiveMethod !== 'none'}
+                <details class="border border-base-content/5 rounded-lg px-2 py-1 mt-2">
+                  <summary class="text-xs text-base-content/30 cursor-pointer hover:text-base-content/50 select-none">Software Fallback Settings</summary>
+                  <p class="text-xs text-base-content/25 mt-1 mb-2">These only apply when falling back to software encoding (libx265 / SVT-AV1).</p>
+                  <div class="space-y-2">
+                    {@render swSettings()}
+                  </div>
+                </details>
+                {:else}
+                  {@render swSettings()}
+                {/if}
               </div>
             </details>
             </div>
