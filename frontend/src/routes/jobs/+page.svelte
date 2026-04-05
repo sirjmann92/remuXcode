@@ -68,7 +68,7 @@ async function fetchJobs(reset = true) {
       offset: reset ? 0 : jobs.length,
       status: filter,
       search: search.trim() || undefined,
-      job_type: jobTypeFilter !== 'all' ? jobTypeFilter : undefined,
+      phase: jobTypeFilter !== 'all' ? jobTypeFilter : undefined,
       media_type: mediaTypeFilter !== 'all' ? mediaTypeFilter : undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
@@ -231,7 +231,6 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
         <span class="label-text text-xs text-base-content/40 pb-0.5">Worker</span>
         <select class="select select-xs select-bordered font-mono" bind:value={jobTypeFilter}>
           <option value="all">All</option>
-          <option value="full">Full</option>
           <option value="video">Video</option>
           <option value="audio">Audio</option>
           <option value="cleanup">Cleanup</option>

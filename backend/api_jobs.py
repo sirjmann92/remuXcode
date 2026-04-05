@@ -27,6 +27,7 @@ async def list_jobs(
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
     job_type: str | None = Query(default=None),
+    phase: str | None = Query(default=None),
     media_type: str | None = Query(default=None),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
@@ -63,6 +64,14 @@ async def list_jobs(
 
     if job_type and job_type != "all":
         filtered = [j for j in filtered if j.job_type.value == job_type]
+
+    if phase and phase != "all":
+        filtered = [
+            j
+            for j in filtered
+            if (j.completed_phases and phase in j.completed_phases)
+            or (j.result and j.result.get(phase))
+        ]
 
     if media_type and media_type != "all":
         filtered = [j for j in filtered if j.media_type == media_type]
