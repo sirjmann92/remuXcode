@@ -58,6 +58,15 @@ const phaseLabels: Record<JobPhase, string> = {
   cleanup: 'Cleanup',
 };
 
+/** True when the job completed but no phases actually did any work. */
+const noWorkNeeded = $derived(
+  job.status === 'completed' &&
+    job.result != null &&
+    job.result.audio == null &&
+    job.result.video == null &&
+    job.result.cleanup == null,
+);
+
 /** Compute overall size reduction across all completed phases. */
 const overallSize = $derived.by(() => {
   const r = job.result;
@@ -117,6 +126,12 @@ async function handleCancel() {
         <StatusBadge status={job.status} />
         <span class="badge badge-outline badge-xs text-base-content/40">{job.job_type}</span>
         <span class="badge badge-outline badge-xs text-base-content/40">{job.source}</span>
+        {#if noWorkNeeded}
+          <span class="badge badge-ghost badge-xs text-base-content/40 gap-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+            No work needed
+          </span>
+        {/if}
         {#if elapsed && job.status !== 'running'}
           <span class="text-xs text-base-content/30">{elapsed}</span>
         {/if}

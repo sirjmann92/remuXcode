@@ -37,6 +37,7 @@ let filter: JobStatus | 'all' = $state(
 let search: string = $state('');
 let jobTypeFilter: string = $state('all');
 let mediaTypeFilter: string = $state('all');
+let sourceFilter: string = $state('all');
 let dateFrom: string = $state('');
 let dateTo: string = $state('');
 let showFilters = $state(false);
@@ -44,12 +45,17 @@ let showFilters = $state(false);
 let loadError = $state(false);
 
 const hasActiveFilters = $derived(
-  jobTypeFilter !== 'all' || mediaTypeFilter !== 'all' || dateFrom !== '' || dateTo !== '',
+  jobTypeFilter !== 'all' ||
+    mediaTypeFilter !== 'all' ||
+    sourceFilter !== 'all' ||
+    dateFrom !== '' ||
+    dateTo !== '',
 );
 
 function clearFilters() {
   jobTypeFilter = 'all';
   mediaTypeFilter = 'all';
+  sourceFilter = 'all';
   dateFrom = '';
   dateTo = '';
 }
@@ -70,6 +76,7 @@ async function fetchJobs(reset = true) {
       search: search.trim() || undefined,
       phase: jobTypeFilter !== 'all' ? jobTypeFilter : undefined,
       media_type: mediaTypeFilter !== 'all' ? mediaTypeFilter : undefined,
+      source: sourceFilter !== 'all' ? sourceFilter : undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
     });
@@ -109,6 +116,7 @@ $effect(() => {
   const q = search;
   const _jt = jobTypeFilter;
   const _mt = mediaTypeFilter;
+  const _src = sourceFilter;
   const _df = dateFrom;
   const _dt = dateTo;
   // Debounce search, immediate for filter changes
@@ -242,6 +250,15 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
           <option value="all">All</option>
           <option value="movie">Movies</option>
           <option value="episode">Episodes</option>
+        </select>
+      </label>
+      <label class="form-control w-auto">
+        <span class="label-text text-xs text-base-content/40 pb-0.5">Source</span>
+        <select class="select select-xs select-bordered font-mono w-28" bind:value={sourceFilter}>
+          <option value="all">All</option>
+          <option value="webhook">Webhook</option>
+          <option value="api">API</option>
+          <option value="batch">Batch</option>
         </select>
       </label>
       <label class="form-control w-auto">

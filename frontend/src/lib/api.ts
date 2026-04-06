@@ -51,6 +51,7 @@ export async function getJobs(options?: {
   search?: string;
   phase?: string;
   media_type?: string;
+  source?: string;
   date_from?: string;
   date_to?: string;
 }): Promise<JobsResponse> {
@@ -64,6 +65,7 @@ export async function getJobs(options?: {
   if (options.phase && options.phase !== 'all') params.set('phase', options.phase);
   if (options.media_type && options.media_type !== 'all')
     params.set('media_type', options.media_type);
+  if (options.source && options.source !== 'all') params.set('source', options.source);
   if (options.date_from) params.set('date_from', options.date_from);
   if (options.date_to) params.set('date_to', options.date_to);
 
