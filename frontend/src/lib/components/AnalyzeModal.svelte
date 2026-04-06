@@ -130,9 +130,15 @@ function fileName(path: string): string {
         </div>
 
         {#if result.needs_audio_conversion || result.needs_video_conversion}
-          <div class="divider text-xs text-base-content/30">Conversion Needed</div>
+          <div class="divider text-xs text-base-content/30">Work Needed</div>
           <div class="flex flex-wrap gap-2">
-            {#if result.needs_audio_conversion}
+            {#if result.audio_codecs_to_convert?.length}
+              <span class="badge badge-warning badge-sm">{result.audio_codecs_to_convert.join(', ')} to convert</span>
+            {/if}
+            {#if result.audio_codecs_to_drop?.length}
+              <span class="badge badge-warning badge-sm">{result.audio_codecs_to_drop.join(', ')} to remove</span>
+            {/if}
+            {#if result.needs_audio_conversion && !result.audio_codecs_to_convert?.length && !result.audio_codecs_to_drop?.length}
               <span class="badge badge-warning badge-sm">Audio conversion needed</span>
             {/if}
             {#if result.needs_video_conversion}

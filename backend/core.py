@@ -638,6 +638,7 @@ def process_file(
         results["audio"] = {
             "success": audio_result.success,
             "streams_converted": audio_result.streams_converted,
+            "streams_dropped": audio_result.streams_dropped,
             "converted_streams": audio_result.converted_streams,
             "original_size": audio_result.original_size,
             "new_size": audio_result.new_size,

@@ -214,6 +214,9 @@ async function handleCancel() {
                   {:else}
                     {job.result.audio.streams_converted} stream{(job.result.audio.streams_converted ?? 0) !== 1 ? 's' : ''} converted
                   {/if}
+                  {#if (job.result.audio.streams_dropped ?? 0) > 0}
+                    <span class="text-base-content/30"> · </span>Dropped {job.result.audio.streams_dropped} redundant
+                  {/if}
                   {#if sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}
                     <span class="text-base-content/30"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
                   {/if}

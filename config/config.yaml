@@ -40,7 +40,7 @@ audio:
   convert_dts_x: true
   convert_truehd: false
   keep_original: false
-  keep_original_dts_x: true
+  keep_original_dts_x: false
   original_as_secondary: true
   prefer_ac3: false
   ac3_bitrate: 640
