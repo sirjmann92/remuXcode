@@ -937,8 +937,32 @@ const sortOptions: { value: string; label: string }[] = [
         {#if analysisFiltersActive}
           <p class="text-base text-base-content/40">No shows match this filter</p>
           <p class="text-sm text-base-content/30 mt-1">Some filters (DTS:X, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
+        {:else if search}
+          <p class="text-base text-base-content/40">No shows match your search</p>
+          <p class="text-sm text-base-content/30 mt-1">Try a different spelling or clear the search.</p>
+        {:else if filter === 'needs_conversion'}
+          <p class="text-2xl mb-1">&#127881;</p>
+          <p class="text-base text-base-content/60">Every episode is in peak condition.</p>
+          <p class="text-sm text-base-content/30 mt-1">Your library called — it says thanks.</p>
+        {:else if filter === 'video'}
+          <p class="text-2xl mb-1">&#127916;</p>
+          <p class="text-base text-base-content/60">All video tracks are already on point.</p>
+          <p class="text-sm text-base-content/30 mt-1">Not a re-encode in sight. Well done.</p>
+        {:else if filter === 'audio'}
+          <p class="text-2xl mb-1">&#127911;</p>
+          <p class="text-base text-base-content/60">Audio is impeccable across all episodes.</p>
+          <p class="text-sm text-base-content/30 mt-1">Nothing to transcode here — just vibes.</p>
+        {:else if filter === 'cleanup'}
+          <p class="text-2xl mb-1">&#10024;</p>
+          <p class="text-base text-base-content/60">No stray tracks or subtitles to remove.</p>
+          <p class="text-sm text-base-content/30 mt-1">Marie Kondo would be proud.</p>
+        {:else if filter === 'anime'}
+          <p class="text-2xl mb-1">&#128517;</p>
+          <p class="text-base text-base-content/60">No anime series found.</p>
+          <p class="text-sm text-base-content/30 mt-1">Sonarr doesn't seem to have any anime tagged. Give it time.</p>
         {:else}
           <p class="text-base text-base-content/40">No shows found</p>
+          <p class="text-sm text-base-content/30 mt-1">Make sure Sonarr has series in your library.</p>
         {/if}
       </div>
     {:else}

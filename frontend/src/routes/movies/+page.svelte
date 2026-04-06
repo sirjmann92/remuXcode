@@ -546,8 +546,32 @@ const sortOptions: { value: string; label: string }[] = [
       {#if analysisFiltersActive}
         <p class="text-base text-base-content/40">No movies match this filter</p>
         <p class="text-sm text-base-content/30 mt-1">Some filters (DTS:X, Atmos, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
+      {:else if search}
+        <p class="text-base text-base-content/40">No movies match your search</p>
+        <p class="text-sm text-base-content/30 mt-1">Try a different spelling or clear the search.</p>
+      {:else if filter === 'needs_conversion'}
+        <p class="text-2xl mb-1">&#127881;</p>
+        <p class="text-base text-base-content/60">Your movie library is flawless.</p>
+        <p class="text-sm text-base-content/30 mt-1">Nothing to convert — go watch something instead.</p>
+      {:else if filter === 'video'}
+        <p class="text-2xl mb-1">&#127916;</p>
+        <p class="text-base text-base-content/60">All video tracks look great.</p>
+        <p class="text-sm text-base-content/30 mt-1">Not a single re-encode needed. You love to see it.</p>
+      {:else if filter === 'audio'}
+        <p class="text-2xl mb-1">&#127911;</p>
+        <p class="text-base text-base-content/60">Audio is already perfect across the board.</p>
+        <p class="text-sm text-base-content/30 mt-1">Every track is exactly where it should be.</p>
+      {:else if filter === 'cleanup'}
+        <p class="text-2xl mb-1">&#10024;</p>
+        <p class="text-base text-base-content/60">Squeaky clean — nothing to tidy up.</p>
+        <p class="text-sm text-base-content/30 mt-1">Your library is more organized than your sock drawer.</p>
+      {:else if filter === 'anime'}
+        <p class="text-2xl mb-1">&#128517;</p>
+        <p class="text-base text-base-content/60">No anime movies found.</p>
+        <p class="text-sm text-base-content/30 mt-1">Your Radarr doesn't seem to have any anime tagged. Or you just haven't discovered the genre yet.</p>
       {:else}
         <p class="text-base text-base-content/40">No movies found</p>
+        <p class="text-sm text-base-content/30 mt-1">Make sure Radarr has movies in your library.</p>
       {/if}
     </div>
   {:else}
