@@ -318,7 +318,7 @@ async function queueEpisode(ep: EpisodeFile) {
   const key = ep.path;
   queueing[key] = true;
   try {
-    await convertFile(ep.path, 'full', selectedSeries?.poster);
+    await convertFile(ep.path, 'full', selectedSeries?.poster, 'episode');
   } catch {
     // ignore
   } finally {
@@ -332,7 +332,7 @@ async function queueSeason(season: Season) {
   try {
     for (const ep of season.episodes) {
       if (episodeNeedsWork(ep)) {
-        await convertFile(ep.path, 'full', selectedSeries?.poster);
+        await convertFile(ep.path, 'full', selectedSeries?.poster, 'episode');
       }
     }
   } catch {
@@ -349,7 +349,7 @@ async function queueAllSeries() {
     for (const season of selectedSeries.seasons) {
       for (const ep of season.episodes) {
         if (episodeNeedsWork(ep)) {
-          await convertFile(ep.path, 'full', selectedSeries.poster);
+          await convertFile(ep.path, 'full', selectedSeries.poster, 'episode');
         }
       }
     }
@@ -375,7 +375,7 @@ async function queueAllFiltered() {
       for (const season of detail.seasons) {
         for (const ep of season.episodes) {
           if (episodeNeedsWork(ep)) {
-            await convertFile(ep.path, 'full', series.poster);
+            await convertFile(ep.path, 'full', series.poster, 'episode');
           }
         }
       }
@@ -416,7 +416,7 @@ async function queueSelectedEps() {
   queueingSelected = true;
   try {
     for (const path of selectedEps) {
-      await convertFile(path, 'full', selectedSeries?.poster);
+      await convertFile(path, 'full', selectedSeries?.poster, 'episode');
     }
   } catch {
     // ignore

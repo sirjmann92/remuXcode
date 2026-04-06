@@ -100,10 +100,11 @@ export async function convertFile(
   path: string,
   type: string = 'full',
   poster_url?: string,
+  media_type?: string,
 ): Promise<{ message: string; job_id: string }> {
   return request('/api/convert', {
     method: 'POST',
-    body: JSON.stringify({ path, type, poster_url }),
+    body: JSON.stringify({ path, type, poster_url, media_type }),
   });
 }
 
