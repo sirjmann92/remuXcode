@@ -29,6 +29,7 @@ async def list_jobs(
     job_type: str | None = Query(default=None),
     phase: str | None = Query(default=None),
     media_type: str | None = Query(default=None),
+    source: str | None = Query(default=None),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
 ) -> dict[str, Any]:
@@ -75,6 +76,9 @@ async def list_jobs(
 
     if media_type and media_type != "all":
         filtered = [j for j in filtered if j.media_type == media_type]
+
+    if source and source != "all":
+        filtered = [j for j in filtered if j.source == source]
 
     if date_from:
         try:
