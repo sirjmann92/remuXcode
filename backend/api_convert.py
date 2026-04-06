@@ -29,7 +29,13 @@ async def convert_file(data: dict[str, Any]) -> dict[str, Any]:
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid type: {job_type_str}") from None
 
-    job = create_job(file_path, job_type, source="api", poster_url=data.get("poster_url"))
+    job = create_job(
+        file_path,
+        job_type,
+        source="api",
+        poster_url=data.get("poster_url"),
+        media_type=data.get("media_type"),
+    )
     return {
         "message": "Job queued",
         "job_id": job.id,
@@ -70,7 +76,7 @@ def batch_convert_movies(data: dict[str, Any]) -> dict[str, Any]:
             if file_path:
                 file_path = translate_path(file_path)
                 if Path(file_path).exists():
-                    job = create_job(file_path, job_type, source="batch")
+                    job = create_job(file_path, job_type, source="batch", media_type="movie")
                     job_ids.append(job.id)
         except Exception as e:
             logger.error("Error getting movie %s: %s", movie_id, e)
@@ -121,7 +127,7 @@ def batch_convert_series(data: dict[str, Any]) -> dict[str, Any]:
                 if file_path:
                     file_path = translate_path(file_path)
                     if Path(file_path).exists():
-                        job = create_job(file_path, job_type, source="batch")
+                        job = create_job(file_path, job_type, source="batch", media_type="episode")
                         job_ids.append(job.id)
         except Exception as e:
             logger.error("Error getting series %s: %s", series_id, e)

@@ -84,6 +84,20 @@ class JobStore:
                     conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typedef}")
                     logger.info("Migrated jobs table: added column %s", col)
 
+            # Backfill media_type for existing rows using path heuristics
+            null_count = conn.execute(
+                "SELECT COUNT(*) FROM jobs WHERE media_type IS NULL"
+            ).fetchone()[0]
+            if null_count:
+                # Episodes: path contains SxxExx pattern
+                conn.execute(
+                    "UPDATE jobs SET media_type = 'episode' "
+                    "WHERE media_type IS NULL AND file_path GLOB '*S[0-9][0-9]E[0-9]*'"
+                )
+                # Movies: everything else that's still NULL
+                conn.execute("UPDATE jobs SET media_type = 'movie' WHERE media_type IS NULL")
+                logger.info("Backfilled media_type for %d jobs", null_count)
+
     def save_job(self, job_data: dict[str, Any]) -> None:
         """Save or update a job."""
         with self._lock:
