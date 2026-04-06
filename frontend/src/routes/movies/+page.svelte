@@ -709,7 +709,20 @@ const sortOptions: { value: string; label: string }[] = [
           {#if detailMovie.needs_audio_conversion}
             <div class="flex items-start gap-2">
               <span class="badge badge-warning badge-sm shrink-0">Audio</span>
-              <p class="text-sm">{detailMovie.audio_codecs_to_convert?.length ? detailMovie.audio_codecs_to_convert.join(', ') : detailMovie.audio_codec} will be converted</p>
+              <p class="text-sm">
+                {#if detailMovie.audio_codecs_to_convert?.length}
+                  {detailMovie.audio_codecs_to_convert.join(', ')} will be converted
+                {/if}
+                {#if detailMovie.audio_codecs_to_convert?.length && detailMovie.audio_codecs_to_drop?.length}
+                  <span class="text-base-content/30"> · </span>
+                {/if}
+                {#if detailMovie.audio_codecs_to_drop?.length}
+                  {detailMovie.audio_codecs_to_drop.join(', ')} will be removed
+                {/if}
+                {#if !detailMovie.audio_codecs_to_convert?.length && !detailMovie.audio_codecs_to_drop?.length}
+                  {detailMovie.audio_codec} will be converted
+                {/if}
+              </p>
             </div>
           {/if}
 

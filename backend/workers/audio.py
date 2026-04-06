@@ -71,6 +71,7 @@ class AudioConversionResult:
     new_size: int
     error: str | None = None
     converted_streams: list[dict] | None = None
+    streams_dropped: int = 0
 
 
 class AudioConverter:
@@ -135,14 +136,11 @@ class AudioConverter:
         if info is None:
             return False
 
-        # When keep_original* is enabled, a converted companion track persists
-        # alongside the original.  Detect same-language compatible tracks so we
-        # don't re-flag files that were already processed.
-        compat = (
-            self._compatible_languages(info)
-            if (self.config.keep_original or self.config.keep_original_dts_x)
-            else set()
-        )
+        # Always build the compatible-language set.  A track needs work if it
+        # should be converted (no companion) OR dropped (companion exists but
+        # keep_original is now off).  The only case we skip is when
+        # keep_original is ON and a companion exists (already processed).
+        compat = self._compatible_languages(info)
 
         for s in info.audio_streams:
             lang = (s.language or "und").lower()
@@ -232,37 +230,51 @@ class AudioConverter:
                 error="Failed to analyze input file",
             )
 
-        # Find streams to convert (skip streams with existing companions
-        # when keep_original* is enabled to avoid re-processing)
+        # Find streams to convert or drop.
+        # Always build the compatible-language set so we can detect tracks that
+        # already have a converted companion (from a previous keep_original run).
+        # When keep_original* is ON  + companion exists → skip entirely (already done).
+        # When keep_original* is OFF + companion exists → drop the original track
+        #   instead of converting it (which would create a duplicate).
+        # When no companion exists → convert as normal.
         streams_to_convert: list[AudioStream] = []
-        compat = (
-            self._compatible_languages(info)
-            if (self.config.keep_original or self.config.keep_original_dts_x)
-            else set()
-        )
+        streams_to_drop: list[AudioStream] = []
+        compat = self._compatible_languages(info)
 
         if self.config.convert_dts:
             for s in self.get_dts_streams(info):
                 lang = (s.language or "und").lower()
-                if self.config.keep_original and self._has_compatible_companion(lang, compat):
-                    continue
-                streams_to_convert.append(s)
+                has_companion = self._has_compatible_companion(lang, compat)
+                if self.config.keep_original and has_companion:
+                    continue  # already processed, nothing to do
+                if not self.config.keep_original and has_companion:
+                    streams_to_drop.append(s)
+                else:
+                    streams_to_convert.append(s)
 
         if self.config.convert_dts_x:
             for s in self.get_dts_x_streams(info):
                 lang = (s.language or "und").lower()
-                if self.config.keep_original_dts_x and self._has_compatible_companion(lang, compat):
+                has_companion = self._has_compatible_companion(lang, compat)
+                if self.config.keep_original_dts_x and has_companion:
                     continue
-                streams_to_convert.append(s)
+                if not self.config.keep_original_dts_x and has_companion:
+                    streams_to_drop.append(s)
+                else:
+                    streams_to_convert.append(s)
 
         if self.config.convert_truehd:
             for s in self.get_truehd_streams(info):
                 lang = (s.language or "und").lower()
-                if self.config.keep_original and self._has_compatible_companion(lang, compat):
+                has_companion = self._has_compatible_companion(lang, compat)
+                if self.config.keep_original and has_companion:
                     continue
-                streams_to_convert.append(s)
+                if not self.config.keep_original and has_companion:
+                    streams_to_drop.append(s)
+                else:
+                    streams_to_convert.append(s)
 
-        if not streams_to_convert:
+        if not streams_to_convert and not streams_to_drop:
             return AudioConversionResult(
                 success=True,
                 input_file=input_file,
@@ -274,22 +286,39 @@ class AudioConverter:
                 error=None,
             )
 
-        logger.info(
-            "Converting %d audio stream(s) in: %s", len(streams_to_convert), input_path.name
-        )
+        if streams_to_drop:
+            logger.info(
+                "Dropping %d redundant audio stream(s) (companion already exists) in: %s",
+                len(streams_to_drop),
+                input_path.name,
+            )
+
+        if streams_to_convert:
+            logger.info(
+                "Converting %d audio stream(s) in: %s", len(streams_to_convert), input_path.name
+            )
 
         # Build detail message for UI
         if detail_callback:
-            descriptions = []
-            for s in streams_to_convert:
-                target_codec, _, _ = self._determine_target_format(
-                    s.channels, s.bitrate // 1000 if s.bitrate else 0
+            parts = []
+            if streams_to_convert:
+                descriptions = []
+                for s in streams_to_convert:
+                    target_codec, _, _ = self._determine_target_format(
+                        s.channels, s.bitrate // 1000 if s.bitrate else 0
+                    )
+                    ch = f"{s.channels}ch" if s.channels else ""
+                    descriptions.append(
+                        f"{s.codec_name.upper()} {ch} \u2192 {target_codec.upper()}"
+                    )
+                parts.append(
+                    f"Converting {len(streams_to_convert)} stream{'s' if len(streams_to_convert) != 1 else ''}: {' \u00b7 '.join(descriptions)}"
                 )
-                ch = f"{s.channels}ch" if s.channels else ""
-                descriptions.append(f"{s.codec_name.upper()} {ch} \u2192 {target_codec.upper()}")
-            detail_callback(
-                f"Converting {len(streams_to_convert)} stream{'s' if len(streams_to_convert) != 1 else ''}: {' \u00b7 '.join(descriptions)}"
-            )
+            if streams_to_drop:
+                parts.append(
+                    f"Dropping {len(streams_to_drop)} redundant stream{'s' if len(streams_to_drop) != 1 else ''}"
+                )
+            detail_callback(" | ".join(parts))
 
         # Prepare paths
         replace_input = output_file is None
@@ -320,7 +349,7 @@ class AudioConverter:
 
             # Build and run ffmpeg command
             cmd = self._build_ffmpeg_command(
-                str(input_path), str(temp_output), info, streams_to_convert
+                str(input_path), str(temp_output), info, streams_to_convert, streams_to_drop
             )
             logger.debug("Running: %s", " ".join(cmd))
 
@@ -434,6 +463,7 @@ class AudioConverter:
                 original_size=info.size,
                 new_size=new_size,
                 converted_streams=converted_info,
+                streams_dropped=len(streams_to_drop),
             )
 
         except subprocess.TimeoutExpired:
@@ -585,11 +615,14 @@ class AudioConverter:
         output_file: str,
         info: MediaInfo,
         streams_to_convert: list[AudioStream],
+        streams_to_drop: list[AudioStream] | None = None,
     ) -> list[str]:
         """Build ffmpeg command for audio conversion.
 
         Uses explicit stream mapping (instead of -map 0) so dual-track mode
         can map the same input stream twice and control track ordering.
+        Streams in ``streams_to_drop`` are omitted from the output entirely
+        (companion already exists, so converting would create a duplicate).
         """
 
         cmd = ["ffmpeg", "-i", input_file, "-y"]
@@ -598,6 +631,7 @@ class AudioConverter:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
         convert_indices = {s.index for s in streams_to_convert}
+        drop_indices = {s.index for s in streams_to_drop} if streams_to_drop else set()
 
         # Build explicit stream maps and per-stream codec args
         map_args: list[str] = []
@@ -610,6 +644,15 @@ class AudioConverter:
         # Process audio streams
         audio_output_index = 0
         for stream in info.audio_streams:
+            if stream.index in drop_indices:
+                # Companion already exists — skip entirely (remove from output)
+                logger.info(
+                    "Dropping %s stream #%d (%s) — compatible companion already present",
+                    stream.codec_name.upper(),
+                    stream.index,
+                    stream.language or "und",
+                )
+                continue
             if stream.index in convert_indices:
                 # Determine keep_original per stream type
                 keep_orig = (

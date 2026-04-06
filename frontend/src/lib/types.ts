@@ -53,6 +53,7 @@ export interface JobResult {
 export interface ConversionResult {
   success: boolean;
   streams_converted?: number;
+  streams_dropped?: number;
   converted_streams?: ConvertedStream[] | null;
   original_size?: number;
   new_size?: number;
@@ -220,6 +221,7 @@ export interface BrowseMovie {
   needs_audio_conversion?: boolean;
   needs_video_conversion?: boolean;
   audio_codecs_to_convert?: string[];
+  audio_codecs_to_drop?: string[];
   is_anime?: boolean;
   analyzed?: boolean;
   video?: { codec: string | null; bit_depth: number | null };
@@ -287,6 +289,7 @@ export interface EpisodeFile {
   needs_audio_conversion?: boolean;
   needs_video_conversion?: boolean;
   audio_codecs_to_convert?: string[];
+  audio_codecs_to_drop?: string[];
   is_anime?: boolean;
 }
 
@@ -366,6 +369,8 @@ export interface AnalyzeResult {
   is_anime: boolean;
   content_type: string;
   needs_audio_conversion: boolean;
+  audio_codecs_to_convert?: string[];
+  audio_codecs_to_drop?: string[];
   needs_video_conversion: boolean;
   video_streams: AnalyzeVideoStream[];
   audio_streams: AnalyzeAudioStream[];
