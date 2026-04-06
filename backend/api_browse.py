@@ -82,23 +82,16 @@ def _compatible_track_languages(streams: Any, *, use_dicts: bool = False) -> set
 
 
 def _needs_audio_conversion(info: Any) -> bool:
-    """Config-aware check whether this file needs audio conversion.
+    """Config-aware check whether this file needs audio work.
 
-    Mirrors AudioConverter.should_convert() logic: regular DTS (excluding
-    DTS:X) is checked separately from DTS:X so that keeping an original
-    DTS:X track doesn't trigger a false positive.  When keep_original* is
-    enabled, streams that already have a compatible companion track in the
-    same language are considered "already converted" and skipped.
+    Returns True when any incompatible track needs conversion OR removal
+    (i.e. a companion already exists but keep_original is now off).
     """
     cfg = core.config.audio if core.config else None
     if not cfg:
         return False
-    # Build companion-language set for keep_original detection
-    compat = (
-        _compatible_track_languages(info.audio_streams)
-        if (cfg.keep_original or cfg.keep_original_dts_x)
-        else set()
-    )
+    # Always build compat so we detect tracks that should be dropped
+    compat = _compatible_track_languages(info.audio_streams)
     for s in info.audio_streams:
         lang = (s.language or "und").lower()
         if cfg.convert_dts and s.is_dts and not s.is_dts_x:
@@ -121,11 +114,8 @@ def _needs_audio_conversion_from_streams(streams: list[dict[str, Any]]) -> bool:
     cfg = core.config.audio if core.config else None
     if not cfg:
         return False
-    compat = (
-        _compatible_track_languages(streams, use_dicts=True)
-        if (cfg.keep_original or cfg.keep_original_dts_x)
-        else set()
-    )
+    # Always build compat so we detect tracks that should be dropped
+    compat = _compatible_track_languages(streams, use_dicts=True)
     for s in streams:
         is_dts = s.get("is_dts", False)
         is_dts_x = s.get("is_dts_x", False)
@@ -147,15 +137,16 @@ def _needs_audio_conversion_from_streams(streams: list[dict[str, Any]]) -> bool:
 
 
 def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
-    """Return list of codec names that need conversion (for detail display)."""
+    """Return list of codec names that need conversion (for detail display).
+
+    Only includes tracks that will actually be transcoded (no companion exists).
+    Tracks with a companion are either already processed (keep_original on)
+    or will be dropped (keep_original off) — neither needs transcoding.
+    """
     cfg = core.config.audio if core.config else None
     if not cfg:
         return []
-    compat = (
-        _compatible_track_languages(streams, use_dicts=True)
-        if (cfg.keep_original or cfg.keep_original_dts_x)
-        else set()
-    )
+    compat = _compatible_track_languages(streams, use_dicts=True)
     codecs: list[str] = []
     for s in streams:
         is_dts = s.get("is_dts", False)
@@ -164,17 +155,42 @@ def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
         codec = s.get("codec", "")
         lang = (s.get("language") or "und").lower()
         if cfg.convert_dts and is_dts and not is_dts_x:
-            if cfg.keep_original and _has_compatible_companion(lang, compat):
+            if _has_compatible_companion(lang, compat):
                 continue
             codecs.append(codec.upper() or "DTS")
         elif cfg.convert_dts_x and is_dts_x:
-            if cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+            if _has_compatible_companion(lang, compat):
                 continue
             codecs.append("DTS:X")
         elif cfg.convert_truehd and is_truehd:
-            if cfg.keep_original and _has_compatible_companion(lang, compat):
+            if _has_compatible_companion(lang, compat):
                 continue
             codecs.append(codec.upper() or "TrueHD")
+    return codecs
+
+
+def _audio_codecs_to_drop(streams: list[dict[str, Any]]) -> list[str]:
+    """Return list of codec names that will be dropped (companion already exists)."""
+    cfg = core.config.audio if core.config else None
+    if not cfg:
+        return []
+    compat = _compatible_track_languages(streams, use_dicts=True)
+    codecs: list[str] = []
+    for s in streams:
+        is_dts = s.get("is_dts", False)
+        is_dts_x = s.get("is_dts_x", False)
+        is_truehd = s.get("is_truehd", False)
+        codec = s.get("codec", "")
+        lang = (s.get("language") or "und").lower()
+        if cfg.convert_dts and is_dts and not is_dts_x:
+            if not cfg.keep_original and _has_compatible_companion(lang, compat):
+                codecs.append(codec.upper() or "DTS")
+        elif cfg.convert_dts_x and is_dts_x:
+            if not cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+                codecs.append("DTS:X")
+        elif cfg.convert_truehd and is_truehd:
+            if not cfg.keep_original and _has_compatible_companion(lang, compat):
+                codecs.append(codec.upper() or "TrueHD")
     return codecs
 
 
@@ -398,6 +414,18 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
         for s in info.subtitle_streams
     ]
 
+    # Build stream dicts usable by the shared codec helpers
+    audio_stream_dicts = [
+        {
+            "codec": a.codec_name,
+            "language": a.language,
+            "is_dts": a.is_dts,
+            "is_dts_x": a.is_dts_x,
+            "is_truehd": a.is_truehd,
+        }
+        for a in info.audio_streams
+    ]
+
     return {
         "file": str(info.path),
         "format": info.format_name,
@@ -408,6 +436,8 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
         "is_anime": is_anime,
         "content_type": content_type.value,
         "needs_audio_conversion": _needs_audio_conversion(info),
+        "audio_codecs_to_convert": _audio_codecs_to_convert(audio_stream_dicts),
+        "audio_codecs_to_drop": _audio_codecs_to_drop(audio_stream_dicts),
         "needs_video_conversion": _needs_video_conversion(info, is_anime),
         "video_streams": video_streams,
         "audio_streams": audio_streams,
@@ -688,6 +718,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                             cached_streams
                         )
                         item["audio_codecs_to_convert"] = _audio_codecs_to_convert(cached_streams)
+                        item["audio_codecs_to_drop"] = _audio_codecs_to_drop(cached_streams)
                     else:
                         # Fallback: re-evaluate with updated DTS/TrueHD flags
                         # Use has_dts_x to avoid false positive when only DTS:X present
@@ -1174,6 +1205,7 @@ def get_series_detail(
                 cached_ep_streams
             )
             ep_item["audio_codecs_to_convert"] = _audio_codecs_to_convert(cached_ep_streams)
+            ep_item["audio_codecs_to_drop"] = _audio_codecs_to_drop(cached_ep_streams)
         else:
             # Fallback: use Sonarr mediaInfo primary codec
             cfg_audio = core.config.audio if core.config else None
