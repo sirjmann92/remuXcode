@@ -229,10 +229,8 @@ const filtered = $derived.by(() => {
   switch (sortBy) {
     case 'needsWork':
       result = result.toSorted((a, b) => {
-        const aw =
-          (a.audio_convert_count ?? 0) + (a.video_convert_count ?? 0) + (a.cleanup_count ?? 0);
-        const bw =
-          (b.audio_convert_count ?? 0) + (b.video_convert_count ?? 0) + (b.cleanup_count ?? 0);
+        const aw = a.needs_work_count ?? 0;
+        const bw = b.needs_work_count ?? 0;
         return bw - aw || a.title.localeCompare(b.title);
       });
       break;
@@ -254,7 +252,7 @@ const listSummary = $derived.by(() => {
   const audioEps = filtered.reduce((s, r) => s + (r.audio_convert_count ?? 0), 0);
   const videoEps = filtered.reduce((s, r) => s + (r.video_convert_count ?? 0), 0);
   const cleanupEps = filtered.reduce((s, r) => s + (r.cleanup_count ?? 0), 0);
-  const needsWorkEps = audioEps + videoEps + cleanupEps;
+  const needsWorkEps = filtered.reduce((s, r) => s + (r.needs_work_count ?? 0), 0);
   return { total, audioEps, videoEps, cleanupEps, needsWorkEps };
 });
 
