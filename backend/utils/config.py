@@ -130,17 +130,17 @@ class VideoConfig:
     av1_live_action_framerate: str = ""
 
     # QSV encoder settings (Intel Quick Sync — ICQ mode)
-    qsv_anime_quality: int = 21
-    qsv_live_action_quality: int = 24
+    qsv_anime_quality: int = 18
+    qsv_live_action_quality: int = 21
     qsv_preset: str = "medium"
 
     # VAAPI encoder settings (Constant QP mode)
-    vaapi_anime_quality: int = 21
-    vaapi_live_action_quality: int = 24
+    vaapi_anime_quality: int = 18
+    vaapi_live_action_quality: int = 21
 
     # NVENC encoder settings (NVIDIA — CQ mode)
-    nvenc_anime_quality: int = 21
-    nvenc_live_action_quality: int = 24
+    nvenc_anime_quality: int = 18
+    nvenc_live_action_quality: int = 21
     nvenc_preset: str = "p5"
 
     # Common encoding settings (HEVC-specific, not used for AV1)
@@ -350,13 +350,13 @@ class Config:
             av1_live_action_crf=self._get("video.av1_live_action_crf", 30),
             av1_live_action_preset=self._get("video.av1_live_action_preset", 8),
             av1_live_action_framerate=self._get("video.av1_live_action_framerate", ""),
-            qsv_anime_quality=self._get("video.qsv_anime_quality", 21),
-            qsv_live_action_quality=self._get("video.qsv_live_action_quality", 24),
+            qsv_anime_quality=self._get("video.qsv_anime_quality", 18),
+            qsv_live_action_quality=self._get("video.qsv_live_action_quality", 21),
             qsv_preset=self._get("video.qsv_preset", "medium"),
-            vaapi_anime_quality=self._get("video.vaapi_anime_quality", 21),
-            vaapi_live_action_quality=self._get("video.vaapi_live_action_quality", 24),
-            nvenc_anime_quality=self._get("video.nvenc_anime_quality", 21),
-            nvenc_live_action_quality=self._get("video.nvenc_live_action_quality", 24),
+            vaapi_anime_quality=self._get("video.vaapi_anime_quality", 18),
+            vaapi_live_action_quality=self._get("video.vaapi_live_action_quality", 21),
+            nvenc_anime_quality=self._get("video.nvenc_anime_quality", 18),
+            nvenc_live_action_quality=self._get("video.nvenc_live_action_quality", 21),
             nvenc_preset=self._get("video.nvenc_preset", "p5"),
             vbv_maxrate=self._get("video.vbv_maxrate", 5000),
             vbv_bufsize=self._get("video.vbv_bufsize", 10000),
