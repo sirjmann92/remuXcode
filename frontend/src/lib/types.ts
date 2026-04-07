@@ -254,6 +254,7 @@ export interface BrowseSeries {
   audio_convert_count?: number;
   video_convert_count?: number;
   cleanup_count?: number;
+  needs_work_count?: number;
   dts_x_count?: number;
   audio_codecs: string[];
   video_codecs: string[];
