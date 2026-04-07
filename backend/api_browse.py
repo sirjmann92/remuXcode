@@ -88,7 +88,7 @@ def _needs_audio_conversion(info: Any) -> bool:
     (i.e. a companion already exists but keep_original is now off).
     """
     cfg = core.config.audio if core.config else None
-    if not cfg:
+    if not cfg or not cfg.enabled:
         return False
     # Always build compat so we detect tracks that should be dropped
     compat = _compatible_track_languages(info.audio_streams)
@@ -112,7 +112,7 @@ def _needs_audio_conversion(info: Any) -> bool:
 def _needs_audio_conversion_from_streams(streams: list[dict[str, Any]]) -> bool:
     """Stream-level check using cached analysis data (from media.db)."""
     cfg = core.config.audio if core.config else None
-    if not cfg:
+    if not cfg or not cfg.enabled:
         return False
     # Always build compat so we detect tracks that should be dropped
     compat = _compatible_track_languages(streams, use_dicts=True)
@@ -144,7 +144,7 @@ def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
     or will be dropped (keep_original off) — neither needs transcoding.
     """
     cfg = core.config.audio if core.config else None
-    if not cfg:
+    if not cfg or not cfg.enabled:
         return []
     compat = _compatible_track_languages(streams, use_dicts=True)
     codecs: list[str] = []
@@ -172,7 +172,7 @@ def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
 def _audio_codecs_to_drop(streams: list[dict[str, Any]]) -> list[str]:
     """Return list of codec names that will be dropped (companion already exists)."""
     cfg = core.config.audio if core.config else None
-    if not cfg:
+    if not cfg or not cfg.enabled:
         return []
     compat = _compatible_track_languages(streams, use_dicts=True)
     codecs: list[str] = []
@@ -197,7 +197,7 @@ def _audio_codecs_to_drop(streams: list[dict[str, Any]]) -> list[str]:
 def _needs_video_conversion(info: Any, is_anime: bool) -> bool:
     """Config-aware check whether this file needs video conversion."""
     cfg = core.config.video if core.config else None
-    if not cfg:
+    if not cfg or not cfg.enabled:
         return False
     video = info.primary_video
     if video is None:
@@ -236,7 +236,7 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
     Use _needs_cleanup_from_streams() when ffprobe-level data is available.
     """
     cfg = core.config.cleanup if core.config else None
-    if not cfg or (not cfg.clean_subtitles and not cfg.clean_audio):
+    if not cfg or not cfg.enabled or (not cfg.clean_subtitles and not cfg.clean_audio):
         return False
     keep = {lang.lower() for lang in cfg.keep_languages}
 
@@ -271,7 +271,7 @@ def _needs_cleanup_from_streams(
 ) -> bool:
     """Precise cleanup check using stream-level data (applies commentary/AD exemptions)."""
     cfg = core.config.cleanup if core.config else None
-    if not cfg or (not cfg.clean_subtitles and not cfg.clean_audio):
+    if not cfg or not cfg.enabled or (not cfg.clean_subtitles and not cfg.clean_audio):
         return False
     keep = {lang.lower() for lang in cfg.keep_languages}
 
@@ -630,7 +630,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
         # Config-aware audio detection from mediaInfo (overridden by ffprobe/cache if available)
         # Radarr mediaInfo only reports the primary track codec, so this is approximate.
         cfg_audio = core.config.audio if core.config else None
-        if cfg_audio:
+        if cfg_audio and cfg_audio.enabled:
             if cfg_audio.convert_dts and item["has_dts"]:
                 item["needs_audio_conversion"] = True
             if cfg_audio.convert_truehd and item["has_truehd"]:
@@ -639,7 +639,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
 
         # Config-aware video detection from Radarr mediaInfo (overridden by ffprobe if analyzed)
         cfg_video_m = core.config.video if core.config else None
-        if cfg_video_m:
+        if cfg_video_m and cfg_video_m.enabled:
             vc_m = media_info.get("videoCodec", "").lower()
             vbd_m = media_info.get("videoBitDepth", 8) or 8
             is_h264_m = any(x in vc_m for x in ("x264", "avc", "h264"))
@@ -723,7 +723,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                         # Fallback: re-evaluate with updated DTS/TrueHD flags
                         # Use has_dts_x to avoid false positive when only DTS:X present
                         cfg_audio_cache = core.config.audio if core.config else None
-                        if cfg_audio_cache:
+                        if cfg_audio_cache and cfg_audio_cache.enabled:
                             audio_needs = False
                             has_regular_dts = item["has_dts"] and not item.get("has_dts_x")
                             if cfg_audio_cache.convert_dts and has_regular_dts:
@@ -961,7 +961,7 @@ def _build_series_results(
                         has_truehd_ep = ep_analysis.get("has_truehd", "TRUEHD" in ac)
                         has_dts_x_ep = ep_analysis.get("has_dts_x", False)
                         has_audio_issue = False
-                        if cfg_audio:
+                        if cfg_audio and cfg_audio.enabled:
                             has_regular_dts = has_dts_ep and not has_dts_x_ep
                             if cfg_audio.convert_dts and has_regular_dts:
                                 has_audio_issue = True
@@ -973,7 +973,7 @@ def _build_series_results(
                         audio_count += 1
                     # Video conversion check from Sonarr mediaInfo
                     has_video_issue = False
-                    if cfg_video:
+                    if cfg_video and cfg_video.enabled:
                         vc = mi.get("videoCodec", "").lower()
                         vbd = mi.get("videoBitDepth", 8) or 8
                         is_h264_ep = any(x in vc for x in ("x264", "avc", "h264"))
@@ -1219,7 +1219,7 @@ def get_series_detail(
             # Fallback: use Sonarr mediaInfo primary codec
             cfg_audio = core.config.audio if core.config else None
             ep_item["needs_audio_conversion"] = False
-            if cfg_audio:
+            if cfg_audio and cfg_audio.enabled:
                 has_regular_dts = ep_item["has_dts"] and not ep_item.get("has_dts_x")
                 if cfg_audio.convert_dts and has_regular_dts:
                     ep_item["needs_audio_conversion"] = True
@@ -1230,7 +1230,7 @@ def get_series_detail(
 
         cfg_video_ep = core.config.video if core.config else None
         ep_item["needs_video_conversion"] = False
-        if cfg_video_ep:
+        if cfg_video_ep and cfg_video_ep.enabled:
             vc = mi.get("videoCodec", "").lower()
             vbd = mi.get("videoBitDepth", 8) or 8
             is_h264_item = any(x in vc for x in ("x264", "avc", "h264"))
