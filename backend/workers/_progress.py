@@ -53,8 +53,18 @@ def run_ffmpeg_with_progress(
     fifo_path = fifo_dir / "progress.fifo"
     os.mkfifo(fifo_path)
 
-    # Inject -progress <fifo> before the last argument (the output path)
-    progress_cmd = [*cmd[:-1], "-progress", str(fifo_path), cmd[-1]]
+    # Inject -stats_period and -progress before the last argument (the output
+    # path).  -stats_period 0.5 forces ffmpeg to emit progress blocks every
+    # 500ms even when video is just copied (otherwise audio-only conversions
+    # produce almost no intermediate updates).
+    progress_cmd = [
+        *cmd[:-1],
+        "-stats_period",
+        "0.5",
+        "-progress",
+        str(fifo_path),
+        cmd[-1],
+    ]
 
     stderr_chunks: list[str] = []
     cancelled = threading.Event()

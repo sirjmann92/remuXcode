@@ -1,5 +1,5 @@
 video:
-  enabled: true
+  enabled: false
   codec: hevc
   convert_10bit_x264: true
   convert_8bit_x264: false
@@ -24,7 +24,7 @@ video:
   level: '4.1'
   vbv_maxrate: 5000
   vbv_bufsize: 10000
-  hw_accel: none
+  hw_accel: qsv
   qsv_anime_quality: 18
   qsv_live_action_quality: 21
   qsv_preset: medium
@@ -34,7 +34,7 @@ video:
   nvenc_live_action_quality: 21
   nvenc_preset: p5
 audio:
-  enabled: false
+  enabled: true
   anime_only: false
   convert_dts: true
   convert_dts_x: true
