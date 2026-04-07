@@ -930,6 +930,7 @@ def _build_series_results(
                 audio_count = 0
                 video_count = 0
                 cleanup_count = 0
+                work_count = 0
                 dts_x_count = 0
                 cfg_audio = core.config.audio if core.config else None
                 cfg_video = core.config.video if core.config else None
@@ -971,6 +972,7 @@ def _build_series_results(
                     if has_audio_issue:
                         audio_count += 1
                     # Video conversion check from Sonarr mediaInfo
+                    has_video_issue = False
                     if cfg_video:
                         vc = mi.get("videoCodec", "").lower()
                         vbd = mi.get("videoBitDepth", 8) or 8
@@ -980,8 +982,10 @@ def _build_series_results(
                             if (cfg_video.convert_10bit_x264 and is_h264_ep and vbd >= 10) or (
                                 cfg_video.convert_8bit_x264 and is_h264_ep and vbd < 10
                             ):
+                                has_video_issue = True
                                 video_count += 1
                     # Use stream-level data for precise cleanup check when available
+                    has_cleanup_issue = False
                     cached_streams = ep_analysis.get("audio_streams", [])
                     if cached_streams:
                         ep_sub_langs = item.get("subtitles", []) or [
@@ -992,9 +996,13 @@ def _build_series_results(
                             ep_sub_langs,
                             is_anime=item.get("is_anime", False),
                         ):
+                            has_cleanup_issue = True
                             cleanup_count += 1
                     elif _needs_cleanup(mi, is_anime=item.get("is_anime", False)):
+                        has_cleanup_issue = True
                         cleanup_count += 1
+                    if has_audio_issue or has_video_issue or has_cleanup_issue:
+                        work_count += 1
                     # Collect unique codec strings for contextual filtering
                     ac_raw = mi.get("audioCodec", "")
                     vc_raw = mi.get("videoCodec", "")
@@ -1009,6 +1017,7 @@ def _build_series_results(
                 item["audio_convert_count"] = audio_count
                 item["video_convert_count"] = video_count
                 item["cleanup_count"] = cleanup_count
+                item["needs_work_count"] = work_count
                 item["dts_x_count"] = dts_x_count
                 item["audio_codecs"] = sorted(audio_codecs_set)
                 item["video_codecs"] = sorted(video_codecs_set)
