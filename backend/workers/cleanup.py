@@ -325,12 +325,25 @@ class StreamCleanup:
             )
             logger.debug("Running: %s", " ".join(cmd))
 
+            # Estimate total frames for progress (out_time_us stays 0 with -c:v copy)
+            total_frames: float | None = None
+            if info.video_streams and info.duration > 0:
+                fr = info.video_streams[0].frame_rate
+                try:
+                    num, den = fr.split("/")
+                    fps = float(num) / float(den)
+                except (ValueError, ZeroDivisionError):
+                    fps = 0.0
+                if fps > 0:
+                    total_frames = info.duration * fps
+
             returncode, stderr_text = run_ffmpeg_with_progress(
                 cmd,
                 duration_secs=info.duration,
                 progress_cb=progress_callback,
                 timeout=3600,
                 cancel_event=cancel_event,
+                total_frames=total_frames,
             )
 
             if returncode != 0:

@@ -353,12 +353,27 @@ class AudioConverter:
             )
             logger.debug("Running: %s", " ".join(cmd))
 
+            # Estimate total frames for progress reporting.  When video is
+            # copied (-c:v copy), ffmpeg doesn't populate out_time_us so we
+            # fall back to frame-based progress.
+            total_frames: float | None = None
+            if info.video_streams and info.duration > 0:
+                fr = info.video_streams[0].frame_rate  # e.g. "24000/1001"
+                try:
+                    num, den = fr.split("/")
+                    fps = float(num) / float(den)
+                except (ValueError, ZeroDivisionError):
+                    fps = 0.0
+                if fps > 0:
+                    total_frames = info.duration * fps
+
             returncode, stderr_text = run_ffmpeg_with_progress(
                 cmd,
                 duration_secs=info.duration,
                 progress_cb=progress_callback,
                 timeout=self.config.job_timeout or None,  # 0 = no timeout
                 cancel_event=cancel_event,
+                total_frames=total_frames,
             )
 
             if returncode != 0:
