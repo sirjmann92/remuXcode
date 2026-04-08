@@ -466,18 +466,26 @@ class JobQueue:
                 or (result.get("cleanup") and result["cleanup"].get("success"))
             )
             if any_success:
+                rename_result = RenameResult()
                 try:
-                    trigger_rename(job.file_path)
+                    rename_result = trigger_rename(job.file_path)
                 except Exception as rename_err:
                     logger.warning("Rename trigger failed (job still completed): %s", rename_err)
 
-                # Auto-analyze the (potentially renamed) output file
+                # Analyze the (possibly renamed) output file and store in
+                # media DB with the Sonarr/Radarr file ID so browse lookups
+                # find the updated analysis immediately.
+                analyze_path = rename_result.new_path or job.file_path
                 try:
                     from backend.api_analyze import analyze_and_store
 
-                    analyze_and_store(job.file_path)
+                    analyze_and_store(
+                        analyze_path,
+                        radarr_movie_file_id=rename_result.radarr_movie_file_id,
+                        sonarr_episode_file_id=rename_result.sonarr_episode_file_id,
+                    )
                 except Exception as analyze_err:
-                    logger.debug("Post-job analysis skipped: %s", analyze_err)
+                    logger.warning("Post-job analysis failed for %s: %s", analyze_path, analyze_err)
 
             job.status = JobStatus.COMPLETED
             logger.info("Job %s completed successfully", job_id)
@@ -708,19 +716,32 @@ def process_file(
 # ---------------------------------------------------------------------------
 
 
-def trigger_rename(file_path: str, media_type: str = "auto") -> None:
-    """Trigger Sonarr/Radarr refresh and rename after conversion."""
+@dataclass
+class RenameResult:
+    """Result of a Sonarr/Radarr rename operation."""
+
+    new_path: str | None = None
+    radarr_movie_file_id: int | None = None
+    sonarr_episode_file_id: int | None = None
+
+
+def trigger_rename(file_path: str, media_type: str = "auto") -> RenameResult:
+    """Trigger Sonarr/Radarr refresh and rename after conversion.
+
+    Returns a RenameResult containing the (possibly new) file path
+    and the Sonarr/Radarr file ID for DB linkage.
+    """
     if media_type == "auto":
         path_lower = file_path.lower()
         media_type = "movie" if ("/movies/" in path_lower or "/films/" in path_lower) else "tv"
 
     try:
         if media_type == "movie":
-            _trigger_radarr_rename(file_path)
-        else:
-            _trigger_sonarr_rename(file_path)
+            return _trigger_radarr_rename(file_path)
+        return _trigger_sonarr_rename(file_path)
     except Exception as e:
         logger.error("Failed to trigger rename: %s", e)
+        return RenameResult()
 
 
 def _get_radarr_config() -> tuple[str, str]:
@@ -771,12 +792,12 @@ def refresh_sonarr() -> None:
     _poll_command(sonarr_url, sonarr_key, cmd_id, "Sonarr library refresh", max_wait=120)
 
 
-def _trigger_radarr_rename(file_path: str) -> None:
+def _trigger_radarr_rename(file_path: str) -> RenameResult:
     radarr_url, radarr_key = _get_radarr_config()
 
     if not radarr_url or not radarr_key:
         logger.warning("Radarr not configured, skipping rename")
-        return
+        return RenameResult()
 
     response = requests.get(
         f"{radarr_url}/api/v3/movie",
@@ -796,7 +817,7 @@ def _trigger_radarr_rename(file_path: str) -> None:
 
     if not movie_id:
         logger.warning("Movie not found in Radarr for path: %s", file_path)
-        return
+        return RenameResult()
 
     # Refresh — forces Radarr to re-read mediainfo from disk
     resp = requests.post(
@@ -810,7 +831,7 @@ def _trigger_radarr_rename(file_path: str) -> None:
     logger.info("Triggered Radarr refresh for movie ID %s", movie_id)
     _poll_command(radarr_url, radarr_key, cmd_id, "Radarr refresh")
 
-    # Get movie file ID
+    # Get movie file ID (pre-rename)
     movie_file_id = None
     resp = requests.get(
         f"{radarr_url}/api/v3/moviefile",
@@ -839,13 +860,28 @@ def _trigger_radarr_rename(file_path: str) -> None:
     _poll_command(radarr_url, radarr_key, rename_cmd_id, "Radarr rename")
     logger.info("Radarr rename completed for movie ID %s", movie_id)
 
+    # Re-fetch file info to get the (possibly new) path after rename
+    new_path = file_path
+    if movie_file_id:
+        resp = requests.get(
+            f"{radarr_url}/api/v3/moviefile/{movie_file_id}",
+            headers={"X-Api-Key": radarr_key},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            new_path = resp.json().get("path", file_path)
+            if new_path != file_path:
+                logger.info("Radarr renamed file: %s", Path(new_path).name)
 
-def _trigger_sonarr_rename(file_path: str) -> None:
+    return RenameResult(new_path=new_path, radarr_movie_file_id=movie_file_id)
+
+
+def _trigger_sonarr_rename(file_path: str) -> RenameResult:
     sonarr_url, sonarr_key = _get_sonarr_config()
 
     if not sonarr_url or not sonarr_key:
         logger.warning("Sonarr not configured, skipping rename")
-        return
+        return RenameResult()
 
     response = requests.get(
         f"{sonarr_url}/api/v3/series",
@@ -865,7 +901,7 @@ def _trigger_sonarr_rename(file_path: str) -> None:
 
     if not series_id:
         logger.warning("Series not found in Sonarr for path: %s", file_path)
-        return
+        return RenameResult()
 
     # RefreshSeries — forces full metadata re-read including mediainfo
     # (RescanSeries only detects new/removed files, not content changes)
@@ -920,6 +956,21 @@ def _trigger_sonarr_rename(file_path: str) -> None:
     rename_cmd_id = resp.json().get("id")
     _poll_command(sonarr_url, sonarr_key, rename_cmd_id, "Sonarr rename")
     logger.info("Sonarr rename completed for series ID %s", series_id)
+
+    # Re-fetch file info to get the (possibly new) path after rename
+    new_path = file_path
+    if episode_file_id:
+        resp = requests.get(
+            f"{sonarr_url}/api/v3/episodefile/{episode_file_id}",
+            headers={"X-Api-Key": sonarr_key},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            new_path = resp.json().get("path", file_path)
+            if new_path != file_path:
+                logger.info("Sonarr renamed file: %s", Path(new_path).name)
+
+    return RenameResult(new_path=new_path, sonarr_episode_file_id=episode_file_id)
 
 
 def _poll_command(
