@@ -738,9 +738,14 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                         item["needs_video_conversion"] = a["needs_video_conversion"]
                     # Re-evaluate cleanup using stream-level data if titles are available
                     if cached_streams:
+                        # Prefer DB subtitle langs over stale Radarr data
+                        db_sub_langs = a.get("subtitle_langs")
+                        sub_langs = (
+                            db_sub_langs if db_sub_langs is not None else item.get("subtitles", [])
+                        )
                         item["needs_cleanup"] = _needs_cleanup_from_streams(
                             cached_streams,
-                            item.get("subtitles", []),
+                            sub_langs,
                             is_anime=item.get("is_anime", False),
                         )
                     # Update path if renamed since last analysis
@@ -988,9 +993,16 @@ def _build_series_results(
                     has_cleanup_issue = False
                     cached_streams = ep_analysis.get("audio_streams", [])
                     if cached_streams:
-                        ep_sub_langs = item.get("subtitles", []) or [
-                            s.lower() for s in _split_slash_field(mi.get("subtitles", ""))
-                        ]
+                        # Prefer DB subtitle langs over stale Sonarr data
+                        db_sub_langs = ep_analysis.get("subtitle_langs")
+                        ep_sub_langs = (
+                            db_sub_langs
+                            if db_sub_langs is not None
+                            else (
+                                item.get("subtitles", [])
+                                or [s.lower() for s in _split_slash_field(mi.get("subtitles", ""))]
+                            )
+                        )
                         if _needs_cleanup_from_streams(
                             cached_streams,
                             ep_sub_langs,
@@ -1197,7 +1209,11 @@ def get_series_detail(
             # Re-evaluate cleanup with stream-level data if titles are available
             cached_streams = a.get("audio_streams", [])
             if cached_streams:
-                ep_sub_langs = ep_item.get("subtitles", [])
+                # Prefer DB subtitle langs over stale Sonarr data
+                db_sub_langs = a.get("subtitle_langs")
+                ep_sub_langs = (
+                    db_sub_langs if db_sub_langs is not None else ep_item.get("subtitles", [])
+                )
                 ep_item["needs_cleanup"] = _needs_cleanup_from_streams(
                     cached_streams,
                     ep_sub_langs,
