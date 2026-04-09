@@ -49,6 +49,7 @@ def build_analysis_dict(info: Any) -> dict[str, Any]:
         "has_dts_x": info.has_dts_x,
         "has_truehd": info.has_truehd,
         "subtitle_count": len(info.subtitle_streams),
+        "subtitle_langs": [s.language or "" for s in info.subtitle_streams],
     }
 
 
