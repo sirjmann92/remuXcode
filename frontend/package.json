@@ -21,7 +21,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.5.2",
-    "svelte": "^5.0.0",
+    "svelte": "^5.55.2",
     "svelte-check": "^4.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0",
