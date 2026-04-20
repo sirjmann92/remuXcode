@@ -17,7 +17,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.10",
     "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.57.0",
+    "@sveltejs/kit": "^2.57.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.5.2",
