@@ -105,7 +105,9 @@ async def list_jobs(
     filtered.sort(
         key=lambda j: (
             status_order.get(j.status.value, 9),
-            -(j.created_at or 0),
+            # Pending: oldest first (queue order — next to process at top)
+            # Everything else: newest first
+            (j.created_at or 0) if j.status.value == "pending" else -(j.created_at or 0),
         )
     )
 
