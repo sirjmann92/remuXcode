@@ -204,6 +204,14 @@ def _needs_video_conversion(info: Any, is_anime: bool) -> bool:
         return False
     if cfg.anime_only and not is_anime:
         return False
+    if cfg.live_action_only and is_anime:
+        return False
+    # Skip Dolby Vision unless dv_to_hdr10 is enabled
+    if video.is_dolby_vision and not cfg.dv_to_hdr10:
+        return False
+    # Skip HDR10+ unless hdr10plus_to_hdr10 is enabled
+    if video.is_hdr10_plus and not cfg.hdr10plus_to_hdr10:
+        return False
     if video.is_10bit_h264 and cfg.convert_10bit_x264:
         return True
     if video.is_h264 and not video.is_10bit and cfg.convert_8bit_x264:
