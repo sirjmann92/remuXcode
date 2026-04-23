@@ -43,7 +43,9 @@ const animeQualityField = $derived(
       ? 'vaapi_anime_quality'
       : effectiveMethod === 'nvenc'
         ? 'nvenc_anime_quality'
-        : 'anime_crf',
+        : config?.video.codec === 'av1'
+          ? 'av1_anime_crf'
+          : 'anime_crf',
 );
 
 const liveQualityField = $derived(
@@ -53,10 +55,14 @@ const liveQualityField = $derived(
       ? 'vaapi_live_action_quality'
       : effectiveMethod === 'nvenc'
         ? 'nvenc_live_action_quality'
-        : 'live_action_crf',
+        : config?.video.codec === 'av1'
+          ? 'av1_live_action_crf'
+          : 'live_action_crf',
 );
 
-const qualityMax = $derived(effectiveMethod === 'vaapi' ? 52 : 51);
+const qualityMax = $derived(
+  effectiveMethod === 'vaapi' ? 52 : effectiveMethod === 'none' && config?.video.codec === 'av1' ? 63 : 51
+);
 
 async function fetchConfig() {
   loading = true;
