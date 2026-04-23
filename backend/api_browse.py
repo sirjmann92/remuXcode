@@ -643,7 +643,9 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
             vc_m = media_info.get("videoCodec", "").lower()
             vbd_m = media_info.get("videoBitDepth", 8) or 8
             is_h264_m = any(x in vc_m for x in ("x264", "avc", "h264"))
-            if not cfg_video_m.anime_only or movie_is_anime:
+            if (not cfg_video_m.anime_only or movie_is_anime) and (
+                not cfg_video_m.live_action_only or not movie_is_anime
+            ):
                 if (cfg_video_m.convert_10bit_x264 and is_h264_m and vbd_m >= 10) or (
                     cfg_video_m.convert_8bit_x264 and is_h264_m and vbd_m < 10
                 ):
@@ -983,7 +985,9 @@ def _build_series_results(
                         vbd = mi.get("videoBitDepth", 8) or 8
                         is_h264_ep = any(x in vc for x in ("x264", "avc", "h264"))
                         is_anime_ep = item.get("is_anime", False)
-                        if not cfg_video.anime_only or is_anime_ep:
+                        if (not cfg_video.anime_only or is_anime_ep) and (
+                            not cfg_video.live_action_only or not is_anime_ep
+                        ):
                             if (cfg_video.convert_10bit_x264 and is_h264_ep and vbd >= 10) or (
                                 cfg_video.convert_8bit_x264 and is_h264_ep and vbd < 10
                             ):
@@ -1250,7 +1254,9 @@ def get_series_detail(
             vc = mi.get("videoCodec", "").lower()
             vbd = mi.get("videoBitDepth", 8) or 8
             is_h264_item = any(x in vc for x in ("x264", "avc", "h264"))
-            if not cfg_video_ep.anime_only or series_is_anime:
+            if (not cfg_video_ep.anime_only or series_is_anime) and (
+                not cfg_video_ep.live_action_only or not series_is_anime
+            ):
                 if (cfg_video_ep.convert_10bit_x264 and is_h264_item and vbd >= 10) or (
                     cfg_video_ep.convert_8bit_x264 and is_h264_item and vbd < 10
                 ):

@@ -102,6 +102,8 @@ class VideoConfig:
 
     # Only convert anime content (skip live action)
     anime_only: bool = True
+    # Only convert live action content (skip anime)
+    live_action_only: bool = False
 
     # Anime-specific settings
     anime_auto_detect: bool = True
