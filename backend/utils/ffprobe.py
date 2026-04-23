@@ -5,6 +5,7 @@ Provides structured access to media file information via ffprobe.
 Returns parsed JSON data about video, audio, and subtitle streams.
 """
 
+import contextlib
 from dataclasses import dataclass
 import json
 import logging
@@ -29,6 +30,13 @@ class VideoStream:
     frame_rate: str
     duration: float | None
     bitrate: int | None
+    color_primaries: str | None = None
+    color_trc: str | None = None
+    color_space: str | None = None
+    # HDR10 mastering display in x265-format: G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)
+    hdr_master_display: str | None = None
+    # HDR10 content light level: "maxCLL,maxFALL"
+    hdr_max_cll: str | None = None
 
     @property
     def is_hevc(self) -> bool:
@@ -282,6 +290,50 @@ class FFProbe:
             format_tags={k.upper(): v for k, v in format_info.get("tags", {}).items()},
         )
 
+    @staticmethod
+    def _parse_hdr_side_data(side_data_list: list[dict]) -> tuple[str | None, str | None]:
+        """Extract HDR10 mastering display and content light level from side data.
+
+        Returns:
+            (master_display, max_cll) where master_display is x265-format string
+            e.g. "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,50)"
+            and max_cll is "maxCLL,maxFALL" e.g. "1000,400". Either may be None.
+        """
+        master_display: str | None = None
+        max_cll: str | None = None
+
+        for sd in side_data_list:
+            sd_type = sd.get("side_data_type", "").lower()
+
+            if "mastering display" in sd_type and master_display is None:
+                try:
+
+                    def _frac(frac: str, scale: int) -> int:
+                        n, d = frac.split("/")
+                        return round(int(n) * scale / int(d))
+
+                    gx = _frac(sd["green_x"], 50000)
+                    gy = _frac(sd["green_y"], 50000)
+                    bx = _frac(sd["blue_x"], 50000)
+                    by = _frac(sd["blue_y"], 50000)
+                    rx = _frac(sd["red_x"], 50000)
+                    ry = _frac(sd["red_y"], 50000)
+                    wpx = _frac(sd["white_point_x"], 50000)
+                    wpy = _frac(sd["white_point_y"], 50000)
+                    max_l = _frac(sd["max_luminance"], 10000)
+                    min_l = _frac(sd["min_luminance"], 10000)
+                    master_display = (
+                        f"G({gx},{gy})B({bx},{by})R({rx},{ry})WP({wpx},{wpy})L({max_l},{min_l})"
+                    )
+                except (KeyError, ValueError, ZeroDivisionError):
+                    pass
+
+            elif "content light level" in sd_type and max_cll is None:
+                with contextlib.suppress(TypeError, ValueError):
+                    max_cll = f"{sd.get('max_content', 0)},{sd.get('max_average', 0)}"
+
+        return master_display, max_cll
+
     def _parse_video_stream(self, stream: dict) -> VideoStream:
         """Parse video stream information."""
         # Determine bit depth
@@ -297,6 +349,10 @@ class FFProbe:
         # Parse frame rate
         r_frame_rate = stream.get("r_frame_rate", "0/1")
 
+        # Parse HDR side data
+        side_data_list = stream.get("side_data_list", [])
+        hdr_master_display, hdr_max_cll = self._parse_hdr_side_data(side_data_list)
+
         return VideoStream(
             index=stream.get("index", 0),
             codec_name=stream.get("codec_name", ""),
@@ -309,6 +365,11 @@ class FFProbe:
             frame_rate=r_frame_rate,
             duration=float(stream.get("duration", 0)) if stream.get("duration") else None,
             bitrate=int(stream.get("bit_rate", 0)) if stream.get("bit_rate") else None,
+            color_primaries=stream.get("color_primaries") or None,
+            color_trc=stream.get("color_transfer") or None,
+            color_space=stream.get("color_space") or None,
+            hdr_master_display=hdr_master_display,
+            hdr_max_cll=hdr_max_cll,
         )
 
     def _parse_audio_stream(self, stream: dict) -> AudioStream:
