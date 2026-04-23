@@ -128,12 +128,12 @@ class VideoConfig:
     live_action_framerate: str = ""  # Empty = auto-detect from source
 
     # AV1 settings - Anime (SVT-AV1 encoder)
-    av1_anime_crf: int = 28  # Equivalent to ~HEVC CRF 19
+    av1_anime_crf: int = 24  # High-quality archive default
     av1_anime_preset: int = 6  # 0-13, lower = slower/better
     av1_anime_framerate: str = "24000/1001"
 
     # AV1 settings - Live action
-    av1_live_action_crf: int = 27  # Equivalent to ~HEVC CRF 19-20
+    av1_live_action_crf: int = 24  # High-quality archive default
     av1_live_action_preset: int = 8  # Faster preset
     av1_live_action_framerate: str = ""
 
@@ -355,10 +355,10 @@ class Config:
             live_action_preset=self._get("video.live_action_preset", "medium"),
             live_action_tune=self._get("video.live_action_tune"),
             live_action_framerate=self._get("video.live_action_framerate", ""),
-            av1_anime_crf=self._get("video.av1_anime_crf", 28),
+            av1_anime_crf=self._get("video.av1_anime_crf", 24),
             av1_anime_preset=self._get("video.av1_anime_preset", 6),
             av1_anime_framerate=self._get("video.av1_anime_framerate", "24000/1001"),
-            av1_live_action_crf=self._get("video.av1_live_action_crf", 27),
+            av1_live_action_crf=self._get("video.av1_live_action_crf", 24),
             av1_live_action_preset=self._get("video.av1_live_action_preset", 8),
             av1_live_action_framerate=self._get("video.av1_live_action_framerate", ""),
             qsv_anime_quality=self._get("video.qsv_anime_quality", 18),
