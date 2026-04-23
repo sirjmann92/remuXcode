@@ -133,7 +133,7 @@ class VideoConfig:
     av1_anime_framerate: str = "24000/1001"
 
     # AV1 settings - Live action
-    av1_live_action_crf: int = 30  # Equivalent to ~HEVC CRF 22
+    av1_live_action_crf: int = 27  # Equivalent to ~HEVC CRF 19-20
     av1_live_action_preset: int = 8  # Faster preset
     av1_live_action_framerate: str = ""
 
@@ -358,7 +358,7 @@ class Config:
             av1_anime_crf=self._get("video.av1_anime_crf", 28),
             av1_anime_preset=self._get("video.av1_anime_preset", 6),
             av1_anime_framerate=self._get("video.av1_anime_framerate", "24000/1001"),
-            av1_live_action_crf=self._get("video.av1_live_action_crf", 30),
+            av1_live_action_crf=self._get("video.av1_live_action_crf", 27),
             av1_live_action_preset=self._get("video.av1_live_action_preset", 8),
             av1_live_action_framerate=self._get("video.av1_live_action_framerate", ""),
             qsv_anime_quality=self._get("video.qsv_anime_quality", 18),
