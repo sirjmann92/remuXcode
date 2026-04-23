@@ -629,9 +629,25 @@ class VideoConverter:
             preset = self.config.av1_live_action_preset
             framerate = self.config.av1_live_action_framerate
 
+        # Compute keyframe interval: 5 seconds × fps.
+        # SVT-AV1 defaults to 2–3 s which wastes bitrate on I-frames.
+        # Prefer the configured output framerate; fall back to the source
+        # frame_rate from ffprobe; fall back to 120 (5 s @ 24 fps).
+        _fps_str = framerate or (video.frame_rate if video else "") or ""
+        try:
+            if "/" in _fps_str:
+                _n, _d = _fps_str.split("/")
+                _fps = float(_n) / float(_d)
+            else:
+                _fps = float(_fps_str)
+            keyint = max(1, round(_fps * 5))
+        except (ValueError, ZeroDivisionError):
+            keyint = 120  # safe fallback: 5 s @ 24 fps
+
         # SVT-AV1 params
         svtav1_params = [
             "tune=0",  # 0=VQ (visual quality), 1=PSNR
+            f"keyint={keyint}",  # 5-second keyframe interval
         ]
 
         # Add animation-specific tuning for anime
