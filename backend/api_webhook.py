@@ -81,7 +81,6 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
                 media_type=media_type,
             )
             job_ids.append(job.id)
-            logger.info("Queued job %s for %s", job.id, Path(file_path).name)
         else:
             logger.warning("Webhook file not found on disk: %s", file_path)
 
