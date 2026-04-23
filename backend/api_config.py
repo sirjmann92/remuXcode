@@ -29,6 +29,7 @@ async def get_config_summary() -> dict[str, Any]:
             "convert_10bit_x264": cfg.video.convert_10bit_x264,
             "convert_8bit_x264": cfg.video.convert_8bit_x264,
             "anime_only": cfg.video.anime_only,
+            "live_action_only": cfg.video.live_action_only,
             "anime_crf": cfg.video.anime_crf,
             "live_action_crf": cfg.video.live_action_crf,
             # Advanced
@@ -178,6 +179,7 @@ class VideoUpdate(BaseModel):
     convert_10bit_x264: bool | None = None
     convert_8bit_x264: bool | None = None
     anime_only: bool | None = None
+    live_action_only: bool | None = None
     anime_auto_detect: bool | None = None
     anime_crf: int | None = Field(None, ge=0, le=51)
     anime_preset: str | None = None

@@ -99,6 +99,7 @@ export interface ConfigSummary {
     convert_10bit_x264: boolean;
     convert_8bit_x264: boolean;
     anime_only: boolean;
+    live_action_only: boolean;
     anime_crf: number;
     live_action_crf: number;
     // Advanced
