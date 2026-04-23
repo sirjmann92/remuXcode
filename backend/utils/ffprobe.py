@@ -37,6 +37,10 @@ class VideoStream:
     hdr_master_display: str | None = None
     # HDR10 content light level: "maxCLL,maxFALL"
     hdr_max_cll: str | None = None
+    # Dolby Vision RPU layer detected (DOVI configuration record side data)
+    is_dolby_vision: bool = False
+    # HDR10+ dynamic metadata detected (SMPTE ST 2094-40 side data)
+    is_hdr10_plus: bool = False
 
     @property
     def is_hevc(self) -> bool:
@@ -291,21 +295,31 @@ class FFProbe:
         )
 
     @staticmethod
-    def _parse_hdr_side_data(side_data_list: list[dict]) -> tuple[str | None, str | None]:
-        """Extract HDR10 mastering display and content light level from side data.
+    def _parse_hdr_side_data(
+        side_data_list: list[dict],
+    ) -> tuple[str | None, str | None, bool, bool]:
+        """Extract HDR metadata from stream side data.
 
         Returns:
-            (master_display, max_cll) where master_display is x265-format string
-            e.g. "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,50)"
-            and max_cll is "maxCLL,maxFALL" e.g. "1000,400". Either may be None.
+            (master_display, max_cll, is_dolby_vision, is_hdr10_plus)
+            master_display: x265-format string e.g. "G(...)B(...)R(...)WP(...)L(...)"
+            max_cll: "maxCLL,maxFALL" e.g. "1000,400"
+            is_dolby_vision: True if DOVI configuration record present
+            is_hdr10_plus: True if HDR Dynamic Metadata SMPTE2094-40 present
         """
         master_display: str | None = None
         max_cll: str | None = None
+        is_dolby_vision = False
+        is_hdr10_plus = False
 
         for sd in side_data_list:
             sd_type = sd.get("side_data_type", "").lower()
 
-            if "mastering display" in sd_type and master_display is None:
+            if "dovi configuration" in sd_type or "dolby vision" in sd_type:
+                is_dolby_vision = True
+            elif "smpte2094-40" in sd_type or "hdr dynamic metadata" in sd_type:
+                is_hdr10_plus = True
+            elif "mastering display" in sd_type and master_display is None:
                 try:
 
                     def _frac(frac: str, scale: int) -> int:
@@ -332,7 +346,7 @@ class FFProbe:
                 with contextlib.suppress(TypeError, ValueError):
                     max_cll = f"{sd.get('max_content', 0)},{sd.get('max_average', 0)}"
 
-        return master_display, max_cll
+        return master_display, max_cll, is_dolby_vision, is_hdr10_plus
 
     def _parse_video_stream(self, stream: dict) -> VideoStream:
         """Parse video stream information."""
@@ -351,7 +365,9 @@ class FFProbe:
 
         # Parse HDR side data
         side_data_list = stream.get("side_data_list", [])
-        hdr_master_display, hdr_max_cll = self._parse_hdr_side_data(side_data_list)
+        hdr_master_display, hdr_max_cll, is_dolby_vision, is_hdr10_plus = self._parse_hdr_side_data(
+            side_data_list
+        )
 
         return VideoStream(
             index=stream.get("index", 0),
@@ -370,6 +386,8 @@ class FFProbe:
             color_space=stream.get("color_space") or None,
             hdr_master_display=hdr_master_display,
             hdr_max_cll=hdr_max_cll,
+            is_dolby_vision=is_dolby_vision,
+            is_hdr10_plus=is_hdr10_plus,
         )
 
     def _parse_audio_stream(self, stream: dict) -> AudioStream:
