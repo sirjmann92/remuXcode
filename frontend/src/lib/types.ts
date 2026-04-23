@@ -100,6 +100,8 @@ export interface ConfigSummary {
     convert_8bit_x264: boolean;
     anime_only: boolean;
     live_action_only: boolean;
+    dv_to_hdr10: boolean;
+    hdr10plus_to_hdr10: boolean;
     anime_crf: number;
     live_action_crf: number;
     // Advanced

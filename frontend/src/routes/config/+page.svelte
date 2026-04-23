@@ -65,9 +65,7 @@ const liveQualityField = $derived(
           : 'live_action_crf',
 );
 
-const qualityMax = $derived(
-  effectiveMethod === 'vaapi' ? 52 : isAv1Sw ? 63 : 51
-);
+const qualityMax = $derived(effectiveMethod === 'vaapi' ? 52 : isAv1Sw ? 63 : 51);
 
 async function fetchConfig() {
   loading = true;
@@ -435,6 +433,8 @@ $effect(() => {
               { field: 'convert_8bit_x264', label: 'Convert 8-bit x264', hint: 'Re-encode standard 8-bit H.264 files' },
               { field: 'anime_only', label: 'Anime Only', hint: 'Only convert video for anime content, skip live action' },
               { field: 'live_action_only', label: 'Live Action Only', hint: 'Only convert video for live action content, skip anime' },
+              { field: 'dv_to_hdr10', label: 'Convert Dolby Vision → HDR10', hint: 'Strip DV RPU layer and encode; static HDR10 base is preserved. Off = skip DV files.' },
+              { field: 'hdr10plus_to_hdr10', label: 'Convert HDR10+ → HDR10', hint: 'Strip dynamic SMPTE 2094-40 metadata and encode; static HDR10 base is preserved. Off = skip HDR10+ files.' },
             ] as item}
               <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
                 <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>

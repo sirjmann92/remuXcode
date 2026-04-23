@@ -124,6 +124,24 @@ class VideoConverter:
             logger.debug("Skipping HEVC file: %s", file_path)
             return False
 
+        # Skip Dolby Vision files unless dv_to_hdr10 is explicitly enabled.
+        # The DV RPU layer cannot survive a re-encode; only the HDR10 base is kept.
+        if video.is_dolby_vision and not self.config.dv_to_hdr10:
+            logger.info(
+                "Skipping Dolby Vision file (enable 'dv_to_hdr10' to encode, DV RPU will be stripped): %s",
+                file_path,
+            )
+            return False
+
+        # Skip HDR10+ files unless hdr10plus_to_hdr10 is explicitly enabled.
+        # Dynamic SMPTE 2094-40 metadata cannot be re-injected during re-encode.
+        if video.is_hdr10_plus and not self.config.hdr10plus_to_hdr10:
+            logger.info(
+                "Skipping HDR10+ file (enable 'hdr10plus_to_hdr10' to encode, dynamic metadata will be stripped): %s",
+                file_path,
+            )
+            return False
+
         # Check if anime-only mode and skip non-anime
         if self.config.anime_only:
             content_type = self.anime_detector.detect(file_path, use_api=False)

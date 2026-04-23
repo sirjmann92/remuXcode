@@ -105,6 +105,12 @@ class VideoConfig:
     # Only convert live action content (skip anime)
     live_action_only: bool = False
 
+    # HDR handling: by default DV and HDR10+ files are skipped to prevent
+    # metadata loss.  Enable these to allow encoding (dynamic/RPU metadata
+    # will be stripped; the static HDR10 base layer is preserved).
+    dv_to_hdr10: bool = False  # Dolby Vision → HDR10 (strip DV RPU)
+    hdr10plus_to_hdr10: bool = False  # HDR10+ → HDR10 (strip dynamic metadata)
+
     # Anime-specific settings
     anime_auto_detect: bool = True
     anime_paths: list[str] = field(default_factory=lambda: ["/Anime/", "/アニメ/"])
@@ -336,6 +342,9 @@ class Config:
             convert_10bit_x264=self._get("video.convert_10bit_x264", True),
             convert_8bit_x264=self._get("video.convert_8bit_x264", False),
             anime_only=self._get("video.anime_only", True),
+            live_action_only=self._get("video.live_action_only", False),
+            dv_to_hdr10=self._get("video.dv_to_hdr10", False),
+            hdr10plus_to_hdr10=self._get("video.hdr10plus_to_hdr10", False),
             anime_auto_detect=self._get("video.anime_auto_detect", True),
             anime_paths=self._get("video.anime_paths", ["/Anime/", "/アニメ/"]),
             anime_crf=self._get("video.anime_crf", 19),
