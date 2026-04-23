@@ -36,6 +36,11 @@ const qualityLabel = $derived(
         : 'CRF',
 );
 
+const isAv1Sw = $derived.by(() => {
+  if (!config) return false;
+  return effectiveMethod === 'none' && config.video.codec === 'av1';
+});
+
 const animeQualityField = $derived(
   effectiveMethod === 'qsv'
     ? 'qsv_anime_quality'
@@ -43,7 +48,7 @@ const animeQualityField = $derived(
       ? 'vaapi_anime_quality'
       : effectiveMethod === 'nvenc'
         ? 'nvenc_anime_quality'
-        : config?.video.codec === 'av1'
+        : isAv1Sw
           ? 'av1_anime_crf'
           : 'anime_crf',
 );
@@ -55,13 +60,13 @@ const liveQualityField = $derived(
       ? 'vaapi_live_action_quality'
       : effectiveMethod === 'nvenc'
         ? 'nvenc_live_action_quality'
-        : config?.video.codec === 'av1'
+        : isAv1Sw
           ? 'av1_live_action_crf'
           : 'live_action_crf',
 );
 
 const qualityMax = $derived(
-  effectiveMethod === 'vaapi' ? 52 : effectiveMethod === 'none' && config?.video.codec === 'av1' ? 63 : 51
+  effectiveMethod === 'vaapi' ? 52 : isAv1Sw ? 63 : 51
 );
 
 async function fetchConfig() {
