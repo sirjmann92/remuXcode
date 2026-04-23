@@ -74,6 +74,13 @@ def run_ffmpeg_with_progress(
     # both sides connect immediately.
     fifo_fd = os.open(fifo_path, os.O_RDONLY | os.O_NONBLOCK)
 
+    # Hold a dummy write-end open for the lifetime of the read loop.
+    # ffmpeg's -progress implementation opens/writes/closes the FIFO once per
+    # stats period.  Without this, when ffmpeg closes its write-end the kernel
+    # sets the EOF flag on the FIFO, causing os.read() to return b"" and the
+    # progress loop to exit prematurely while ffmpeg is still encoding.
+    fifo_wr_dummy = os.open(fifo_path, os.O_WRONLY | os.O_NONBLOCK)
+
     proc = subprocess.Popen(
         progress_cmd,
         stdout=subprocess.DEVNULL,
@@ -158,6 +165,8 @@ def run_ffmpeg_with_progress(
         logger.exception("Error reading ffmpeg progress")
     finally:
         os.close(fifo_fd)
+        with contextlib.suppress(OSError):
+            os.close(fifo_wr_dummy)
         # Clean up the FIFO
         with contextlib.suppress(OSError):
             fifo_path.unlink()

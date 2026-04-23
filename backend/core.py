@@ -1010,6 +1010,23 @@ def create_job(
     media_type: str | None = None,
 ) -> ConversionJob:
     """Create and queue a new conversion job."""
+    # Deduplicate: if a pending/running job already exists for this file+type,
+    # return the existing job instead of queueing a duplicate.
+    if job_queue:
+        with job_queue.lock:
+            for existing in job_queue.jobs.values():
+                if (
+                    existing.file_path == file_path
+                    and existing.job_type == job_type
+                    and existing.status in (JobStatus.PENDING, JobStatus.RUNNING)
+                ):
+                    logger.info(
+                        "Skipping duplicate job for %s (existing: %s)",
+                        Path(file_path).name,
+                        existing.id,
+                    )
+                    return existing
+
     job = ConversionJob(
         id=uuid.uuid4().hex[:12],
         job_type=job_type,

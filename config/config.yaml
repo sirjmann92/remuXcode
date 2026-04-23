@@ -3,10 +3,8 @@ video:
   codec: av1
   convert_10bit_x264: true
   convert_8bit_x264: true
-  anime_only: true
+  anime_only: false
   live_action_only: false
-  # HDR handling: skip DV/HDR10+ by default to prevent metadata loss.
-  # Enable to allow encoding (dynamic/RPU metadata stripped, HDR10 base preserved).
   dv_to_hdr10: false
   hdr10plus_to_hdr10: false
   anime_auto_detect: true
@@ -18,10 +16,10 @@ video:
   live_action_preset: slow
   live_action_tune: ''
   live_action_framerate: ''
-  av1_anime_crf: 27
+  av1_anime_crf: 24
   av1_anime_preset: 5
   av1_anime_framerate: 24000/1001
-  av1_live_action_crf: 27
+  av1_live_action_crf: 24
   av1_live_action_preset: 5
   av1_live_action_framerate: ''
   pix_fmt: yuv420p10le
