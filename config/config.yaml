@@ -13,10 +13,10 @@ video:
   live_action_preset: slow
   live_action_tune: ''
   live_action_framerate: ''
-  av1_anime_crf: 19
+  av1_anime_crf: 27
   av1_anime_preset: 5
   av1_anime_framerate: 24000/1001
-  av1_live_action_crf: 22
+  av1_live_action_crf: 30
   av1_live_action_preset: 4
   av1_live_action_framerate: ''
   pix_fmt: yuv420p10le
