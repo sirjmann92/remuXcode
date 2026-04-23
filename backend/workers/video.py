@@ -17,7 +17,7 @@ import uuid
 
 from backend.utils.anime_detect import AnimeDetector, ContentType
 from backend.utils.config import VideoConfig
-from backend.utils.ffprobe import FFProbe
+from backend.utils.ffprobe import FFProbe, VideoStream
 from backend.utils.hwaccel import HWAccelCaps, resolve_encoder
 from backend.workers._progress import run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace
@@ -129,6 +129,13 @@ class VideoConverter:
             content_type = self.anime_detector.detect(file_path, use_api=False)
             if content_type != ContentType.ANIME:
                 logger.debug("Skipping non-anime file (anime_only=True): %s", file_path)
+                return False
+
+        # Check if live-action-only mode and skip anime
+        if self.config.live_action_only:
+            content_type = self.anime_detector.detect(file_path, use_api=False)
+            if content_type == ContentType.ANIME:
+                logger.debug("Skipping anime file (live_action_only=True): %s", file_path)
                 return False
 
         # Check conversion criteria
@@ -270,7 +277,7 @@ class VideoConverter:
                 _src_mtime = None
                 _src_size = None
 
-            cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type)
+            cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type, video)
             logger.debug("Running: %s", " ".join(cmd))
 
             # Estimate total frames for progress when out_time_us is N/A
@@ -415,32 +422,72 @@ class VideoConverter:
             )
 
     def _build_ffmpeg_command(
-        self, input_file: str, output_file: str, content_type: ContentType
+        self,
+        input_file: str,
+        output_file: str,
+        content_type: ContentType,
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build ffmpeg command with content-appropriate settings."""
         encoder = resolve_encoder(self.target_codec, self.hw_accel, self.hw_caps)
 
         # HW-accelerated encoders
         if encoder == "hevc_qsv":
-            return self._build_qsv_command(input_file, output_file, content_type, codec="hevc")
+            return self._build_qsv_command(
+                input_file, output_file, content_type, codec="hevc", video=video
+            )
         if encoder == "av1_qsv":
-            return self._build_qsv_command(input_file, output_file, content_type, codec="av1")
+            return self._build_qsv_command(
+                input_file, output_file, content_type, codec="av1", video=video
+            )
         if encoder == "hevc_vaapi":
-            return self._build_vaapi_command(input_file, output_file, content_type, codec="hevc")
+            return self._build_vaapi_command(
+                input_file, output_file, content_type, codec="hevc", video=video
+            )
         if encoder == "av1_vaapi":
-            return self._build_vaapi_command(input_file, output_file, content_type, codec="av1")
+            return self._build_vaapi_command(
+                input_file, output_file, content_type, codec="av1", video=video
+            )
         if encoder == "hevc_nvenc":
-            return self._build_nvenc_command(input_file, output_file, content_type, codec="hevc")
+            return self._build_nvenc_command(
+                input_file, output_file, content_type, codec="hevc", video=video
+            )
         if encoder == "av1_nvenc":
-            return self._build_nvenc_command(input_file, output_file, content_type, codec="av1")
+            return self._build_nvenc_command(
+                input_file, output_file, content_type, codec="av1", video=video
+            )
 
         # Software encoders
         if self.target_codec == "av1":
-            return self._build_av1_command(input_file, output_file, content_type)
-        return self._build_hevc_command(input_file, output_file, content_type)
+            return self._build_av1_command(input_file, output_file, content_type, video=video)
+        return self._build_hevc_command(input_file, output_file, content_type, video=video)
+
+    @staticmethod
+    def _build_color_args(video: VideoStream | None) -> list[str]:
+        """Return ffmpeg color metadata flags matching the source stream.
+
+        Falls back to BT.709 when the source has no color metadata (safe for
+        all standard SDR content).  HDR sources carry bt2020/smpte2084 etc.
+        and those values are passed through unchanged.
+        """
+        primaries = (video.color_primaries if video else None) or "bt709"
+        trc = (video.color_trc if video else None) or "bt709"
+        space = (video.color_space if video else None) or "bt709"
+        return [
+            "-color_primaries",
+            primaries,
+            "-color_trc",
+            trc,
+            "-colorspace",
+            space,
+        ]
 
     def _build_hevc_command(
-        self, input_file: str, output_file: str, content_type: ContentType
+        self,
+        input_file: str,
+        output_file: str,
+        content_type: ContentType,
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build ffmpeg command for HEVC (libx265) encoding."""
 
@@ -469,6 +516,12 @@ class VideoConverter:
             "min-keyint=24",
             "scenecut=40",
         ]
+
+        # Pass through HDR10 mastering display metadata if present
+        if video and video.hdr_master_display:
+            x265_params.append(f"master-display={video.hdr_master_display}")
+        if video and video.hdr_max_cll:
+            x265_params.append(f"max-cll={video.hdr_max_cll}")
 
         cmd = [
             "ffmpeg",
@@ -520,16 +573,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
-        cmd.extend(
-            [
-                "-color_primaries",
-                "bt709",
-                "-color_trc",
-                "bt709",
-                "-colorspace",
-                "bt709",
-            ]
-        )
+        cmd.extend(self._build_color_args(video))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -549,7 +593,11 @@ class VideoConverter:
         return cmd
 
     def _build_av1_command(
-        self, input_file: str, output_file: str, content_type: ContentType
+        self,
+        input_file: str,
+        output_file: str,
+        content_type: ContentType,
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build ffmpeg command for AV1 (libsvtav1) encoding."""
 
@@ -572,6 +620,12 @@ class VideoConverter:
         if content_type == ContentType.ANIME:
             svtav1_params.append("enable-overlay=0")
             svtav1_params.append("film-grain=0")
+
+        # Pass through HDR10 metadata if present
+        if video and video.hdr_master_display:
+            svtav1_params.append(f"mastering-display={video.hdr_master_display}")
+        if video and video.hdr_max_cll:
+            svtav1_params.append(f"content-light={video.hdr_max_cll}")
 
         cmd = [
             "ffmpeg",
@@ -617,16 +671,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
-        cmd.extend(
-            [
-                "-color_primaries",
-                "bt709",
-                "-color_trc",
-                "bt709",
-                "-colorspace",
-                "bt709",
-            ]
-        )
+        cmd.extend(self._build_color_args(video))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -706,6 +751,7 @@ class VideoConverter:
         content_type: ContentType,
         *,
         codec: str = "hevc",
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build ffmpeg command for Intel QSV encoding (HEVC or AV1).
 
@@ -775,6 +821,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
+        cmd.extend(self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.append(output_file)
         return cmd
@@ -786,6 +833,7 @@ class VideoConverter:
         content_type: ContentType,
         *,
         codec: str = "hevc",
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build ffmpeg command for VAAPI encoding (HEVC or AV1).
 
@@ -855,6 +903,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
+        cmd.extend(self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.append(output_file)
         return cmd
@@ -866,6 +915,7 @@ class VideoConverter:
         content_type: ContentType,
         *,
         codec: str = "hevc",
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build ffmpeg command for NVENC encoding (HEVC or AV1).
 
@@ -933,6 +983,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
+        cmd.extend(self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.append(output_file)
         return cmd
