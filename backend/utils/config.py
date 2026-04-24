@@ -128,13 +128,13 @@ class VideoConfig:
     live_action_framerate: str = ""  # Empty = auto-detect from source
 
     # AV1 settings - Anime (SVT-AV1 encoder)
-    av1_anime_crf: int = 24  # High-quality archive default
-    av1_anime_preset: int = 6  # 0-13, lower = slower/better
+    av1_anime_crf: int = 22  # Archival quality (transparent on virtually all content)
+    av1_anime_preset: int = 4  # 0-13, lower = slower/better; 4 is archival sweet spot
     av1_anime_framerate: str = "24000/1001"
 
     # AV1 settings - Live action
-    av1_live_action_crf: int = 24  # High-quality archive default
-    av1_live_action_preset: int = 8  # Faster preset
+    av1_live_action_crf: int = 22  # Archival quality
+    av1_live_action_preset: int = 4  # Match anime preset for consistency
     av1_live_action_framerate: str = ""
 
     # QSV encoder settings (Intel Quick Sync — ICQ mode)
@@ -355,11 +355,11 @@ class Config:
             live_action_preset=self._get("video.live_action_preset", "medium"),
             live_action_tune=self._get("video.live_action_tune"),
             live_action_framerate=self._get("video.live_action_framerate", ""),
-            av1_anime_crf=self._get("video.av1_anime_crf", 24),
-            av1_anime_preset=self._get("video.av1_anime_preset", 6),
+            av1_anime_crf=self._get("video.av1_anime_crf", 22),
+            av1_anime_preset=self._get("video.av1_anime_preset", 4),
             av1_anime_framerate=self._get("video.av1_anime_framerate", "24000/1001"),
-            av1_live_action_crf=self._get("video.av1_live_action_crf", 24),
-            av1_live_action_preset=self._get("video.av1_live_action_preset", 8),
+            av1_live_action_crf=self._get("video.av1_live_action_crf", 22),
+            av1_live_action_preset=self._get("video.av1_live_action_preset", 4),
             av1_live_action_framerate=self._get("video.av1_live_action_framerate", ""),
             qsv_anime_quality=self._get("video.qsv_anime_quality", 18),
             qsv_live_action_quality=self._get("video.qsv_live_action_quality", 21),
