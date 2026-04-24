@@ -187,6 +187,23 @@ async function handleRegenerate() {
 
 $effect(() => {
   fetchConfig();
+
+  // Re-fetch when the tab regains visibility after being idle/backgrounded.
+  // Without this, number inputs can display stale values once the browser
+  // throttles or discards the tab's rendering state.
+  function onVisible() {
+    if (document.visibilityState === 'visible') fetchConfig();
+  }
+  // Also handle bfcache restores (back/forward navigation in some browsers)
+  function onPageShow(e: PageTransitionEvent) {
+    if (e.persisted) fetchConfig();
+  }
+  document.addEventListener('visibilitychange', onVisible);
+  window.addEventListener('pageshow', onPageShow);
+  return () => {
+    document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('pageshow', onPageShow);
+  };
 });
 </script>
 
@@ -448,25 +465,31 @@ $effect(() => {
             {/each}
             <div class="flex items-center justify-between">
               <span>Anime {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for anime (lower = better)</span></span>
+              {#key animeQualityField}
               <input
                 type="number"
                 class="input input-xs input-bordered w-16 text-center font-mono"
                 min="0"
                 max={qualityMax}
+                autocomplete="off"
                 value={(config.video as Record<string, unknown>)[animeQualityField]}
                 onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, qualityMax); (config!.video as Record<string, unknown>)[animeQualityField] = v; save('video', animeQualityField, v); }}
               />
+              {/key}
             </div>
             <div class="flex items-center justify-between">
               <span>Live Action {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for live action (lower = better)</span></span>
+              {#key liveQualityField}
               <input
                 type="number"
                 class="input input-xs input-bordered w-16 text-center font-mono"
                 min="0"
                 max={qualityMax}
+                autocomplete="off"
                 value={(config.video as Record<string, unknown>)[liveQualityField]}
                 onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 0, qualityMax); (config!.video as Record<string, unknown>)[liveQualityField] = v; save('video', liveQualityField, v); }}
               />
+              {/key}
             </div>
             {#if effectiveMethod !== 'none'}
               <p class="text-xs text-base-content/30 -mt-1">Using {effectiveMethod.toUpperCase()} hardware encoder</p>
