@@ -16,6 +16,10 @@ video:
   # WARNING: 8-bit x264 -> HEVC often results in LARGER files
   convert_8bit_x264: ${CONVERT_8BIT_X264:-false}
 
+  # Convert legacy codecs (VC-1, MPEG-2, MPEG-4/Xvid/DivX) to HEVC/AV1
+  # Recommended: these codecs have poor modern device support
+  convert_legacy_codecs: ${CONVERT_LEGACY_CODECS:-true}
+
   # Only convert anime content (skip live action videos)
   # Set to false to convert ALL 10-bit H.264 regardless of content type
   anime_only: ${ANIME_ONLY:-true}

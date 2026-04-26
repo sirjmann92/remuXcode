@@ -163,6 +163,9 @@ class VideoConverter:
         if video.is_h264 and not video.is_10bit and self.config.convert_8bit_x264:
             return True
 
+        if video.is_legacy_codec and self.config.convert_legacy_codecs:
+            return True
+
         return False
 
     def convert(

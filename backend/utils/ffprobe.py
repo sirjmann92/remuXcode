@@ -67,6 +67,20 @@ class VideoStream:
         """Check if stream is 10-bit H.264 (needs conversion for compatibility)."""
         return self.is_h264 and self.is_10bit
 
+    @property
+    def is_legacy_codec(self) -> bool:
+        """Check if stream uses a legacy codec (VC-1, MPEG-2, MPEG-4/Xvid/DivX)."""
+        return self.codec_name.lower() in (
+            "vc1",
+            "wmv3",
+            "mpeg2video",
+            "mpeg4",
+            "msmpeg4v3",
+            "msmpeg4v2",
+            "divx",
+            "xvid",
+        )
+
 
 @dataclass
 class AudioStream:
