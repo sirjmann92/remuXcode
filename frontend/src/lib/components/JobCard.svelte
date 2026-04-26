@@ -14,6 +14,7 @@ const { job, onRemoved, detailed = false }: Props = $props();
 let deleting = $state(false);
 let cancelling = $state(false);
 let copiedError = $state('');
+let expandedErrors = $state(new Set<string>());
 
 function copyError(text: string) {
   navigator.clipboard.writeText(text).then(() => {
@@ -22,6 +23,16 @@ function copyError(text: string) {
       copiedError = '';
     }, 2000);
   });
+}
+
+function toggleError(key: string) {
+  const next = new Set(expandedErrors);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  expandedErrors = next;
 }
 
 const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
@@ -264,8 +275,18 @@ async function handleCancel() {
                 </span>
               {/if}
               {#if phaseFailed && phaseResult?.error}
+                {@const errorKey = `phase-${phase}`}
+                {@const isLong = phaseResult.error.split('\n').length > 5}
+                {@const isExpanded = expandedErrors.has(errorKey)}
                 <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
-                  <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{phaseResult.error}</p>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs text-error/70 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-5' : ''}">{phaseResult.error}</p>
+                    {#if isLong}
+                      <button onclick={() => toggleError(errorKey)} class="text-xs text-error/40 hover:text-error px-1.5 pt-0.5">
+                        {isExpanded ? '▲ Show less' : '▼ Show more'}
+                      </button>
+                    {/if}
+                  </div>
                   <button onclick={() => copyError(phaseResult!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
                     {#if copiedError === phaseResult.error}✓{:else}
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -494,8 +515,17 @@ async function handleCancel() {
           <p class="text-xs text-warning/90">{job.error}</p>
         </div>
       {:else}
+        {@const isLong = job.error.split('\n').length > 5}
+        {@const isExpanded = expandedErrors.has('job')}
         <div class="flex items-start gap-1 mt-0.5">
-          <p class="text-xs text-error/80 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.error}</p>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs text-error/80 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-5' : ''}">{job.error}</p>
+            {#if isLong}
+              <button onclick={() => toggleError('job')} class="text-xs text-error/40 hover:text-error px-1.5 pt-0.5">
+                {isExpanded ? '▲ Show less' : '▼ Show more'}
+              </button>
+            {/if}
+          </div>
           <button onclick={() => copyError(job.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
             {#if copiedError === job.error}✓{:else}
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
