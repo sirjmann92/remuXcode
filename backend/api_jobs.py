@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from backend import core
 
@@ -157,9 +158,25 @@ async def get_job(job_id: str) -> dict[str, Any]:
     return job.to_dict()
 
 
+class ReorderRequest(BaseModel):
+    order: list[str]
+
+
+@router.post("/jobs/reorder")
+async def reorder_jobs(body: ReorderRequest) -> dict[str, Any]:
+    """Reorder pending jobs. Body must contain all current pending job IDs in desired order."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    if not core.job_queue.reorder_queue(body.order):
+        raise HTTPException(
+            status_code=409,
+            detail="Order list does not match current pending jobs. Refresh and try again.",
+        )
+    return {"order": body.order}
+
+
 @router.delete("/jobs/{job_id}")
 async def cancel_or_delete_job(job_id: str) -> dict[str, Any]:
-    """Cancel a pending/running job or delete a completed/failed job."""
     if not core.job_queue:
         raise HTTPException(status_code=503, detail="Service not ready")
 
