@@ -488,7 +488,7 @@ async function handleCancel() {
           <p class="text-xs text-base-content/50 italic truncate" title={job.status_detail}>{job.status_detail}</p>
         {/if}
         <div class="flex justify-between items-center">
-          <span class="text-xs text-base-content/40">{job.progress.toFixed(1)}%</span>
+          <span class="text-xs text-base-content/40">{job.progress > 0 && job.progress < 0.05 ? '<0.1' : job.progress.toFixed(1)}%</span>
           {#if elapsed}
             <span class="text-xs text-base-content/30">{elapsed}</span>
           {/if}
