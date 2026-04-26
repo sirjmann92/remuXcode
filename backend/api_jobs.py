@@ -103,9 +103,7 @@ async def list_jobs(
         "failed": 3,
         "cancelled": 4,
     }
-    pending_order = {
-        job_id: idx for idx, job_id in enumerate(core.job_queue.get_pending_order())
-    }
+    pending_order = {job_id: idx for idx, job_id in enumerate(core.job_queue.get_pending_order())}
     filtered.sort(
         key=lambda j: (
             status_order.get(j.status.value, 9),
@@ -161,6 +159,8 @@ async def get_job(job_id: str) -> dict[str, Any]:
 
 
 class ReorderRequest(BaseModel):
+    """Request body for reordering the pending job queue."""
+
     order: list[str]
 
 
@@ -179,6 +179,7 @@ async def reorder_jobs(body: ReorderRequest) -> dict[str, Any]:
 
 @router.delete("/jobs/{job_id}")
 async def cancel_or_delete_job(job_id: str) -> dict[str, Any]:
+    """Cancel a pending/running job or delete a completed/failed job."""
     if not core.job_queue:
         raise HTTPException(status_code=503, detail="Service not ready")
 
