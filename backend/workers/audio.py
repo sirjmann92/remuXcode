@@ -385,7 +385,7 @@ class AudioConverter:
                     streams_total=len(info.audio_streams),
                     original_size=info.size,
                     new_size=0,
-                    error=f"FFmpeg failed: {stderr_text[:500]}",
+                    error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
             # Move temp file to output location

@@ -358,7 +358,7 @@ class StreamCleanup:
                     original_size=info.size,
                     new_size=0,
                     original_language=original_lang,
-                    error=f"FFmpeg failed: {stderr_text[:500]}",
+                    error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
             # Move temp file to output location
