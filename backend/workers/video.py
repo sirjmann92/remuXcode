@@ -558,9 +558,9 @@ class VideoConverter:
         cmd.extend(
             [
                 "-analyzeduration",
-                "10M",
+                "200M",
                 "-probesize",
-                "10M",
+                "200M",
                 "-i",
                 input_file,
                 "-map",
@@ -678,9 +678,9 @@ class VideoConverter:
         cmd.extend(
             [
                 "-analyzeduration",
-                "10M",
+                "200M",
                 "-probesize",
-                "10M",
+                "200M",
                 "-i",
                 input_file,
                 "-map",
@@ -825,9 +825,9 @@ class VideoConverter:
         cmd.extend(
             [
                 "-analyzeduration",
-                "10M",
+                "200M",
                 "-probesize",
-                "10M",
+                "200M",
                 "-i",
                 input_file,
                 "-map",
@@ -909,9 +909,9 @@ class VideoConverter:
         cmd.extend(
             [
                 "-analyzeduration",
-                "10M",
+                "200M",
                 "-probesize",
-                "10M",
+                "200M",
                 "-i",
                 input_file,
                 "-map",
@@ -988,9 +988,9 @@ class VideoConverter:
         cmd.extend(
             [
                 "-analyzeduration",
-                "10M",
+                "200M",
                 "-probesize",
-                "10M",
+                "200M",
                 "-i",
                 input_file,
                 "-map",
