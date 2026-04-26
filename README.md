@@ -52,7 +52,6 @@ services:
 **2. Start**
 
 ```bash
-docker compose pull
 docker compose up -d
 ```
 
