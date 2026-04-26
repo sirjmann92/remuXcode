@@ -640,7 +640,7 @@ class AudioConverter:
         (companion already exists, so converting would create a duplicate).
         """
 
-        cmd = ["ffmpeg", "-i", input_file, "-y"]
+        cmd = ["ffmpeg", "-analyzeduration", "200M", "-probesize", "200M", "-i", input_file, "-y"]
 
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
