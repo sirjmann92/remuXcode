@@ -13,6 +13,16 @@ interface Props {
 const { job, onRemoved, detailed = false }: Props = $props();
 let deleting = $state(false);
 let cancelling = $state(false);
+let copiedError = $state('');
+
+function copyError(text: string) {
+  navigator.clipboard.writeText(text).then(() => {
+    copiedError = text;
+    setTimeout(() => {
+      copiedError = '';
+    }, 2000);
+  });
+}
 
 const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
 const libraryLink = $derived.by(() => {
@@ -254,7 +264,14 @@ async function handleCancel() {
                 </span>
               {/if}
               {#if phaseFailed && phaseResult?.error}
-                <span class="text-xs text-error/70 truncate" title={phaseResult.error}>{phaseResult.error}</span>
+                <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
+                  <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{phaseResult.error}</p>
+                  <button onclick={() => copyError(phaseResult!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                    {#if copiedError === phaseResult.error}✓{:else}
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {/if}
+                  </button>
+                </div>
               {/if}
             </div>
           {/each}
@@ -357,7 +374,14 @@ async function handleCancel() {
                 Audio
               </span>
               {#if job.result.audio.error}
-                <span class="text-xs text-error/70 truncate" title={job.result.audio.error}>{job.result.audio.error}</span>
+                <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
+                  <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.result.audio.error}</p>
+                  <button onclick={() => copyError(job.result!.audio!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                    {#if copiedError === job.result.audio.error}✓{:else}
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {/if}
+                  </button>
+                </div>
               {/if}
             </div>
           {/if}
@@ -368,7 +392,14 @@ async function handleCancel() {
                 Video
               </span>
               {#if job.result.video.error}
-                <span class="text-xs text-error/70 truncate" title={job.result.video.error}>{job.result.video.error}</span>
+                <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
+                  <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.result.video.error}</p>
+                  <button onclick={() => copyError(job.result!.video!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                    {#if copiedError === job.result.video.error}✓{:else}
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {/if}
+                  </button>
+                </div>
               {/if}
             </div>
           {/if}
@@ -379,7 +410,14 @@ async function handleCancel() {
                 Cleanup
               </span>
               {#if job.result.cleanup.error}
-                <span class="text-xs text-error/70 truncate" title={job.result.cleanup.error}>{job.result.cleanup.error}</span>
+                <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
+                  <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.result.cleanup.error}</p>
+                  <button onclick={() => copyError(job.result!.cleanup!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                    {#if copiedError === job.result.cleanup.error}✓{:else}
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {/if}
+                  </button>
+                </div>
               {/if}
             </div>
           {/if}
