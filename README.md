@@ -1,335 +1,166 @@
 # remuXcode
 
-A self-hosted media library maintenance tool that keeps your Plex/Jellyfin library clean and compatible — automatically or on demand.
+A self-hosted media maintenance tool that automatically converts, cleans, and optimizes your Plex/Jellyfin library — triggered by Sonarr and Radarr webhooks or kicked off manually from the built-in web UI.
 
-When Sonarr or Radarr imports a file, remuXcode receives a webhook, analyzes the media, and converts what needs fixing: DTS/DTS:X audio becomes AC3/AAC for broad device support, 10-bit H.264 anime gets re-encoded to HEVC or AV1, and unwanted language tracks are stripped out. Everything happens in the background with no manual intervention required.
+When new content is imported, remuXcode receives a webhook, analyzes the file, and runs whichever conversions are needed: DTS/DTS-HD audio gets converted to AC3/EAC3/AAC for broad device compatibility, 10-bit H.264 (or legacy codecs like VC-1 and MPEG-2) gets re-encoded to HEVC or AV1, and foreign-language audio and subtitle tracks get stripped out. All of this runs in the background with no manual intervention.
 
-The application also supports manually updating and maintaining existing Sonarr/Radarr libraries. The built-in web UI lets you browse your entire library — movies and shows — with poster grids, filters, and per-file analysis. See exactly which files have incompatible audio, which anime needs encoding, and kick off conversions for individual files or entire series with a click. It's both a fire-and-forget automation layer and a hands-on library management tool.
+The web UI lets you browse your entire Sonarr/Radarr library — movies and shows — with poster grids, episode tables, filters, and per-file analysis. Queue individual files, full series, or bulk selections, and monitor everything from the Jobs page.
 
 ## Features
 
-- 🎯 **Smart Format Selection**: AC3 for surround (5.1+), AAC for stereo/7.1+
-- 🔊 **DTS:X Awareness**: Separate controls for regular DTS vs object-based DTS:X
-- 🎬 **HEVC/AV1 Encoding**: Convert 10-bit H.264 to HEVC or AV1 (configurable)
-- ⚡ **Hardware Acceleration**: Intel QSV, VAAPI, and NVIDIA NVENC with automatic detection and fallback to software encoding
-- 🌸 **Anime Detection**: Auto-detects anime for optimized encoding (`-tune animation`)
-- 🎌 **Per-Worker Anime Only**: Independent anime-only toggle for video, audio, and cleanup
-- 🌍 **Language Cleanup**: Keep only original language + English tracks
-- 📊 **Bitrate Matching**: Preserves quality while respecting format limits
-- 🔄 **Automatic Renaming**: Triggers Sonarr/Radarr to update filenames after processing
-- 🌐 **Webhook-Based**: Triggered by containerized Sonarr/Radarr, runs against your mounts
-- 📋 **Job Queue**: Track conversion progress with persistent job status
-- � **Real-Time Progress**: Live encoding progress via FIFO-based FFmpeg monitoring with frame-based fallback for hardware encoders
-- 📦 **Size Tracking**: Before/after file sizes with percentage change shown per conversion phase
-- �💾 **SQLite Persistence**: Jobs survive restarts, resume interrupted conversions
-- 🛑 **Job Controls**: Stop running jobs, clear pending queue, or delete finished jobs with confirmation — granular control from the Jobs page
-- 🖥️ **Web UI**: Built-in SvelteKit dashboard with library browsing, job management, and config
-- 🎞️ **Library Browse**: Movies & Shows pages with poster grids, filters, and processing previews
-- 🔎 **File Analysis**: Full ffprobe/MediaInfo modal — video, audio, and subtitle stream details per file
-- � **Job Timestamps**: Start and completion times displayed on every job card
-- �📡 **Live Job Status**: Pending/running indicators on movie posters and episode rows, auto-refresh on completion
-- 🔃 **Manual Library Refresh**: Force Sonarr/Radarr metadata re-read from the Movies/Shows pages
-- 🎌 **Anime Dual-Audio**: Optionally keep original-language audio on anime while still cleaning subtitles
-- 🔍 **Detection Accuracy**: Config-aware audio detection, EAC3 Atmos vs TrueHD distinction
+- **Audio conversion** — DTS/DTS-HD → AC3 (5.1), EAC3 (7.1+), or AAC (stereo); configurable bitrate caps; optional keep-original; TrueHD passthrough
+- **Video encoding** — 10-bit H.264, 8-bit H.264 (optional), and legacy codecs (VC-1, MPEG-2, MPEG-4/XviD/DivX) → HEVC or AV1
+- **Hardware acceleration** — Intel QSV/VAAPI and NVIDIA NVENC auto-detected at startup; software fallback when no GPU is available
+- **Stream cleanup** — remove audio and subtitle tracks outside your keep-languages list; preserve forced subtitles, SDH, commentary, and audio description
+- **Anime support** — per-worker anime-only mode, anime-optimized encoding presets, dual-audio preservation
+- **Library browse** — Movies and Shows pages backed by Radarr/Sonarr APIs with poster art, filters, sort, multi-select batch queue
+- **Analyze modal** — full stream detail (video, audio, subtitle streams) for any file via ffprobe
+- **Job queue** — persistent SQLite-backed queue, resumable after restart, drag-and-drop reordering of pending jobs
+- **Webhook-driven** — fire-and-forget automation; also fully usable in manual mode
+- **Single container** — FastAPI backend + SvelteKit frontend, port 7889
+
+See [docs/](docs/) for the full feature reference.
 
 ---
 
 ## Quick Start
 
-**Preferred: Use the Prebuilt Image**
+### Option 1 — Prebuilt Image (recommended)
 
-The remuXcode image is published to Docker Hub and GitHub Container Registry. You do **not** need to build the image yourself unless you want to run the latest development version.
-
-### 1. Create your `compose.yml`
+**1. Create `compose.yml`**
 
 ```yaml
 services:
   remuxcode:
     container_name: remuxcode
-    image: ghcr.io/sirjmann92/remuxcode:latest # or sirjmann92/remuxcode:latest
+    image: ghcr.io/sirjmann92/remuxcode:latest
     ports:
       - "7889:7889"
     volumes:
-      - ./config:/app/config
+      - ./config:/app/config         # config.yaml, jobs.db, API key
       - ./logs:/app/logs
-      - /mnt/yournas:/share:rw       # match Sonarr/Radarr's internal path
+      - /mnt/yournas:/share:rw       # match the path Sonarr/Radarr use internally
     devices:
-      - /dev/dri:/dev/dri             # optional — Intel QSV/VAAPI GPU passthrough
+      - /dev/dri:/dev/dri            # optional — Intel QSV/VAAPI GPU passthrough
     environment:
       - TZ=America/Chicago
     restart: unless-stopped
 ```
 
-### 2. Start
+> Mount your media at the **same path Sonarr/Radarr use inside their containers** so webhook file paths need no translation. Add additional volume mounts if your library spans multiple shares.
+
+**2. Start**
 
 ```bash
-docker compose pull  # get the latest image
+docker compose pull
 docker compose up -d
 ```
 
-`config/config.yaml` is created automatically on first run with sensible defaults. All settings — including Sonarr/Radarr connection details — can be configured from the Settings page in the web UI.
+`config/config.yaml` is created automatically on first run with sensible defaults. Open `http://localhost:7889/config` to enter your Sonarr/Radarr connection details.
 
-An API key is auto-generated on first start and stored in `config/.api_key`. You can find it on the Settings page or view it with `cat config/.api_key`.
-
-### 3. Configure Sonarr/Radarr Webhook
-
-**Sonarr** → Settings → Connect → Add Webhook:
-- **URL**: `http://YOUR_HOST_IP:7889/api/webhook`
-- **Triggers**: On Import Complete (Alternatively On File Import and/or On File Upgrade)
-- **Headers**: `X-API-Key: <API Key from remuXcode Config page>`
-
-**Radarr** → Settings → Connect → Add Webhook:
-- **URL**: `http://YOUR_HOST_IP:7889/api/webhook`
-- **Triggers**: On File Import, On File Upgrade
-- **Headers**: `X-API-Key: <API Key from remuXcode Config page>`
-
-> Sonarr's **On Import Complete** fires once after a full batch import (e.g. a whole season), sending all file paths together. Radarr uses the standard per-file events.
+Your API key is auto-generated on first start and stored in `config/.api_key`. It's also shown on the Settings page.
 
 ---
 
-## Configuration
-
-All conversion settings — audio, video, cleanup, languages, integrations, and processing options — are configurable through the **Settings** page in the web UI at `http://localhost:7889/config`. Changes take effect immediately.
-
-On first run, a default `config/config.yaml` is created automatically. You can also edit this file directly if you prefer, but the UI is the recommended approach. No `.env` file is needed — everything is configured through the Settings page.
-
----
-
-## Conversion Rules
-
-### Audio
-
-| Source | Target | Notes |
-|--------|--------|-------|
-| Stereo DTS (2ch) | AAC | Max 320 kbps |
-| 5.1 DTS (6ch) | AC3 | Max 640 kbps |
-| 7.1+ DTS (8ch) | E-AC3 | Max 1536 kbps |
-
-### Video
-
-| Setting | Anime | Live Action |
-|---------|-------|-------------|
-| CRF (HEVC) | 19 | 22 |
-| Preset | slow | medium |
-| Tune | animation | none |
-| Output | HEVC 10-bit | HEVC 10-bit |
-
-AV1 mode is also available (set codec to `av1` in Settings) — ~30% better compression, slower encoding, less hardware decoder support.
-
-**Hardware acceleration** is auto-detected on startup. If an Intel GPU (QSV/VAAPI) or NVIDIA GPU (NVENC) is available and passed through to the container, encoding will use the GPU automatically. Software encoding (`libx265`/`libsvtav1`) is the fallback when no GPU is detected.
-
-> Video conversion is **anime-only** by default. Audio conversion and stream cleanup process all content by default. Each worker has its own Anime Only toggle in the Settings page.
-
-### Job Persistence
-
-Jobs are persisted to `config/jobs.db`. On startup, pending jobs are automatically resumed and old completed jobs are pruned after the configured retention period (default: 30 days).
-
----
-
-## API Reference (Advanced)
-
-If you'd like to create custom scripts or manually use a CLI to manage your media, remuXcode comes with a full set of APIs. You can find all endpoints and options at http://localhost:7889/docs
-
-All endpoints require `X-API-Key` header except `/health`.
-
-### Health Check
-
-```bash
-curl http://localhost:7889/health
-```
-
-### Analyze Single File
-
-```bash
-curl "http://localhost:7889/api/analyze?path=/share/movies/Movie/movie.mkv" \
-  -H "X-API-Key: your-key"
-```
-
-### Browse Library
-
-```bash
-# Movies (with full media analysis)
-curl "http://localhost:7889/api/movies" -H "X-API-Key: your-key"
-
-# Filter results
-curl "http://localhost:7889/api/movies?filter=video" -H "X-API-Key: your-key"   # needs HEVC encode
-curl "http://localhost:7889/api/movies?filter=audio" -H "X-API-Key: your-key"   # has DTS/TrueHD
-curl "http://localhost:7889/api/movies?filter=anime" -H "X-API-Key: your-key"   # anime only
-curl "http://localhost:7889/api/movies?search=inception" -H "X-API-Key: your-key"
-
-# Series
-curl "http://localhost:7889/api/series" -H "X-API-Key: your-key"
-
-# Scan arbitrary directory
-curl "http://localhost:7889/api/scan?path=/share/downloads" -H "X-API-Key: your-key"
-```
-
-### Convert Files
-
-```bash
-# Single file — full conversion (audio + video + cleanup)
-curl -X POST http://localhost:7889/api/convert \
-  -H "X-API-Key: your-key" \
-  -H "Content-Type: application/json" \
-  -d '{"path": "/share/movies/Movie/movie.mkv", "type": "full"}'
-
-# type options: full | audio | video | cleanup
-
-# Batch — movies by Radarr ID
-curl -X POST http://localhost:7889/api/convert/movies \
-  -H "X-API-Key: your-key" \
-  -H "Content-Type: application/json" \
-  -d '{"movie_ids": [123, 456], "type": "full"}'
-
-# Batch — series by Sonarr ID
-curl -X POST http://localhost:7889/api/convert/series \
-  -H "X-API-Key: your-key" \
-  -H "Content-Type: application/json" \
-  -d '{"series_ids": [42], "type": "audio"}'
-```
-
-### Job Management
-
-```bash
-# List all jobs
-curl http://localhost:7889/api/jobs -H "X-API-Key: your-key"
-
-# Single job
-curl http://localhost:7889/api/jobs/abc-123 -H "X-API-Key: your-key"
-
-# Cancel or delete job
-curl -X DELETE http://localhost:7889/api/jobs/abc-123 -H "X-API-Key: your-key"
-```
-
-**Job status values:** `pending`, `running`, `completed`, `failed`, `cancelled`
-
----
-
-## Architecture
-
-```
-Sonarr/Radarr → POST /api/webhook → Job Queue → ffmpeg workers → files
-                                         ↓                      ↓
-                                    SQLite (config/jobs.db)   Rename trigger
-                                         ↑
-                              SvelteKit UI (port 7889)
-```
-
-### Project Structure
-
-```
-backend/
-├── config.yaml           # Configuration template (shipped with repo)
-├── app.py                # FastAPI application
-├── core.py               # Job queue, workers, singletons
-├── api_browse.py         # /api/movies, /api/series, /api/scan, /api/analyze
-├── api_convert.py        # /api/convert
-├── api_jobs.py           # /api/jobs
-├── api_webhook.py        # /api/webhook
-├── api_config.py         # /api/config
-├── utils/
-│   ├── ffprobe.py        # Media analysis
-│   ├── config.py         # YAML config loader with env var substitution
-│   ├── language.py       # Original language detection
-│   ├── anime_detect.py   # Content type detection
-│   ├── hwaccel.py        # GPU detection (QSV/VAAPI/NVENC)
-│   └── job_store.py      # SQLite job persistence
-└── workers/
-    ├── _progress.py      # FIFO-based FFmpeg progress reporting
-    ├── _safe_move.py     # Safe file replacement with backup/restore
-    ├── audio.py          # DTS → AC3/AAC
-    ├── video.py          # H.264 → HEVC/AV1 (SW + HW encode)
-    └── cleanup.py        # Stream removal/reorder
-
-config/                   # Docker volume — created on first run
-├── config.yaml           # Your active configuration
-├── jobs.db               # Job history (SQLite)
-└── .api_key              # Auto-generated API key
-
-frontend/                 # SvelteKit UI (built into Docker image)
-├── src/
-│   ├── lib/
-│   │   ├── api.ts        # API client
-│   │   ├── types.ts      # TypeScript interfaces
-│   │   └── components/   # JobCard, Navbar, StatusBadge, AnalyzeModal
-│   └── routes/
-│       ├── +page.svelte   # Dashboard
-│       ├── movies/        # Library browse (poster grid + detail modal + job status)
-│       ├── shows/         # Series browse (drill-down to episodes + job status)
-│       ├── jobs/          # Job queue with processing details
-│       └── config/        # Settings page
-```
----
-
-## Logs & Debugging
-
-```bash
-# Live logs
-docker compose logs -f
-
-# Last 100 lines
-docker compose logs --tail=100
-
-# Quick codec check
-ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile \
-  -of default=noprint_wrappers=1 file.mkv
-```
-
----
-
-## Troubleshooting
-
-**Container won't start**
-```bash
-docker compose logs --tail=50
-```
-
-**Webhook test fails**
-```bash
-curl http://localhost:7889/health
-cat config/.api_key
-```
-
-**Files not being converted**
-```bash
-# Check what the analyzer sees
-curl "http://localhost:7889/api/analyze?path=/share/your/file.mkv" \
-  -H "X-API-Key: $(cat config/.api_key)"
-```
-
-**"Failed to trigger rename"**
-- Verify Sonarr/Radarr URLs and API keys on the Settings page
-
----
-
-## Build from Source (Optional)
-
-If you want to make local changes, you can build the image yourself:
-
-### 1. Clone
+### Option 2 — Build from Source
 
 ```bash
 git clone https://github.com/sirjmann92/remuXcode.git
 cd remuXcode
 ```
 
-### 2. Create and update compose.yml
-Follow the instructions above to create your `compose.yml` file, then replace
-```yaml
-image: ghcr.io/sirjmann92/remuxcode:latest
-```
-with
+Create a `compose.yml` as above, but replace `image: ghcr.io/...` with:
+
 ```yaml
 build: .
 ```
 
-### 3. Build and start
+Then:
 
 ```bash
 docker compose up -d --build
 ```
 
-The rest of the setup (webhook, config, etc) is the same as above.
+---
+
+## Webhook Setup
+
+### Sonarr
+
+Settings → Connect → Add → Webhook:
+
+| Field | Value |
+|-------|-------|
+| URL | `http://<host>:7889/api/webhook` |
+| Method | POST |
+| Triggers | **On Import Complete** (recommended) |
+| Headers | `X-API-Key: <your key>` |
+
+> **On Import Complete** fires once after a full batch import (e.g. a whole season), delivering all file paths in a single payload — more efficient than per-episode triggers. You can also enable **On File Import** and/or **On File Upgrade** for per-file triggers.
+
+### Radarr
+
+Settings → Connect → Add → Webhook:
+
+| Field | Value |
+|-------|-------|
+| URL | `http://<host>:7889/api/webhook` |
+| Method | POST |
+| Triggers | On Import, On Upgrade |
+| Headers | `X-API-Key: <your key>` |
 
 ---
-````
+
+## API
+
+All endpoints (except `/health`) require an `X-API-Key` header. Interactive API docs are available at `http://localhost:7889/docs`.
+
+```bash
+# Health check (no auth required)
+curl http://localhost:7889/health
+
+# Queue a single file for full conversion
+curl -X POST http://localhost:7889/api/convert \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/share/movies/Movie (2024)/movie.mkv", "type": "full"}'
+
+# type options: full | audio | video | cleanup
+
+# Queue all files in a Radarr library (by Radarr movie IDs)
+curl -X POST http://localhost:7889/api/convert/movies \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"movie_ids": [123, 456], "type": "full"}'
+
+# Queue all episodes in a Sonarr series (by Sonarr series ID)
+curl -X POST http://localhost:7889/api/convert/series \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"series_ids": [42], "type": "audio"}'
+
+# List jobs
+curl http://localhost:7889/api/jobs -H "X-API-Key: your-key"
+
+# Analyze a file
+curl "http://localhost:7889/api/analyze?path=/share/movies/Movie/movie.mkv" \
+  -H "X-API-Key: your-key"
+```
+
+---
+
+## Documentation
+
+| Page | Description |
+|------|-------------|
+| [Dashboard](docs/dashboard.md) | Live stats, active jobs, queue management |
+| [Movies](docs/movies.md) | Browse and process your movie library |
+| [Shows](docs/shows.md) | Browse and process your TV library |
+| [Jobs](docs/jobs.md) | Job history, filtering, controls |
+| [Settings](docs/settings.md) | Complete settings reference |
+
+---
+
+## License
+
+MIT

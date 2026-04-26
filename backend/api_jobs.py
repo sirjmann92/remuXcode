@@ -103,12 +103,14 @@ async def list_jobs(
         "failed": 3,
         "cancelled": 4,
     }
+    pending_order = {
+        job_id: idx for idx, job_id in enumerate(core.job_queue.get_pending_order())
+    }
     filtered.sort(
         key=lambda j: (
             status_order.get(j.status.value, 9),
-            # Pending: oldest first (queue order — next to process at top)
-            # Everything else: newest first
-            (j.created_at or 0) if j.status.value == "pending" else -(j.created_at or 0),
+            # Pending: use queue position; everything else: newest first
+            pending_order.get(j.id, 0) if j.status.value == "pending" else -(j.created_at or 0),
         )
     )
 
