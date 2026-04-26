@@ -13,7 +13,6 @@ import json as _json
 import logging
 import os
 from pathlib import Path
-import queue
 import shutil
 import tempfile
 import threading
@@ -146,7 +145,7 @@ class JobQueue:
     def __init__(self, max_workers: int = 1, job_store: JobStore | None = None) -> None:
         """Initialize the job queue with max_workers worker threads."""
         self.jobs: dict[str, ConversionJob] = {}
-        self.pending_queue: queue.Queue[str] = queue.Queue()
+        self.pending_queue: list[str] = []
         self.lock = threading.Lock()
         self.workers: list[threading.Thread] = []
         self.running = False
@@ -181,9 +180,9 @@ class JobQueue:
         """Add a job to the queue and return its ID."""
         with self.lock:
             self.jobs[job.id] = job
+            self.pending_queue.append(job.id)
         if self.job_store:
             self._save_job_to_store(job)
-        self.pending_queue.put(job.id)
         logger.info(
             "Queued job %s: %s for %s", job.id, job.job_type.value, Path(job.file_path).name
         )
@@ -215,6 +214,24 @@ class JobQueue:
             self._save_job_to_store(job)
         logger.info("Cancelled job %s", job_id)
         return True
+
+    def reorder_queue(self, ordered_ids: list[str]) -> bool:
+        """Reorder pending jobs. ordered_ids must be exactly the current pending set."""
+        with self.lock:
+            current_pending = set(self.pending_queue)
+            if set(ordered_ids) != current_pending:
+                return False
+            self.pending_queue = list(ordered_ids)
+        if self.job_store:
+            for pos, job_id in enumerate(ordered_ids):
+                self.job_store.update_queue_position(job_id, pos)
+        logger.info("Reordered queue: %s", ordered_ids)
+        return True
+
+    def get_pending_order(self) -> list[str]:
+        """Return current ordered list of pending job IDs."""
+        with self.lock:
+            return list(self.pending_queue)
 
     def delete_job(self, job_id: str) -> bool:
         """Delete a finished job."""
@@ -279,7 +296,7 @@ class JobQueue:
             job.progress = 0.0
             with self.lock:
                 self.jobs[job.id] = job
-            self.pending_queue.put(job.id)
+                self.pending_queue.append(job.id)
             count += 1
         if count > 0:
             logger.info("Loaded %d pending job(s) from database", count)
@@ -412,13 +429,14 @@ class JobQueue:
 
     def _worker_loop(self) -> None:
         while self.running:
-            try:
-                job_id = self.pending_queue.get(timeout=1)
+            job_id = None
+            with self.lock:
+                if self.pending_queue:
+                    job_id = self.pending_queue.pop(0)
+            if job_id:
                 self._process_job(job_id)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                logger.error("Worker error: %s", e)
+            else:
+                time.sleep(0.1)
 
     def _process_job(self, job_id: str) -> None:
         job = self.jobs.get(job_id)

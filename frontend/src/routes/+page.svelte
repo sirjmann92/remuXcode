@@ -1,5 +1,5 @@
 <script lang="ts">
-import { getConfig, getJobs } from '$lib/api';
+import { getConfig, getJobs, reorderJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
 import type { ConfigSummary, Job } from '$lib/types';
 
@@ -10,6 +10,7 @@ let totalCompleted = $state(0);
 let totalFailed = $state(0);
 let config: ConfigSummary | null = $state(null);
 let loading = $state(true);
+let autoRefreshEnabled = $state(true);
 
 async function fetchData() {
   try {
@@ -39,9 +40,54 @@ async function fetchData() {
 
 $effect(() => {
   fetchData();
-  const id = setInterval(fetchData, 3000);
+  const id = setInterval(() => {
+    if (autoRefreshEnabled) fetchData();
+  }, 3000);
   return () => clearInterval(id);
 });
+
+let draggingId = $state<string | null>(null);
+let dragOverId = $state<string | null>(null);
+
+function handleDragStart(id: string) {
+  draggingId = id;
+}
+
+function handleDragOver(e: DragEvent, id: string) {
+  e.preventDefault();
+  if (!draggingId || id === draggingId || id === dragOverId) return;
+  dragOverId = id;
+  const from = pendingJobs.findIndex((j) => j.id === draggingId);
+  const to = pendingJobs.findIndex((j) => j.id === id);
+  if (from === -1 || to === -1) return;
+  const reordered = [...pendingJobs];
+  const [item] = reordered.splice(from, 1);
+  reordered.splice(to, 0, item);
+  pendingJobs = reordered;
+}
+
+async function handleDrop() {
+  if (!draggingId) return;
+  draggingId = null;
+  dragOverId = null;
+  const pendingOrder = pendingJobs.map((j) => j.id);
+  autoRefreshEnabled = false;
+  try {
+    await reorderJobs(pendingOrder);
+  } catch {
+    await fetchData();
+    autoRefreshEnabled = true;
+    return;
+  }
+  setTimeout(() => {
+    autoRefreshEnabled = true;
+  }, 2000);
+}
+
+function handleDragEnd() {
+  draggingId = null;
+  dragOverId = null;
+}
 </script>
 
 <svelte:head>
@@ -138,7 +184,22 @@ $effect(() => {
       </h2>
       <div class="space-y-2">
         {#each pendingJobs as job (job.id)}
-          <JobCard {job} onRemoved={fetchData} />
+          <div
+            role="listitem"
+            class="relative group {draggingId === job.id ? 'opacity-50' : ''}"
+            draggable="true"
+            ondragstart={() => handleDragStart(job.id)}
+            ondragover={(e) => handleDragOver(e, job.id)}
+            ondrop={handleDrop}
+            ondragend={handleDragEnd}
+          >
+            <div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-30 cursor-grab z-10 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm-8 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm-8 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+              </svg>
+            </div>
+            <JobCard {job} onRemoved={fetchData} />
+          </div>
         {/each}
       </div>
     </section>
