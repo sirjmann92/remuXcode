@@ -1,6 +1,6 @@
 <script lang="ts">
 import { page } from '$app/stores';
-import { cancelAllPending, cancelRunning, deleteFinished, getJobs } from '$lib/api';
+import { cancelAllPending, cancelRunning, deleteFinished, getJobs, reorderJobs } from '$lib/api';
 import JobCard from '$lib/components/JobCard.svelte';
 import type { Job, JobStatus, JobsCounts } from '$lib/types';
 
@@ -184,6 +184,50 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
   { value: 'failed', label: 'Failed' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
+
+let draggingId = $state<string | null>(null);
+let dragOverId = $state<string | null>(null);
+
+function handleDragStart(id: string) {
+  draggingId = id;
+}
+
+function handleDragOver(e: DragEvent, id: string) {
+  e.preventDefault();
+  if (!draggingId || id === draggingId || id === dragOverId) return;
+  const targetJob = jobs.find((j) => j.id === id);
+  if (!targetJob || targetJob.status !== 'pending') return;
+  dragOverId = id;
+  const from = jobs.findIndex((j) => j.id === draggingId);
+  const to = jobs.findIndex((j) => j.id === id);
+  if (from === -1 || to === -1) return;
+  const reordered = [...jobs];
+  const [item] = reordered.splice(from, 1);
+  reordered.splice(to, 0, item);
+  jobs = reordered;
+}
+
+async function handleDrop() {
+  if (!draggingId) return;
+  draggingId = null;
+  dragOverId = null;
+  const pendingOrder = jobs.filter((j) => j.status === 'pending').map((j) => j.id);
+  autoRefreshEnabled = false;
+  try {
+    await reorderJobs(pendingOrder);
+  } catch {
+    await fetchJobs(true);
+    return;
+  }
+  setTimeout(() => {
+    autoRefreshEnabled = true;
+  }, 2000);
+}
+
+function handleDragEnd() {
+  draggingId = null;
+  dragOverId = null;
+}
 </script>
 
 <svelte:head>
@@ -331,7 +375,26 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
   {:else}
     <div class="space-y-2">
       {#each jobs as job (job.id)}
-        <JobCard {job} onRemoved={fetchJobs} detailed={true} />
+        {#if job.status === 'pending'}
+          <div
+            role="listitem"
+            class="relative group {draggingId === job.id ? 'opacity-50' : ''}"
+            draggable="true"
+            ondragstart={() => handleDragStart(job.id)}
+            ondragover={(e) => handleDragOver(e, job.id)}
+            ondrop={handleDrop}
+            ondragend={handleDragEnd}
+          >
+            <div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-30 cursor-grab z-10 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm-8 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm-8 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+              </svg>
+            </div>
+            <JobCard {job} onRemoved={fetchJobs} detailed={true} />
+          </div>
+        {:else}
+          <JobCard {job} onRemoved={fetchJobs} detailed={true} />
+        {/if}
       {/each}
     </div>
     {#if hasMore}

@@ -78,6 +78,7 @@ class JobStore:
                 "result_json": "TEXT",
                 "poster_url": "TEXT",
                 "media_type": "TEXT",
+                "queue_position": "INTEGER DEFAULT 0",
             }
             for col, typedef in migrations.items():
                 if col not in existing:
@@ -219,15 +220,23 @@ class JobStore:
         """Get jobs that should be resumed (pending or running).
 
         Returns:
-            List of job dictionaries
+            List of job dictionaries ordered by queue_position then created_at
         """
         with self._lock, self._get_connection() as conn:
             rows = conn.execute("""
                     SELECT * FROM jobs
                     WHERE status IN ('pending', 'running')
-                    ORDER BY created_at ASC
+                    ORDER BY queue_position ASC, created_at ASC
                 """).fetchall()
             return [dict(row) for row in rows]
+
+    def update_queue_position(self, job_id: str, position: int) -> None:
+        """Update the queue position of a pending job."""
+        with self._lock, self._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET queue_position = ? WHERE id = ?",
+                (position, job_id),
+            )
 
     def delete_job(self, job_id: str) -> bool:
         """Delete a job.

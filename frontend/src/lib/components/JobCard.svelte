@@ -494,7 +494,14 @@ async function handleCancel() {
           <p class="text-xs text-warning/90">{job.error}</p>
         </div>
       {:else}
-        <p class="text-xs text-error/80">{job.error}</p>
+        <div class="flex items-start gap-1 mt-0.5">
+          <p class="text-xs text-error/80 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.error}</p>
+          <button onclick={() => copyError(job.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+            {#if copiedError === job.error}✓{:else}
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            {/if}
+          </button>
+        </div>
       {/if}
     {/if}
 

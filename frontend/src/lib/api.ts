@@ -97,6 +97,13 @@ export async function deleteFinished(): Promise<{ message: string; deleted: numb
   return request('/api/jobs/finished', { method: 'DELETE' });
 }
 
+export async function reorderJobs(order: string[]): Promise<{ order: string[] }> {
+  return request('/api/jobs/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ order }),
+  });
+}
+
 // Convert
 export async function convertFile(
   path: string,
