@@ -1,391 +1,52 @@
-# remuXcode - Future Roadmap
+# remuXcode — Roadmap
 
-## Phase 1: Core Functionality ✓ (CURRENT)
-- [x] Single file conversion script
-- [x] Sonarr/Radarr integration via custom scripts
-- [x] Batch converter for existing libraries
-- [x] API-triggered automatic renaming
-- [x] Smart format selection (AC3/AAC)
-- [x] Bitrate matching
-- [x] Comprehensive logging
+## What's Built
 
-### Phase 1.5: Production Hardening
-- [ ] **Proper log storage and rotation**
-  - Implement `logging.handlers.RotatingFileHandler` for automatic log rotation
-  - Configurable retention (days/size limits)
-  - Configurable log level (DEBUG for troubleshooting, INFO for production)
-  
-- [x] **Batch conversion API endpoint**
-  - Accept multiple movie/series IDs in single request
-  - `/api/convert/movies` - POST with array of Radarr movie IDs
-  - `/api/convert/series` - POST with array of Sonarr series IDs
-  - `/api/convert/episodes` - POST with array of specific episode IDs
-  - Query Radarr/Sonarr API to get file paths for each ID
-  - Queue all files in single batch job
-  - Return job ID for progress tracking
-  - Use case: Bulk re-convert after settings change
-  
-- [x] **Error recovery improvements**
-  - Graceful handling of disk full scenarios
-  - Better temp directory cleanup on crashes
-  - Resume partial conversions (job persistence via SQLite)
-  
-- [x] **Monitoring & alerting**
-  - Health check endpoint
-  - Job statistics and tracking
-  - Comprehensive logging with configurable levels
+### Core Conversion Workers
 
-## Phase 1.6: Unified Media Converter Backend ✓ (COMPLETED)
+- **Audio** — DTS/DTS-HD → AC3 (5.1), EAC3 (7.1+), AAC (stereo); separate DTS:X toggle; TrueHD passthrough; configurable bitrate caps; keep-original option with track ordering control
+- **Video** — 10-bit H.264 → HEVC or AV1; 8-bit H.264 (optional); legacy codecs (VC-1, MPEG-2, MPEG-4/XviD/DivX); anime-optimized presets (CRF, tune, framerate); hardware acceleration (Intel QSV/VAAPI, NVIDIA NVENC) with automatic software fallback
+- **Cleanup** — mux-only pass that removes audio/subtitle tracks outside keep-languages list; preserves forced subtitles, SDH, commentary, audio description; anime dual-audio mode
 
-### Goal
-Combine DTS audio conversion, HEVC video encoding, and stream cleanup into a unified, modular backend.
+### Automation & Integration
 
-### Completed Features
-- [x] **HEVC Video Encoding**
-  - Convert 10-bit H.264 (High 10) to HEVC for device compatibility
-  - Content-aware encoding: anime vs live action detection
-  - Different settings for anime (`-tune animation`, CRF 20) vs live action
-  - VBV bitrate caps for streaming devices
-  - Backup original files before conversion
+- Sonarr/Radarr webhook receiver (On Import Complete, On File Import, On File Upgrade)
+- Post-conversion rename trigger via Sonarr/Radarr API — Sonarr RescanSeries + polled rename; Radarr polled rename
+- Job persistence (SQLite) — survives container restarts, resumes pending jobs in queue order
+- Anime detection — path patterns, NFO genre parsing, Sonarr/Radarr API genres and studio names
+- Original language detection — NFO, API, path pattern fallback chain
 
-- [x] **Anime Auto-Detection**
-  - Path-based detection (`/Anime/`, `/アニメ/`)
-  - NFO file parsing for genres (animation, anime)
-  - Sonarr/Radarr API integration for series/movie type
-  - Studio detection (Japanese animation studios)
+### Web UI
 
-- [x] **Language-Based Stream Cleanup**
-  - Detect original content language from NFO, API, or path
-  - Keep only original language + English audio/subtitles
-  - Preserve forced subtitles and SDH tracks
-  - Configurable language preferences
+- **Dashboard** — live job stats (processed, active, queued, storage saved), in-progress jobs with per-phase progress and size delta, pending queue with drag-and-drop reordering, recent activity
+- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, per-file analyze modal, individual and multi-select batch queue, job status indicators on posters, library refresh
+- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, per-episode analyze modal, individual and multi-select batch queue, season-level and series-level Queue All, library refresh
+- **Jobs** — full job history with status/worker/media/source/date-range filters and search, per-phase results (size delta per phase), full-text error display with clipboard copy button, drag-and-drop pending queue reordering, Stop Current / Clear Pending / Delete Completed controls, individual job cancel and delete, load-more pagination
+- **Settings** — all settings configurable from the UI: audio, video, cleanup, language detection, Sonarr/Radarr connections, workers, job retention, hardware acceleration
 
-- [x] **Modular Architecture**
-  - Separate workers: `audio.py`, `video.py`, `cleanup.py`
-  - Shared utilities: `ffprobe.py`, `config.py`, `language.py`, `anime_detect.py`
-  - YAML configuration with environment variable substitution
-  - Typed dataclasses for configuration
+### Infrastructure
 
-### Backend Structure
-```
-backend/
-├── config.yaml           # Main configuration file
-├── utils/
-│   ├── ffprobe.py       # Media analysis (streams, codecs, bit depth)
-│   ├── config.py        # YAML config loader with typed dataclasses
-│   ├── language.py      # Original language detection (NFO, API, path)
-│   └── anime_detect.py  # Content type detection (anime vs live action)
-└── workers/
-    ├── audio.py         # DTS→AC3/AAC conversion
-    ├── video.py         # H.264→HEVC encoding
-    └── cleanup.py       # Language-based stream removal
-```
+- Single Docker container — FastAPI backend + SvelteKit frontend (port 7889)
+- Multi-stage Dockerfile: Node.js builds frontend → Python 3 slim runtime
+- Hardware acceleration auto-detection at startup (QSV / VAAPI / NVENC / software)
+- Real-time FFmpeg progress via Unix FIFO; frame-count fallback for hardware encoders that report `out_time_us=N/A`
+- File size tracking: before/after displayed per conversion phase in the Jobs UI
+- Automatic job retry on startup for jobs interrupted mid-encode
 
-### Completed Work
-- [x] Job queue manager with SQLite persistence
-- [x] Unified webhook handler for all conversion types
-- [x] HTTP API endpoints for manual triggering
-- [x] .env configuration controls for all components
-- [x] Comprehensive code cleanup and optimization
-- [x] Rebranding to remuXcode (v2.0.0)
+---
 
-## Phase 1.7: Configuration & Control Improvements ✓ (COMPLETED)
+## Planned / Future
 
-### Goal
-Improve consistency and clarity of content filtering and processing controls.
+### Phase 3 — Community & Distribution
 
-### Completed Features
-- [x] **Per-Worker Anime-Only Flags**
-  - Individual `anime_only` setting per worker: Video, Audio, Cleanup
-  - When `true`: that worker only processes anime content, skipping everything else
-  - When `false` (default for Audio/Cleanup): that worker processes all content
-  - Allows independent control — e.g. only encode anime video, but convert DTS audio on everything
-  - Full UI support in Settings page with per-section Anime Only toggles
+- **Notification Center** — in-UI event log (info / warning / error) for conversion events, watchdog actions, and worker lifecycle; filterable by severity
+- **Unraid Community Apps** — native plugin support
+- **Multi-node federation** — coordinate jobs across multiple remuXcode instances (e.g. a dedicated encode box picking up work from a lighter-duty host)
+- **Plex/Jellyfin webhook support** *(stretch)* — for setups without Sonarr/Radarr; metadata sourcing is a significant undertaking
 
-- [x] **DTS:X Object-Based Audio Awareness**
-  - Separate `convert_dts_x` toggle (off by default — DTS:X is high quality)
-  - Per-type keep-original: `keep_original` for DTS, `keep_original_dts_x` for DTS:X
-  - `original_as_secondary`: converted track first (default player pick), original second
-  - ffprobe profile detection for DTS:X streams
+### Quality of Life
 
-### Implementation Notes
-- Per-worker anime check evaluated inside each worker's `should_*` method
-- Backward compatible: existing behavior unchanged if new flags are not configured
-
-## Phase 2: Docker + WebUI ✓ (COMPLETED)
-
-### Architecture
-```
-┌─────────────────────────────────────────────────┐
-│  Docker Container (single service, port 7889)   │
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │  SvelteKit Frontend (static build)        │  │
-│  │  - Dashboard, job queue, config UI        │  │
-│  └──────────────────────┬────────────────────┘  │
-│                          │ REST API              │
-│  ┌──────────────────────▼────────────────────┐  │
-│  │  FastAPI Backend                          │  │
-│  │  - Webhook endpoints (Sonarr/Radarr)      │  │
-│  │  - Job queue & status (SQLite)            │  │
-│  │  - Media analysis & conversion workers    │  │
-│  └───────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────┘
-```
-
-### Features
-
-#### Dashboard
-- **Real-time statistics**
-  - Total files processed
-  - DTS files found/converted
-  - Storage saved
-  - Processing queue status
-  
-- **Live monitoring**
-  - Currently processing files
-  - Progress bars
-  - ETA calculations
-  - Worker status
-  
-- **Recent activity log**
-  - Last 50 conversions
-  - Errors with details
-  - Success/failure rate
-
-#### Queue Management
-- **Add jobs**
-  - Directory scanning
-  - Manual file selection
-  - Drag & drop interface
-  
-- **Priority control**
-  - High/Normal/Low priority
-  - Pause/Resume/Cancel
-  
-- **Scheduling**
-  - Cron-like scheduling
-  - "Process during off-hours"
-  - Bandwidth/CPU throttling
-
-#### Configuration UI
-- **Conversion settings**
-  - Format preferences (AC3/AAC)
-  - Bitrate caps
-  - Quality presets
-  
-- **Integration settings**
-  - Sonarr/Radarr URLs & API keys
-  - Test connections
-  - Auto-discovery
-  
-- **Watch folders**
-  - Multiple directory monitoring
-  - File pattern filters
-  - Auto-processing triggers
-
-#### Advanced Features
-- **Webhook notifications**
-  - Discord/Slack integration
-  - Custom HTTP callbacks
-  - Email alerts
-  
-- **Statistics & Analytics**
-  - Conversion trends over time
-  - Most common audio formats
-  - Storage savings graphs
-  - Processing time metrics
-  
-- **Batch operations**
-  - Resume interrupted batches
-  - Retry failed conversions
-  - Rollback (restore from backup)
-
-### Technology Stack
-
-#### Backend
-- **FastAPI** - Python web framework
-- **SQLite** - Job history & persistence
-- **asyncio / threading** - In-process async job workers
-
-#### Frontend
-- **SvelteKit** - Reactive UI framework
-- **Tailwind CSS + DaisyUI** - Styling
-- **TypeScript** - Type-safe API client
-
-#### Infrastructure
-- **Docker** - Single-container deployment
-- **Volume mounts** - Media library access, config & log persistence
-
-### Docker Compose Structure
-
-```yaml
-services:
-  remuxcode:
-    container_name: remuxcode
-    build: .
-    ports:
-      - "7889:7889"
-    volumes:
-      - ./config:/app/config   # Persists config.yaml and jobs.db
-      - ./logs:/app/logs
-      - /mnt/your-media:/share:rw
-    environment:
-      - TZ=America/Chicago
-      - REMUXCODE_API_KEY=${REMUXCODE_API_KEY}
-      - SONARR_URL=${SONARR_URL}
-      - SONARR_API_KEY=${SONARR_API_KEY}
-      - RADARR_URL=${RADARR_URL}
-      - RADARR_API_KEY=${RADARR_API_KEY}
-    restart: unless-stopped
-```
-
-### Development Phases
-
-#### 2.1: Backend API
-- [x] FastAPI project setup
-- [x] In-process async job workers (no external queue required)
-- [x] Core endpoints (browse, convert, jobs, config, webhooks)
-- [x] Database models for job history (SQLite)
-- [x] API documentation (OpenAPI/Swagger)
-
-#### 2.2: Frontend UI
-- [x] SvelteKit project setup
-- [x] Dashboard layout with real-time job status
-- [x] Queue management interface with detailed processing results
-- [x] Settings configuration page
-- [x] Real-time progress updates
-- [x] Responsive design
-- [x] **Library Browse: Movies** — poster grid, detail modal with track removal preview, config-aware filters (Audio, Cleanup, Anime)
-- [x] **Library Browse: Shows** — series list with drill-down to seasons/episodes, inline cleanup detail
-- [x] **Detection Accuracy** — EAC3 Atmos vs TrueHD distinction, slash-separated mediaInfo parsing, genre-based anime detection
-- [x] **File Analysis Modal** — full ffprobe/MediaInfo viewer with tabbed UI (General, Video, Audio, Subs) per file
-- [x] **Live Job Status** — pending/running indicators on movie posters and episode rows with 3-second polling
-- [x] **Auto-Refresh on Completion** — Movies/Shows pages automatically re-fetch data when a job finishes
-- [x] **Manual Library Refresh** — Refresh Library buttons on Movies/Shows pages with confirmation modal, forces Sonarr/Radarr full metadata re-read
-- [x] **Anime Dual-Audio** — `anime_keep_original_audio` config to preserve original-language audio on anime content
-- [x] **Sonarr Integration Hardening** — RefreshSeries + RescanSeries (polled), polled rename commands, Specials folder support
-
-#### 2.3: Docker Integration
-- [x] Multi-stage Dockerfile (frontend build + Python backend)
-- [x] Docker Compose configuration (single container)
-- [x] Volume mapping for media access
-- [x] Environment variable management
-- [x] Health checks
-
-#### 2.4: Polish & Testing
-- [x] Error handling improvements
-- [x] Documentation
-- [x] GitHub release
-
-#### 2.5: Batch Operations & UX Improvements
-- [x] **Queue All Button** — Movies and Shows parent pages get a "Queue All" button that queues all currently filtered items needing work
-- [x] **Fix Queue All Episodes** — "Queue All" on a series detail page should only queue episodes that need work, not all episodes
-- [x] **Multi-Select Batch Queue** — Checkboxes on movie posters and episode rows to select multiple items and queue them in one action
-- [x] **Sort Options** — Sort filtered lists by: Needs Work (default, work items first), Title, Year/Episodes, Size
-- [x] **Editable Config Page** — Make settings editable in the UI (audio, video, cleanup options including `anime_keep_original_audio`)
-- [x] **Stop & Clear Queue Controls** — Cancel pending jobs and clear finished jobs from the Jobs page
-- [x] **Complete Language Name Map** — Fix abbreviated language codes (IND, MAY, THA, VIE, GRE, RUM, SLO, BUL, EST, HEB, HIN, etc.) in episode tables and Analyze modal
-- [x] **Show/Season Job Indicators** — Display queued/in-progress badge at the show and season level so users can see activity without expanding seasons
-- [x] **Individual & Bulk Job Cancellation** — Cancel running/pending jobs individually or stop all at once
-- [x] **Language Select Dropdown** — Searchable multi-select component for keep-languages configuration, replacing raw text input
-- [x] **Fully Editable Settings Page** — All settings including Sonarr/Radarr URLs, API keys, worker count, job retention, and all advanced options editable from the UI
-- [x] **Code Audit & Cleanup** — Removed dead code, unused dependencies, deduplicated frontend utilities into shared `format.ts`, optimized Dockerfile
-
-## Phase 2.6: Hardware Acceleration & Progress Reporting ✓ (COMPLETED)
-
-### Goal
-Add GPU-accelerated encoding and reliable real-time progress tracking for all encoder types.
-
-### Completed Features
-- [x] **Hardware Acceleration (QSV/VAAPI/NVENC)**
-  - Auto-detection of Intel QSV, Intel VAAPI, and NVIDIA NVENC at startup
-  - Automatic encoder selection with software fallback (`libx265`/`libsvtav1`)
-  - SW decode + HW encode pattern for maximum compatibility
-  - 10-bit pixel format handling per acceleration method (p010le for QSV/VAAPI, p010 for NVENC)
-  - GPU render device passthrough (`/dev/dri`)
-  - Dockerfile migrated from Alpine to Debian Trixie with Intel media drivers (libmfx, VAAPI)
-  - AV1 hardware encoding support (QSV, VAAPI, NVENC)
-
-- [x] **FIFO-Based Progress Reporting**
-  - Replaced `pipe:1` progress output with Unix FIFO to avoid stdout full-buffering
-  - Non-blocking FIFO open (`O_RDONLY | O_NONBLOCK`) before spawning ffmpeg to prevent deadlocks
-  - `select()` with timeout for efficient reading and cancellation support
-  - Raw `os.read()` to bypass Python's buffered I/O read-ahead on FIFOs
-
-- [x] **Frame-Based Progress Fallback**
-  - Hardware encoders (QSV, VAAPI, NVENC) report `out_time_us=N/A` instead of numeric timestamps
-  - Automatic fallback to `frame=` parsing with `total_frames` calculated from `duration × framerate`
-  - Progress displays correctly for both software and hardware encoders
-
-- [x] **File Size Tracking**
-  - Before/after file sizes with percentage change displayed per conversion phase
-  - Shown in the Jobs UI for audio, video, and cleanup phases
-
-- [x] **Code Audit & Cleanup**
-  - Removed dead code (duplicate exception handler in safe-move)
-  - Tightened progress calculation guards
-  - Full audit of all backend and frontend files
-
-## Phase 2.7: Job Controls & Worker Fix ✓ (COMPLETED)
-
-### Goal
-Improve job management UX and fix a critical worker concurrency bug.
-
-### Completed Features
-- [x] **Worker Spawning Fix**
-  - Watchdog thread was spawning replacement worker threads when detecting stale jobs, causing concurrent workers to exceed `max_concurrent_jobs` setting
-  - Removed replacement worker spawning from watchdog — it still fails stale jobs and signals cancellation but no longer creates extra workers
-
-- [x] **Granular Job Control Buttons**
-  - Replaced "Stop All" + "Clear Finished" with three separate actions:
-  - **Stop Current** — cancels only running jobs (kills ffmpeg), leaves pending queue intact
-  - **Clear Pending** — cancels only pending/queued jobs, doesn't affect running jobs
-  - **Delete Completed** — permanently deletes finished jobs from the database with confirmation dialog
-  - Each button only appears when relevant (running > 0, pending > 0, finished > 0)
-
-- [x] **Destructive Action Confirmation**
-  - "Delete Completed" opens a modal dialog warning that deletion is permanent
-  - Shows count of affected jobs and explicit "cannot be undone" messaging
-
-- [x] **Job Timestamps**
-  - Start time and completion time displayed on every job card header
-  - Uses locale-aware short datetime format (e.g. "Apr 5, 02:30 PM")
-
-- [x] **New API Endpoints**
-  - `POST /jobs/cancel-running` — cancel only running jobs
-  - `DELETE /jobs/finished` — bulk delete all completed/failed/cancelled jobs
-
-## Phase 3: Community & Distribution
-
-### Features
-- **Event Viewer / Notification Center** - Real-time activity log in the UI showing conversion events, data protection alerts, watchdog actions, and worker lifecycle events with filterable severity levels (info, warning, error, critical)
-- **Unraid Plugin** - Native Unraid Community Apps support
-- **Multi-user support** - Role-based access
-- **Cloud storage support** - S3, GCS, etc.
-- **Plex/Jellyfin Webhooks** *(nice-to-have, low priority)* - Support users without Sonarr/Radarr; metadata sourcing would be a significant undertaking
-
-### Distribution Channels
-- Docker Hub
-- GitHub Container Registry
-- Unraid Community Apps
-- TrueNAS plugins
-- Proxmox templates
-
-## MVP for Phase 2 (Docker + WebUI) ✓ (DELIVERED)
-
-1. **Backend API** (FastAPI)
-   - `/api/browse` - Scan library for convertible files
-   - `/api/convert` - Queue conversion job
-   - `/api/jobs` - List all jobs with status
-   - `/api/jobs/{id}` - Get job details & progress
-
-2. **Frontend** (SvelteKit)
-   - Dashboard with job queue and live progress
-   - Settings/config page
-   - Responsive design
-
-3. **Docker**
-   - Single-container `compose.yml`
-   - Pre-configured for common setups
-   - README with quick start
+- **Retry from UI** — re-queue failed jobs from the Jobs page with one click
+- **Settings change detection** — surface files in the library that no longer match current conversion settings (e.g. after loosening or tightening a rule)
+- **Webhook test button** — send a test payload from the Settings page to verify connectivity end-to-end
+- **In-UI log viewer** — tail recent log output from the Settings or Jobs page without needing shell access
