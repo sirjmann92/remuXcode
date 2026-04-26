@@ -28,6 +28,7 @@ async def get_config_summary() -> dict[str, Any]:
             "codec": cfg.video.codec,
             "convert_10bit_x264": cfg.video.convert_10bit_x264,
             "convert_8bit_x264": cfg.video.convert_8bit_x264,
+            "convert_legacy_codecs": cfg.video.convert_legacy_codecs,
             "anime_only": cfg.video.anime_only,
             "live_action_only": cfg.video.live_action_only,
             "dv_to_hdr10": cfg.video.dv_to_hdr10,
@@ -180,6 +181,7 @@ class VideoUpdate(BaseModel):
     codec: Literal["hevc", "av1"] | None = None
     convert_10bit_x264: bool | None = None
     convert_8bit_x264: bool | None = None
+    convert_legacy_codecs: bool | None = None
     anime_only: bool | None = None
     live_action_only: bool | None = None
     dv_to_hdr10: bool | None = None
