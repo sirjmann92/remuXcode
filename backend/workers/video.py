@@ -330,7 +330,7 @@ class VideoConverter:
                     codec_from=video.codec_name,
                     codec_to=codec_to,
                     content_type=content_type.value,
-                    error=f"FFmpeg failed: {stderr_text[:500]}",
+                    error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
             # Move temp file to output location
