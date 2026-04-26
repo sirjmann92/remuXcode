@@ -99,6 +99,7 @@ class VideoConfig:
     codec: str = "hevc"  # hevc or av1
     convert_10bit_x264: bool = True
     convert_8bit_x264: bool = False
+    convert_legacy_codecs: bool = True  # VC-1, MPEG-2, MPEG-4/Xvid/DivX
 
     # Only convert anime content (skip live action)
     anime_only: bool = True
@@ -341,6 +342,7 @@ class Config:
             codec=self._get("video.codec", "hevc"),
             convert_10bit_x264=self._get("video.convert_10bit_x264", True),
             convert_8bit_x264=self._get("video.convert_8bit_x264", False),
+            convert_legacy_codecs=self._get("video.convert_legacy_codecs", True),
             anime_only=self._get("video.anime_only", True),
             live_action_only=self._get("video.live_action_only", False),
             dv_to_hdr10=self._get("video.dv_to_hdr10", False),
@@ -436,6 +438,7 @@ class Config:
             "codec",
             "convert_10bit_x264",
             "convert_8bit_x264",
+            "convert_legacy_codecs",
             "anime_only",
             "anime_auto_detect",
             "anime_crf",
