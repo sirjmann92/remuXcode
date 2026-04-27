@@ -305,7 +305,7 @@ class AudioConverter:
                 descriptions = []
                 for s in streams_to_convert:
                     target_codec, _, _ = self._determine_target_format(
-                        s.channels, s.bitrate // 1000 if s.bitrate else 0
+                        s.channels, s.bitrate // 1000 if s.bitrate else 0, s.codec_name
                     )
                     ch = f"{s.channels}ch" if s.channels else ""
                     descriptions.append(
@@ -449,7 +449,9 @@ class AudioConverter:
             converted_info = []
             for stream in streams_to_convert:
                 target_codec, target_bitrate, _ = self._determine_target_format(
-                    stream.channels, stream.bitrate // 1000 if stream.bitrate else 0
+                    stream.channels,
+                    stream.bitrate // 1000 if stream.bitrate else 0,
+                    stream.codec_name,
                 )
                 converted_info.append(
                     {
@@ -512,7 +514,7 @@ class AudioConverter:
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
     def _determine_target_format(
-        self, channels: int, source_bitrate: int
+        self, channels: int, source_bitrate: int, source_codec: str = ""
     ) -> tuple[str, int, str | None]:
         """Determine optimal target format, bitrate, and channel layout.
 
@@ -520,6 +522,16 @@ class AudioConverter:
             (codec, bitrate, channel_layout) tuple
         """
         target_layout = None
+
+        # channels=0 means ffprobe couldn't determine the count (common with
+        # lossless codecs like DTS-HD MA and TrueHD).  Assume 5.1 rather than
+        # silently downmixing to stereo.
+        if channels == 0:
+            logger.warning(
+                "Unknown channel count for %s stream — assuming 5.1",
+                source_codec or "audio",
+            )
+            channels = 6
 
         # Handle >8 channels - downmix to 7.1
         if channels > 8:
@@ -677,7 +689,9 @@ class AudioConverter:
                 )
 
                 target_codec, target_bitrate, target_layout = self._determine_target_format(
-                    stream.channels, stream.bitrate // 1000 if stream.bitrate else 0
+                    stream.channels,
+                    stream.bitrate // 1000 if stream.bitrate else 0,
+                    stream.codec_name,
                 )
 
                 title = self._generate_track_title(stream.language or "", stream.title or "")

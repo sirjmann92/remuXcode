@@ -413,12 +413,47 @@ class FFProbe:
         tags = stream.get("tags", {})
         disposition = stream.get("disposition", {})
 
+        # Some lossless codecs (DTS-HD MA, TrueHD) report channels=0 when
+        # ffprobe cannot fully decode stream parameters.  Fall back to
+        # channel_layout for a reliable channel count.
+        _LAYOUT_CHANNELS = {
+            "mono": 1,
+            "stereo": 2,
+            "2.1": 3,
+            "3.0": 3,
+            "3.0(back)": 3,
+            "4.0": 4,
+            "quad": 4,
+            "quad(side)": 4,
+            "3.1": 4,
+            "5.0": 5,
+            "5.0(side)": 5,
+            "4.1": 5,
+            "5.1": 6,
+            "5.1(side)": 6,
+            "6.0": 6,
+            "6.0(front)": 6,
+            "hexagonal": 6,
+            "6.1": 7,
+            "6.1(back)": 7,
+            "6.1(front)": 7,
+            "7.0": 7,
+            "7.0(front)": 7,
+            "7.1": 8,
+            "7.1(wide)": 8,
+            "7.1(wide-side)": 8,
+            "octagonal": 8,
+        }
+        raw_channels = stream.get("channels", 0)
+        raw_layout = stream.get("channel_layout") or ""
+        channels = raw_channels or _LAYOUT_CHANNELS.get(raw_layout.lower(), 0)
+
         return AudioStream(
             index=stream.get("index", 0),
             codec_name=stream.get("codec_name", ""),
             codec_long_name=stream.get("codec_long_name", ""),
             profile=stream.get("profile"),
-            channels=stream.get("channels", 0),
+            channels=channels,
             channel_layout=stream.get("channel_layout"),
             sample_rate=int(stream.get("sample_rate", 0)),
             bitrate=int(stream.get("bit_rate", 0)) if stream.get("bit_rate") else None,
