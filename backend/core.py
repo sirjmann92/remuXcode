@@ -583,10 +583,23 @@ def translate_path(container_path: str) -> str:
 
 
 def get_volume_root(file_path: str) -> str:
-    """Get volume root for temp directory."""
+    """Return the directory to create temp files in.
+
+    By default this is the **parent directory** of *file_path* so the temp
+    dir lives on the same underlying device / mergerfs branch as the source
+    file.  This avoids cross-device copies (network round-trips on NFS/CIFS,
+    wrong branch selection on mergerfs) and enables atomic same-device rename
+    at the end of the job.
+
+    Set the ``TEMP_DIR`` env-var to override (e.g. to a fast local NVMe path).
+    """
     temp_dir_override = os.getenv("TEMP_DIR", "").strip()
     if temp_dir_override:
         return temp_dir_override
+    parent = str(Path(file_path).parent)
+    if parent and os.access(parent, os.W_OK):
+        return parent
+    # Fallback: volume root from PATH_MAPPINGS, then system temp
     for _, host_prefix in PATH_MAPPINGS:
         if file_path.startswith(host_prefix):
             if os.access(host_prefix, os.W_OK):
@@ -695,7 +708,9 @@ def process_file(
 
     if len(phases_to_run) > 1:
         _vol = get_volume_root(file_path)
-        _chain_dir = Path(_vol) / f".remuxcode-temp-{job_id}"
+        # Use a distinct prefix so individual worker temp-dir cleanup
+        # (which uses ".remuxcode-temp-{job_id}") never deletes chain files.
+        _chain_dir = Path(_vol) / f".remuxcode-chain-{job_id}"
         _chain_dir.mkdir(parents=True, exist_ok=True)
         _orig_name = Path(file_path).name
         # One temp per intermediate phase (last phase writes straight to original)
@@ -725,6 +740,11 @@ def process_file(
     def _cleanup_chain_temps() -> None:
         for _t in chain_temps:
             _t.unlink(missing_ok=True)
+        if chain_temps:
+            try:
+                chain_temps[0].parent.rmdir()
+            except OSError:
+                pass  # not empty or already gone – ignore
 
     if will_audio:
         _set_phase("audio", "Analyzing audio streams...")
