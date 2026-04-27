@@ -50,6 +50,7 @@ let draggingId = $state<string | null>(null);
 let dragOverId = $state<string | null>(null);
 
 function handleDragStart(id: string) {
+  autoRefreshEnabled = false;
   draggingId = id;
 }
 
@@ -85,8 +86,15 @@ async function handleDrop() {
 }
 
 function handleDragEnd() {
-  draggingId = null;
-  dragOverId = null;
+  // ondragend fires for cancelled drags (no drop). Re-enable refresh only if
+  // the drop handler didn't already clear draggingId and fire the API call.
+  if (draggingId) {
+    // Drag was cancelled — restore from server and re-enable refresh
+    draggingId = null;
+    dragOverId = null;
+    fetchData();
+    autoRefreshEnabled = true;
+  }
 }
 </script>
 
