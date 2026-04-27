@@ -116,11 +116,15 @@ class AudioConverter:
         return lang in compatible_langs
 
     def _compatible_languages(self, info: MediaInfo) -> set[str]:
-        """Build set of languages that have a compatible (non-DTS, non-TrueHD) track."""
+        """Build set of languages that have a compatible (non-DTS, non-TrueHD) track.
+
+        Commentary tracks are explicitly excluded: a 2.0 commentary AC3 must
+        not suppress conversion of a primary 5.1 DTS-HD MA track.
+        """
         return {
             (s.language or "und").lower()
             for s in info.audio_streams
-            if not s.is_dts and not s.is_truehd
+            if not s.is_dts and not s.is_truehd and not s.is_commentary
         }
 
     def should_convert(self, file_path: str, *, is_anime: bool = False) -> bool:
