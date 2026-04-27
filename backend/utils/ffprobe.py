@@ -98,6 +98,11 @@ class AudioStream:
     title: str | None
     is_default: bool
     is_forced: bool
+    # True when the track is a director's commentary or similar secondary track.
+    # Such tracks must not be treated as a "compatible companion" for the main
+    # audio stream — otherwise a 2.0 commentary AC3 would suppress conversion
+    # of the primary DTS-HD MA 5.1 track.
+    is_commentary: bool = False
 
     @property
     def is_dts(self) -> bool:
@@ -448,6 +453,12 @@ class FFProbe:
         raw_layout = stream.get("channel_layout") or ""
         channels = raw_channels or _LAYOUT_CHANNELS.get(raw_layout.lower(), 0)
 
+        # A track is commentary if disposition.comment is set OR the title
+        # contains the word "commentary" (common on Blu-ray remuxes).
+        is_commentary = (
+            disposition.get("comment", 0) == 1 or "commentary" in (tags.get("title") or "").lower()
+        )
+
         return AudioStream(
             index=stream.get("index", 0),
             codec_name=stream.get("codec_name", ""),
@@ -461,6 +472,7 @@ class FFProbe:
             title=tags.get("title"),
             is_default=disposition.get("default", 0) == 1,
             is_forced=disposition.get("forced", 0) == 1,
+            is_commentary=is_commentary,
         )
 
     def _parse_subtitle_stream(self, stream: dict) -> SubtitleStream:
