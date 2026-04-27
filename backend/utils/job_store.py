@@ -99,6 +99,49 @@ class JobStore:
                 conn.execute("UPDATE jobs SET media_type = 'movie' WHERE media_type IS NULL")
                 logger.info("Backfilled media_type for %d jobs", null_count)
 
+            # Reclassify "completed" jobs whose result_json shows all phases failed.
+            # Before the all_phases_failed fix (commit 80cdbaf), jobs where every
+            # phase errored were incorrectly saved as "completed" rather than "failed".
+            rows = conn.execute(
+                "SELECT id, result_json FROM jobs WHERE status = 'completed' AND result_json IS NOT NULL"
+            ).fetchall()
+            reclassified = 0
+            for row in rows:
+                try:
+                    result = json.loads(row[1])
+                except (ValueError, TypeError):
+                    continue
+                any_success = (
+                    (result.get("audio") and result["audio"].get("success"))
+                    or (result.get("video") and result["video"].get("success"))
+                    or (result.get("cleanup") and result["cleanup"].get("success"))
+                )
+                any_phase_failed = (
+                    (result.get("video") and not result["video"].get("success"))
+                    or (result.get("audio") and not result["audio"].get("success"))
+                    or (result.get("cleanup") and not result["cleanup"].get("success"))
+                )
+                if any_phase_failed and not any_success:
+                    error = next(
+                        (
+                            r["error"]
+                            for r in [
+                                result.get("video"),
+                                result.get("audio"),
+                                result.get("cleanup"),
+                            ]
+                            if r and not r.get("success") and r.get("error")
+                        ),
+                        "All phases failed",
+                    )
+                    conn.execute(
+                        "UPDATE jobs SET status = 'failed', error = ? WHERE id = ?",
+                        (error, row[0]),
+                    )
+                    reclassified += 1
+            if reclassified:
+                logger.info("Reclassified %d job(s) from 'completed' to 'failed'", reclassified)
+
     def save_job(self, job_data: dict[str, Any]) -> None:
         """Save or update a job."""
         with self._lock:
