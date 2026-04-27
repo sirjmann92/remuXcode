@@ -508,32 +508,23 @@ class VideoConverter:
     def _build_sw_vf_filter(
         pix_fmt: str,
         framerate: str,
-        video: VideoStream | None,
     ) -> list[str]:
         """Build a single -vf filter chain for software encoders (HEVC, AV1).
 
-        Consolidates pixel format conversion, optional fps normalisation, and
-        color metadata into one explicit filter graph so FFmpeg 7.x has no
-        reason to auto-insert an ``auto_scale`` filter (which conflicts with
-        output-level -color_primaries/-color_trc/-colorspace flags in some
-        source / encoder combinations).
-
-        ``setparams`` sets metadata tags only — no pixel conversion occurs.
+        Only pixel-format conversion and optional fps normalisation are done
+        here.  Color metadata tags are intentionally omitted: declaring a
+        colorspace that differs from the source causes FFmpeg 7.x to insert an
+        ``auto_scale`` filter for the implied conversion, which then conflicts
+        with the explicit filter graph and raises
+        "Impossible to convert … auto_scale_0".  Leaving the tags unset lets
+        players apply the standard BT.709 assumption for HD content, which is
+        correct for the vast majority of encodes.
         """
-        primaries = (video.color_primaries if video else None) or "bt709"
-        trc = (video.color_trc if video else None) or "bt709"
-        space = (video.color_space if video else None) or "bt709"
-
         parts: list[str] = []
         if framerate:
             parts.append(f"fps=fps={framerate}")
         parts.append(f"format={pix_fmt}")
-        parts.append(f"setparams=color_primaries={primaries}:color_trc={trc}:colorspace={space}")
-        # -autoscale 0 prevents FFmpeg 7.x from inserting an auto_scale filter
-        # during filter-graph reinit (triggered by mid-stream codec parameter
-        # changes).  Our explicit format= filter already handles pix_fmt, so
-        # the auto-inserted scale is both unnecessary and incompatible.
-        return ["-autoscale", "0", "-vf", ",".join(parts)]
+        return ["-vf", ",".join(parts)]
 
     def _build_hevc_command(
         self,
@@ -628,7 +619,7 @@ class VideoConverter:
         # ``auto_scale`` for colour-space or fps-mode reasons, which conflicts
         # with an explicit filter graph and causes "Impossible to convert"
         # errors on some source files.
-        cmd.extend(self._build_sw_vf_filter(self.config.pix_fmt, framerate, video))
+        cmd.extend(self._build_sw_vf_filter(self.config.pix_fmt, framerate))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -741,7 +732,7 @@ class VideoConverter:
 
         # Pixel format, framerate, and color metadata all in one explicit filter
         # chain — prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
-        cmd.extend(self._build_sw_vf_filter("yuv420p10le", framerate, video))
+        cmd.extend(self._build_sw_vf_filter("yuv420p10le", framerate))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
