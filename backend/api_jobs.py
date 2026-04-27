@@ -2,6 +2,7 @@
 
 import calendar
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -16,8 +17,6 @@ router = APIRouter(tags=["jobs"])
 
 def _parse_date_param(date_str: str) -> float:
     """Parse a YYYY-MM-DD date string to a UNIX timestamp (start of day UTC)."""
-    import time
-
     return float(calendar.timegm(time.strptime(date_str, "%Y-%m-%d")))
 
 
