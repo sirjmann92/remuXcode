@@ -741,10 +741,8 @@ def process_file(
         for _t in chain_temps:
             _t.unlink(missing_ok=True)
         if chain_temps:
-            try:
+            with contextlib.suppress(OSError):
                 chain_temps[0].parent.rmdir()
-            except OSError:
-                pass  # not empty or already gone – ignore
 
     if will_audio:
         _set_phase("audio", "Analyzing audio streams...")
