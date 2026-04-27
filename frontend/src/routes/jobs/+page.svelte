@@ -185,6 +185,28 @@ const filters: { value: JobStatus | 'all'; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const emptyState = $derived(
+  search.trim()
+    ? {
+        title: 'No jobs match your search',
+        subtitle: 'Try a different search term or clear filters',
+      }
+    : filter === 'running'
+      ? { title: 'No running jobs', subtitle: 'No conversions are currently in progress' }
+      : filter === 'pending'
+        ? { title: 'Queue is empty', subtitle: 'No jobs are waiting to be processed' }
+        : filter === 'completed'
+          ? { title: 'No completed jobs', subtitle: 'Successfully processed jobs will appear here' }
+          : filter === 'failed'
+            ? { title: 'No failed jobs', subtitle: 'No errors recorded' }
+            : filter === 'cancelled'
+              ? { title: 'No cancelled jobs', subtitle: 'Jobs you cancel will appear here' }
+              : {
+                  title: 'No jobs found',
+                  subtitle: 'Jobs will appear here when Sonarr/Radarr sends webhooks',
+                },
+);
+
 let draggingId = $state<string | null>(null);
 let dragOverId = $state<string | null>(null);
 
@@ -369,8 +391,8 @@ function handleDragEnd() {
       <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-4 text-base-content/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
       </svg>
-      <p class="text-base text-base-content/40">No jobs found</p>
-      <p class="text-sm text-base-content/25 mt-1">Jobs will appear here when Sonarr/Radarr sends webhooks</p>
+      <p class="text-base text-base-content/40">{emptyState.title}</p>
+      <p class="text-sm text-base-content/25 mt-1">{emptyState.subtitle}</p>
     </div>
   {:else}
     <div class="space-y-2">
