@@ -276,11 +276,11 @@ async function handleCancel() {
               {/if}
               {#if phaseFailed && phaseResult?.error}
                 {@const errorKey = `phase-${phase}`}
-                {@const isLong = phaseResult.error.split('\n').length > 5}
+                {@const isLong = phaseResult.error.split('\n').length > 3}
                 {@const isExpanded = expandedErrors.has(errorKey)}
                 <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
                   <div class="flex-1 min-w-0">
-                    <p class="text-xs text-error/70 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-5' : ''}">{phaseResult.error}</p>
+                    <p class="text-xs text-error/70 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-3' : ''}">{phaseResult.error}</p>
                     {#if isLong}
                       <button onclick={() => toggleError(errorKey)} class="text-xs text-error/40 hover:text-error px-1.5 pt-0.5">
                         {isExpanded ? '▲ Show less' : '▼ Show more'}
@@ -515,11 +515,11 @@ async function handleCancel() {
           <p class="text-xs text-warning/90">{job.error}</p>
         </div>
       {:else}
-        {@const isLong = job.error.split('\n').length > 5}
+        {@const isLong = job.error.split('\n').length > 3}
         {@const isExpanded = expandedErrors.has('job')}
         <div class="flex items-start gap-1 mt-0.5">
           <div class="flex-1 min-w-0">
-            <p class="text-xs text-error/80 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-5' : ''}">{job.error}</p>
+            <p class="text-xs text-error/80 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-3' : ''}">{job.error}</p>
             {#if isLong}
               <button onclick={() => toggleError('job')} class="text-xs text-error/40 hover:text-error px-1.5 pt-0.5">
                 {isExpanded ? '▲ Show less' : '▼ Show more'}

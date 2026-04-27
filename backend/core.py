@@ -505,8 +505,23 @@ class JobQueue:
                 except Exception as analyze_err:
                     logger.warning("Post-job analysis failed for %s: %s", analyze_path, analyze_err)
 
-            job.status = JobStatus.COMPLETED
-            logger.info("Job %s completed successfully", job_id)
+            any_phase_failed = (
+                (result.get("video") and not result["video"].get("success"))
+                or (result.get("audio") and not result["audio"].get("success"))
+                or (result.get("cleanup") and not result["cleanup"].get("success"))
+            )
+            all_phases_failed = any_phase_failed and not any_success
+            if all_phases_failed:
+                job.status = JobStatus.FAILED
+                job.error = next(
+                    r["error"]
+                    for r in [result.get("video"), result.get("audio"), result.get("cleanup")]
+                    if r and not r.get("success") and r.get("error")
+                )
+                logger.error("Job %s failed: all phases failed", job_id)
+            else:
+                job.status = JobStatus.COMPLETED
+                logger.info("Job %s completed successfully", job_id)
         except Exception as e:
             # CancelledError from workers is expected when user cancels
             if job.status == JobStatus.CANCELLED:
