@@ -575,8 +575,6 @@ class VideoConverter:
                 "0",
                 "-c:v:0",
                 "libx265",
-                "-pix_fmt:v:0",
-                self.config.pix_fmt,
                 "-profile:v",
                 self.config.profile,
                 "-level:v",
@@ -592,6 +590,9 @@ class VideoConverter:
 
         # Add x265 params
         cmd.extend(["-x265-params", ":".join(x265_params)])
+
+        # Pixel format conversion via explicit filter (avoids auto_scale conflict in FFmpeg 7.x)
+        cmd.extend(["-vf", f"format={self.config.pix_fmt}"])
 
         # Add framerate and color settings
         cmd.extend(["-fps_mode", "cfr"])
@@ -701,8 +702,6 @@ class VideoConverter:
                 "0",
                 "-c:v:0",
                 "libsvtav1",
-                "-pix_fmt:v:0",
-                "yuv420p10le",  # AV1 10-bit
                 "-crf",
                 str(crf),
                 "-preset",
@@ -712,6 +711,9 @@ class VideoConverter:
 
         # Add SVT-AV1 params
         cmd.extend(["-svtav1-params", ":".join(svtav1_params)])
+
+        # Pixel format conversion via explicit filter (avoids auto_scale conflict in FFmpeg 7.x)
+        cmd.extend(["-vf", "format=yuv420p10le"])
 
         # Add framerate settings
         cmd.extend(["-fps_mode", "cfr"])
