@@ -500,6 +500,8 @@ async function handleCancel() {
     {#if job.error}
       {@const isProtected = job.error.includes('original file preserved')}
       {@const isStale = job.error.includes('Stale job')}
+      {@const phaseErrors = new Set([job.result?.audio?.error, job.result?.video?.error, job.result?.cleanup?.error])}
+      {@const alreadyShownAsPhase = phaseErrors.has(job.error)}
       {#if isProtected}
         <div class="flex items-start gap-1.5 rounded-md bg-success/10 border border-success/20 px-2 py-1.5">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -514,7 +516,7 @@ async function handleCancel() {
           </svg>
           <p class="text-xs text-warning/90">{job.error}</p>
         </div>
-      {:else}
+      {:else if !alreadyShownAsPhase}
         {@const isLong = job.error.split('\n').length > 3}
         {@const isExpanded = expandedErrors.has('job')}
         <div class="flex items-start gap-1 mt-0.5">
