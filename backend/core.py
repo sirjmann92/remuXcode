@@ -638,20 +638,19 @@ def process_file(
         and stream_cleanup.should_cleanup(file_path, is_anime=file_is_anime)
     )
 
-    # Build planned phases list for the UI
-    planned: list[str] = []
+    # Build planned phases list for the UI and for phase-chaining.
+    phases_to_run: list[str] = []
     if will_audio:
-        planned.append("audio")
+        phases_to_run.append("audio")
     if will_video:
-        planned.append("video")
+        phases_to_run.append("video")
     if will_cleanup:
-        planned.append("cleanup")
+        phases_to_run.append("cleanup")
     if job:
-        job.planned_phases = planned
+        job.planned_phases = phases_to_run[:]
         job.completed_phases = []
 
-    active_phases = [p for p in (will_audio, will_video, will_cleanup) if p]
-    n_phases = len(active_phases) or 1
+    n_phases = len(phases_to_run) or 1
     phase_size = 100.0 / n_phases
     phase_idx = 0
 
@@ -676,12 +675,66 @@ def process_file(
         if detail_callback:
             detail_callback(phase, "")
 
+    # ------------------------------------------------------------------
+    # Phase chaining
+    # ------------------------------------------------------------------
+    # When multiple phases will run on the same file, chain them through
+    # intermediate temp files rather than writing back to the original
+    # between each phase.  This means:
+    #   - one fewer full-file read/write cycle per intermediate phase
+    #   - atomicity: if any phase fails the original is never touched
+    #
+    # Each intermediate phase writes to a .chain-N.mkv temp; the last
+    # phase writes directly to the original path (safe_replace handles
+    # the atomic rename internally).  On any failure all chain temps are
+    # cleaned up and results are returned as-is (original untouched).
+    # ------------------------------------------------------------------
+
+    chain_temps: list[Path] = []
+    chain_current = file_path  # input for the next phase; advances each iteration
+
+    if len(phases_to_run) > 1:
+        _vol = get_volume_root(file_path)
+        _chain_dir = Path(_vol) / f".remuxcode-temp-{job_id}"
+        _chain_dir.mkdir(parents=True, exist_ok=True)
+        _orig_name = Path(file_path).name
+        # One temp per intermediate phase (last phase writes straight to original)
+        chain_temps.extend(
+            _chain_dir / f"{_orig_name}.chain-{_i}.mkv" for _i in range(len(phases_to_run) - 1)
+        )
+
+    def _phase_input() -> str:
+        """Current input file for the next phase."""
+        return chain_current
+
+    def _phase_output(phase_name: str) -> str | None:
+        """Explicit output path for this phase.
+
+        Returns None for single-phase jobs so the converter replaces
+        the input in-place (existing behaviour).  For multi-phase jobs
+        returns a chain-temp path for all but the last phase, and the
+        original file path for the last phase.
+        """
+        if len(phases_to_run) <= 1:
+            return None
+        idx = phases_to_run.index(phase_name)
+        if idx == len(phases_to_run) - 1:
+            return file_path  # last phase: overwrite original
+        return str(chain_temps[idx])
+
+    def _cleanup_chain_temps() -> None:
+        for _t in chain_temps:
+            _t.unlink(missing_ok=True)
+
     if will_audio:
         _set_phase("audio", "Analyzing audio streams...")
         logger.info("Converting audio: %s", Path(file_path).name)
         assert audio_converter is not None
+        _in = _phase_input()
+        _out = _phase_output("audio")
         audio_result = audio_converter.convert(
-            file_path,
+            _in,
+            output_file=_out,
             job_id=job_id,
             progress_callback=make_phase_cb(phase_idx),
             cancel_event=cancel_event,
@@ -700,13 +753,21 @@ def process_file(
         }
         if not audio_result.success:
             logger.error("Audio conversion failed: %s", audio_result.error)
+            _cleanup_chain_temps()
+            return results
+        # Advance chain: next phase reads from the output we just produced
+        if _out is not None:
+            chain_current = _out
 
     if will_video:
         _set_phase("video", "Analyzing video streams...")
         logger.info("Converting video: %s", Path(file_path).name)
         assert video_converter is not None
+        _in = _phase_input()
+        _out = _phase_output("video")
         video_result = video_converter.convert(
-            file_path,
+            _in,
+            output_file=_out,
             job_id=job_id,
             progress_callback=make_phase_cb(phase_idx),
             cancel_event=cancel_event,
@@ -726,13 +787,20 @@ def process_file(
         }
         if not video_result.success:
             logger.error("Video conversion failed: %s", video_result.error)
+            _cleanup_chain_temps()
+            return results
+        if _out is not None:
+            chain_current = _out
 
     if will_cleanup:
         _set_phase("cleanup", "Analyzing streams...")
         logger.info("Cleaning streams: %s", Path(file_path).name)
         assert stream_cleanup is not None
+        _in = _phase_input()
+        _out = _phase_output("cleanup")
         cleanup_result = stream_cleanup.cleanup(
-            file_path,
+            _in,
+            output_file=_out,
             job_id=job_id,
             progress_callback=make_phase_cb(phase_idx),
             is_anime=file_is_anime,
@@ -753,6 +821,12 @@ def process_file(
         }
         if not cleanup_result.success:
             logger.error("Stream cleanup failed: %s", cleanup_result.error)
+            _cleanup_chain_temps()
+            return results
+
+    # All phases completed — clean up any leftover intermediate chain temps
+    # (the last phase wrote directly to file_path so they are now orphaned).
+    _cleanup_chain_temps()
 
     return results
 
