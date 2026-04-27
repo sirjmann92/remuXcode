@@ -529,7 +529,11 @@ class VideoConverter:
             parts.append(f"fps=fps={framerate}")
         parts.append(f"format={pix_fmt}")
         parts.append(f"setparams=color_primaries={primaries}:color_trc={trc}:colorspace={space}")
-        return ["-vf", ",".join(parts)]
+        # -autoscale 0 prevents FFmpeg 7.x from inserting an auto_scale filter
+        # during filter-graph reinit (triggered by mid-stream codec parameter
+        # changes).  Our explicit format= filter already handles pix_fmt, so
+        # the auto-inserted scale is both unnecessary and incompatible.
+        return ["-autoscale", "0", "-vf", ",".join(parts)]
 
     def _build_hevc_command(
         self,
