@@ -216,16 +216,29 @@ class JobQueue:
         return True
 
     def reorder_queue(self, ordered_ids: list[str]) -> bool:
-        """Reorder pending jobs. ordered_ids must be exactly the current pending set."""
+        """Reorder pending jobs.
+
+        ``ordered_ids`` may be a subset of the current pending queue (e.g. the
+        UI only loaded the first 25 jobs, or a job transitioned to running
+        between the last poll and the drop).  IDs that are present in the
+        queue but absent from ``ordered_ids`` are appended at the end in their
+        current relative order.  IDs in ``ordered_ids`` that are no longer
+        pending are silently ignored.
+        """
         with self.lock:
-            current_pending = set(self.pending_queue)
-            if set(ordered_ids) != current_pending:
-                return False
-            self.pending_queue = list(ordered_ids)
+            current_pending = list(self.pending_queue)
+            current_pending_set = set(current_pending)
+            # Keep only IDs that are still pending, preserving submitted order
+            head = [jid for jid in ordered_ids if jid in current_pending_set]
+            head_set = set(head)
+            # Append any pending jobs the client didn't know about
+            tail = [jid for jid in current_pending if jid not in head_set]
+            self.pending_queue = head + tail
+            final_order = list(self.pending_queue)
         if self.job_store:
-            for pos, job_id in enumerate(ordered_ids):
+            for pos, job_id in enumerate(final_order):
                 self.job_store.update_queue_position(job_id, pos)
-        logger.info("Reordered queue: %s", ordered_ids)
+        logger.info("Reordered queue: %s", final_order)
         return True
 
     def get_pending_order(self) -> list[str]:
