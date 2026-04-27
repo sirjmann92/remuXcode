@@ -165,14 +165,10 @@ class ReorderRequest(BaseModel):
 
 @router.post("/jobs/reorder")
 async def reorder_jobs(body: ReorderRequest) -> dict[str, Any]:
-    """Reorder pending jobs. Body must contain all current pending job IDs in desired order."""
+    """Reorder pending jobs. Body contains the desired order of pending job IDs."""
     if not core.job_queue:
         raise HTTPException(status_code=503, detail="Service not ready")
-    if not core.job_queue.reorder_queue(body.order):
-        raise HTTPException(
-            status_code=409,
-            detail="Order list does not match current pending jobs. Refresh and try again.",
-        )
+    core.job_queue.reorder_queue(body.order)
     return {"order": body.order}
 
 
