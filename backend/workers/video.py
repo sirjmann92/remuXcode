@@ -484,12 +484,13 @@ class VideoConverter:
         return self._build_hevc_command(input_file, output_file, content_type, video=video)
 
     @staticmethod
+    @staticmethod
     def _build_color_args(video: VideoStream | None) -> list[str]:
         """Return ffmpeg color metadata flags matching the source stream.
 
-        Falls back to BT.709 when the source has no color metadata (safe for
-        all standard SDR content).  HDR sources carry bt2020/smpte2084 etc.
-        and those values are passed through unchanged.
+        Used by hardware-accelerated builders where the filter chain already
+        handles pixel format conversion.  Falls back to BT.709 when the source
+        has no color metadata (safe for all standard SDR content).
         """
         primaries = (video.color_primaries if video else None) or "bt709"
         trc = (video.color_trc if video else None) or "bt709"
@@ -502,6 +503,33 @@ class VideoConverter:
             "-colorspace",
             space,
         ]
+
+    @staticmethod
+    def _build_sw_vf_filter(
+        pix_fmt: str,
+        framerate: str,
+        video: VideoStream | None,
+    ) -> list[str]:
+        """Build a single -vf filter chain for software encoders (HEVC, AV1).
+
+        Consolidates pixel format conversion, optional fps normalisation, and
+        color metadata into one explicit filter graph so FFmpeg 7.x has no
+        reason to auto-insert an ``auto_scale`` filter (which conflicts with
+        output-level -color_primaries/-color_trc/-colorspace flags in some
+        source / encoder combinations).
+
+        ``setparams`` sets metadata tags only — no pixel conversion occurs.
+        """
+        primaries = (video.color_primaries if video else None) or "bt709"
+        trc = (video.color_trc if video else None) or "bt709"
+        space = (video.color_space if video else None) or "bt709"
+
+        parts: list[str] = []
+        if framerate:
+            parts.append(f"fps=fps={framerate}")
+        parts.append(f"format={pix_fmt}")
+        parts.append(f"setparams=color_primaries={primaries}:color_trc={trc}:colorspace={space}")
+        return ["-vf", ",".join(parts)]
 
     def _build_hevc_command(
         self,
@@ -591,17 +619,12 @@ class VideoConverter:
         # Add x265 params
         cmd.extend(["-x265-params", ":".join(x265_params)])
 
-        # Pixel format conversion via explicit filter (avoids auto_scale conflict in FFmpeg 7.x)
-        cmd.extend(["-vf", f"format={self.config.pix_fmt}"])
-
-        # Add framerate and color settings
-        cmd.extend(["-fps_mode", "cfr"])
-
-        # Add specific framerate if configured
-        if framerate:
-            cmd.extend(["-r", framerate])
-
-        cmd.extend(self._build_color_args(video))
+        # Pixel format, framerate, and color metadata all go into one explicit
+        # filter chain.  This prevents FFmpeg 7.x from auto-inserting
+        # ``auto_scale`` for colour-space or fps-mode reasons, which conflicts
+        # with an explicit filter graph and causes "Impossible to convert"
+        # errors on some source files.
+        cmd.extend(self._build_sw_vf_filter(self.config.pix_fmt, framerate, video))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -712,17 +735,9 @@ class VideoConverter:
         # Add SVT-AV1 params
         cmd.extend(["-svtav1-params", ":".join(svtav1_params)])
 
-        # Pixel format conversion via explicit filter (avoids auto_scale conflict in FFmpeg 7.x)
-        cmd.extend(["-vf", "format=yuv420p10le"])
-
-        # Add framerate settings
-        cmd.extend(["-fps_mode", "cfr"])
-
-        # Add specific framerate if configured
-        if framerate:
-            cmd.extend(["-r", framerate])
-
-        cmd.extend(self._build_color_args(video))
+        # Pixel format, framerate, and color metadata all in one explicit filter
+        # chain — prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
+        cmd.extend(self._build_sw_vf_filter("yuv420p10le", framerate, video))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
