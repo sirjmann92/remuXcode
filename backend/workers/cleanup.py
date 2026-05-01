@@ -540,7 +540,7 @@ class StreamCleanup:
 
         # Language matches — apply commentary/AD filters for kept-language tracks
         title_lower = (stream.title or "").lower()
-        if "commentary" in title_lower:
+        if stream.is_commentary:
             return bool(self.config.keep_commentary)
         if "description" in title_lower or "descriptive" in title_lower:
             return bool(self.config.keep_audio_description)
