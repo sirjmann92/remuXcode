@@ -47,6 +47,10 @@ legacy/
 # Docker config volume (runtime state and secrets)
 config/.api_key
 config/jobs.db
+config/config.yaml
+
+# Runtime config (written by the app; not for version control)
+backend/config.yaml
 
 # Frontend
 frontend/node_modules/
