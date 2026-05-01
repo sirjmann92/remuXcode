@@ -10,9 +10,52 @@ from dataclasses import dataclass
 import json
 import logging
 from pathlib import Path
+import re
 import subprocess
 
 logger = logging.getLogger(__name__)
+
+# Audio-descriptor keywords that would appear in functional track titles
+# but not in participant name lists.
+_AUDIO_DESCRIPTOR_WORDS = frozenset({
+    "surround", "stereo", "mono", "atmos", "dts", "dolby", "truehd",
+    "aac", "flac", "english", "spanish", "french", "german", "japanese",
+    "italian", "portuguese", "russian", "arabic", "hindi", "korean",
+    "chinese", "original", "dubbed", "subtitle", "director",
+    "commentary", "description", "descriptive", "hearing", "impaired",
+})
+# A single proper-name word: starts with a capital, rest are lowercase letters
+# plus optional apostrophe/hyphen (e.g. O'Brien, Smith-Jones).
+_NAME_WORD_RE = re.compile(r"^[A-Z][a-zA-Z'\-]+$")
+
+
+def _looks_like_commentary_participants(title: str) -> bool:
+    """Return True if *title* looks like a list of commentary participants.
+
+    Matches Blu-ray convention of naming commentary tracks after the
+    participants, e.g. "John Krasinski, Jenna Fischer, and Ken Kwapis".
+    Requires at least two comma-separated segments that each look like
+    proper names and contain no audio-descriptor keywords.
+    """
+    if not title or ("," not in title and " and " not in title.lower()):
+        return False
+    # Split on commas and the word "and" (handles "…, and Name")
+    parts = re.split(r",\s*|\s+and\s+", title.strip())
+    if len(parts) < 2:
+        return False
+    name_count = 0
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        words = part.split()
+        # Reject if any word is an audio descriptor
+        if any(w.lower() in _AUDIO_DESCRIPTOR_WORDS for w in words):
+            return False
+        # Each segment should be 1-4 capitalised words (first + last [+ middle])
+        if 1 <= len(words) <= 4 and all(_NAME_WORD_RE.match(w) for w in words):
+            name_count += 1
+    return name_count >= 2
 
 
 @dataclass
@@ -453,10 +496,16 @@ class FFProbe:
         raw_layout = stream.get("channel_layout") or ""
         channels = raw_channels or _LAYOUT_CHANNELS.get(raw_layout.lower(), 0)
 
-        # A track is commentary if disposition.comment is set OR the title
-        # contains the word "commentary" (common on Blu-ray remuxes).
+        # A track is commentary if:
+        #   • disposition.comment is set in the container, OR
+        #   • the title contains the word "commentary", OR
+        #   • the title looks like a participant name list (Blu-ray convention:
+        #     tracks are titled with the speakers rather than "Commentary").
+        _track_title = tags.get("title") or ""
         is_commentary = (
-            disposition.get("comment", 0) == 1 or "commentary" in (tags.get("title") or "").lower()
+            disposition.get("comment", 0) == 1
+            or "commentary" in _track_title.lower()
+            or _looks_like_commentary_participants(_track_title)
         )
 
         return AudioStream(
