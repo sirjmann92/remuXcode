@@ -17,13 +17,40 @@ logger = logging.getLogger(__name__)
 
 # Audio-descriptor keywords that would appear in functional track titles
 # but not in participant name lists.
-_AUDIO_DESCRIPTOR_WORDS = frozenset({
-    "surround", "stereo", "mono", "atmos", "dts", "dolby", "truehd",
-    "aac", "flac", "english", "spanish", "french", "german", "japanese",
-    "italian", "portuguese", "russian", "arabic", "hindi", "korean",
-    "chinese", "original", "dubbed", "subtitle", "director",
-    "commentary", "description", "descriptive", "hearing", "impaired",
-})
+_AUDIO_DESCRIPTOR_WORDS = frozenset(
+    {
+        "surround",
+        "stereo",
+        "mono",
+        "atmos",
+        "dts",
+        "dolby",
+        "truehd",
+        "aac",
+        "flac",
+        "english",
+        "spanish",
+        "french",
+        "german",
+        "japanese",
+        "italian",
+        "portuguese",
+        "russian",
+        "arabic",
+        "hindi",
+        "korean",
+        "chinese",
+        "original",
+        "dubbed",
+        "subtitle",
+        "director",
+        "commentary",
+        "description",
+        "descriptive",
+        "hearing",
+        "impaired",
+    }
+)
 # A single proper-name word: starts with a capital, rest are lowercase letters
 # plus optional apostrophe/hyphen (e.g. O'Brien, Smith-Jones).
 _NAME_WORD_RE = re.compile(r"^[A-Z][a-zA-Z'\-]+$")
