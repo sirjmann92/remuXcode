@@ -67,6 +67,7 @@ async def get_config_summary() -> dict[str, Any]:
         "audio": {
             "enabled": cfg.audio.enabled,
             "anime_only": cfg.audio.anime_only,
+            "live_action_only": cfg.audio.live_action_only,
             "convert_dts": cfg.audio.convert_dts,
             "convert_dts_x": cfg.audio.convert_dts_x,
             "convert_truehd": cfg.audio.convert_truehd,
@@ -83,6 +84,7 @@ async def get_config_summary() -> dict[str, Any]:
         "cleanup": {
             "enabled": cfg.cleanup.enabled,
             "anime_only": cfg.cleanup.anime_only,
+            "live_action_only": cfg.cleanup.live_action_only,
             "clean_audio": cfg.cleanup.clean_audio,
             "clean_subtitles": cfg.cleanup.clean_subtitles,
             "keep_languages": cfg.cleanup.keep_languages,
@@ -161,6 +163,7 @@ class AudioUpdate(BaseModel):
 
     enabled: bool | None = None
     anime_only: bool | None = None
+    live_action_only: bool | None = None
     convert_dts: bool | None = None
     convert_dts_x: bool | None = None
     convert_truehd: bool | None = None
@@ -222,6 +225,7 @@ class CleanupUpdate(BaseModel):
 
     enabled: bool | None = None
     anime_only: bool | None = None
+    live_action_only: bool | None = None
     clean_audio: bool | None = None
     clean_subtitles: bool | None = None
     keep_languages: list[str] | None = None

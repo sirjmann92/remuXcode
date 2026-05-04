@@ -73,7 +73,8 @@ When Radarr is configured, remuXcode:
 | **Convert 10-bit H.264** | Re-encode 10-bit AVC (High 10 profile) to HEVC/AV1. This is the primary use case — 10-bit H.264 has limited hardware decoder support on older devices. | `true` |
 | **Convert 8-bit H.264** | Re-encode standard 8-bit AVC. Results in larger output files in most cases — only enable if you specifically need to eliminate H.264. | `false` |
 | **Convert Legacy Codecs** | Re-encode VC-1, MPEG-2, MPEG-4/XviD/DivX, WMV. These codecs have poor support on modern devices and streaming clients. | `true` |
-| **Anime Only** | When enabled, the video worker only processes files detected as anime. All other content is skipped. | `true` |
+| **Anime Only** | When enabled, the video worker only processes files detected as anime. All other content is skipped. Mutually exclusive with Live Action Only. | `true` |
+| **Live Action Only** | When enabled, the video worker only processes live action files, skipping anime. Mutually exclusive with Anime Only. | `false` |
 
 ### Encoding Quality — HEVC (software: `libx265`)
 
@@ -127,7 +128,8 @@ When hardware acceleration is active:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Enabled** | Master toggle for audio conversion. | `true` |
-| **Anime Only** | Only process audio on anime content, skip everything else. | `false` |
+| **Anime Only** | Only process audio on anime content, skip everything else. Mutually exclusive with Live Action Only. | `false` |
+| **Live Action Only** | Only process audio on live action content, skip anime. Mutually exclusive with Anime Only. | `false` |
 
 ### What to Convert
 
@@ -178,7 +180,8 @@ Stream cleanup removes audio and subtitle tracks that don't match your keep-lang
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Enabled** | Master toggle for stream cleanup. | `true` |
-| **Anime Only** | Only run cleanup on anime content. | `false` |
+| **Anime Only** | Only run cleanup on anime content. Mutually exclusive with Live Action Only. | `false` |
+| **Live Action Only** | Only run cleanup on live action content, skip anime. Mutually exclusive with Anime Only. | `false` |
 | **Clean Audio** | Remove audio tracks in languages not in your keep list. | `true` |
 | **Clean Subtitles** | Remove subtitle tracks in languages not in your keep list. | `true` |
 
