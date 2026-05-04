@@ -137,6 +137,7 @@ export interface ConfigSummary {
   audio: {
     enabled: boolean;
     anime_only: boolean;
+    live_action_only: boolean;
     convert_dts: boolean;
     convert_dts_x: boolean;
     convert_truehd: boolean;
@@ -153,6 +154,7 @@ export interface ConfigSummary {
   cleanup: {
     enabled: boolean;
     anime_only: boolean;
+    live_action_only: boolean;
     clean_audio: boolean;
     clean_subtitles: boolean;
     keep_languages: string[];

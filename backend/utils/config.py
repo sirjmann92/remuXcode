@@ -61,6 +61,7 @@ class AudioConfig:
 
     enabled: bool = True
     anime_only: bool = False  # When True, only convert audio in anime content
+    live_action_only: bool = False  # When True, only convert audio in live-action content
     convert_dts: bool = True
     convert_dts_x: bool = False  # DTS:X is object-based — skip by default
     convert_truehd: bool = False  # TrueHD is lossless Dolby — default is to leave it alone
@@ -81,6 +82,7 @@ class CleanupConfig:
 
     enabled: bool = True
     anime_only: bool = False  # When True, only clean streams in anime content
+    live_action_only: bool = False  # When True, only clean streams in live-action content
     clean_audio: bool = True
     clean_subtitles: bool = True
     keep_languages: list[str] = field(default_factory=lambda: ["eng"])
@@ -306,6 +308,7 @@ class Config:
         return AudioConfig(
             enabled=self._get("audio.enabled", True),
             anime_only=self._get("audio.anime_only", False),
+            live_action_only=self._get("audio.live_action_only", False),
             convert_dts=self._get("audio.convert_dts", True),
             convert_dts_x=self._get("audio.convert_dts_x", False),
             convert_truehd=self._get("audio.convert_truehd", False),
@@ -325,6 +328,7 @@ class Config:
         return CleanupConfig(
             enabled=self._get("cleanup.enabled", True),
             anime_only=self._get("cleanup.anime_only", False),
+            live_action_only=self._get("cleanup.live_action_only", False),
             clean_audio=self._get("cleanup.clean_audio", True),
             clean_subtitles=self._get("cleanup.clean_subtitles", True),
             keep_languages=self._get("cleanup.keep_languages", ["eng"]),
@@ -418,6 +422,7 @@ class Config:
         for key in (
             "enabled",
             "anime_only",
+            "live_action_only",
             "convert_dts",
             "convert_dts_x",
             "convert_truehd",
@@ -476,6 +481,7 @@ class Config:
         for key in (
             "enabled",
             "anime_only",
+            "live_action_only",
             "clean_audio",
             "clean_subtitles",
             "keep_languages",

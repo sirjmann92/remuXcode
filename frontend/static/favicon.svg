@@ -1,6 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="12" fill="#7c3aed"/>
-  <path d="M18 20l-8 12 8 12" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M46 20l8 12-8 12" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M38 16L26 48" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#605dff"/>
+  <text x="32" y="48" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="46" font-weight="700" text-anchor="middle" fill="#f43098">X</text>
 </svg>

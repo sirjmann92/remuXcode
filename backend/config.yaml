@@ -67,6 +67,8 @@ audio:
 
   # Only process anime content (skip live action)
   anime_only: false
+  # Only process live action content (skip anime)
+  live_action_only: false
 
   # What to convert
   convert_dts: true      # Convert DTS/DTS-HD to AC3/AAC
@@ -96,6 +98,8 @@ cleanup:
 
   # Only clean streams in anime content (skip live action)
   anime_only: false
+  # Only clean streams in live action content (skip anime)
+  live_action_only: false
 
   # Clean audio streams based on language
   clean_audio: ${AUDIO_CLEANUP_ENABLED:-true}
