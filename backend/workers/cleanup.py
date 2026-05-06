@@ -6,6 +6,7 @@ Keeps original language + English (or configured languages).
 """
 
 from collections.abc import Callable
+import contextlib
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -419,10 +420,8 @@ class StreamCleanup:
                     detail_callback("Replacing file safely...")
                 safe_replace(ffmpeg_output, output_path)
 
-                try:
+                with contextlib.suppress(Exception):
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception:
-                    pass
 
             new_size = output_path.stat().st_size
 

@@ -6,6 +6,7 @@ Applies different encoding settings for anime vs live action content.
 """
 
 from collections.abc import Callable
+import contextlib
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -292,9 +293,9 @@ class VideoConverter:
             ffmpeg_output = output_path
 
         try:
-            # Clean up any leftover temp files
-            if temp_file.exists():
-                temp_file.unlink()
+            # Clean up any leftover temp files from a previous interrupted attempt
+            if temp_dir is not None and ffmpeg_output.exists():
+                ffmpeg_output.unlink()
 
             # Build and run ffmpeg command
             # Snapshot source file identity before encoding
@@ -388,10 +389,8 @@ class VideoConverter:
                     detail_callback("Replacing file safely...")
                 safe_replace(ffmpeg_output, output_path)
 
-                try:
+                with contextlib.suppress(Exception):
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception:
-                    pass
 
             new_size = output_path.stat().st_size
 
