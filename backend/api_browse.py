@@ -267,8 +267,10 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
             # Skip audio-based cleanup flagging for anime — subtitles above still apply.
             pass
         else:
-            extra_audio = [a for a in audio_langs if a and a != "und" and a not in keep]
-            if extra_audio:
+            keep_audio = [a for a in audio_langs if not a or a == "und" or a in keep]
+            # Mirror the worker safety net: only flag if some tracks would be removed
+            # AND some would survive (otherwise the worker keeps everything).
+            if keep_audio and len(keep_audio) < len(audio_langs):
                 return True
     return False
 
@@ -294,15 +296,14 @@ def _needs_cleanup_from_streams(
         if is_anime and cfg.anime_keep_original_audio:
             pass
         else:
-            for stream in audio_streams:
-                lang = (stream.get("language") or "").lower()
-
-                # Untagged streams are always kept at runtime
-                if not lang or lang == "und":
-                    continue
-                if lang in keep:
-                    continue
-                # This stream would be removed → needs cleanup
+            keep_audio = []
+            for s in audio_streams:
+                lang = (s.get("language") or "").lower()
+                if not lang or lang == "und" or lang in keep:
+                    keep_audio.append(s)
+            # Mirror the worker safety net: only flag if some tracks would be removed
+            # AND some would survive (otherwise the worker keeps everything).
+            if keep_audio and len(keep_audio) < len(audio_streams):
                 return True
 
     return False
@@ -612,6 +613,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
 
         item: dict[str, Any] = {
             "id": movie["id"],
+            "tmdb_id": movie.get("tmdbId"),
             "title": movie.get("title"),
             "year": movie.get("year"),
             "path": host_path,
@@ -923,6 +925,7 @@ def _build_series_results(
         stats = series.get("statistics", {})
         item: dict[str, Any] = {
             "id": series_id,
+            "title_slug": series.get("titleSlug", ""),
             "title": series.get("title"),
             "year": series.get("year"),
             "path": host_path,
@@ -1343,6 +1346,7 @@ def get_series_detail(
 
     return {
         "id": series_id,
+        "title_slug": series.get("titleSlug", ""),
         "title": series.get("title"),
         "year": series.get("year"),
         "path": host_path,

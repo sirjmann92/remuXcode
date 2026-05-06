@@ -94,14 +94,20 @@ class StreamCleanup:
         original_lang = self._detect_original_language(file_path)
 
         # Build separate keep sets for audio vs subtitles
-        audio_keep_languages = self._get_audio_languages_to_keep(original_lang, is_anime=is_anime)
+        audio_keep_languages = self._get_audio_languages_to_keep(
+            original_lang, is_anime=is_anime, audio_stream_count=len(info.audio_streams)
+        )
         sub_keep_languages = self._get_languages_to_keep(original_lang)
 
-        # Check if any audio streams should be removed
+        # Check if any audio streams should be removed.
+        # Mirror the worker safety net: only flag if some tracks would be removed
+        # AND some would survive (otherwise the worker keeps everything instead).
         if self.config.clean_audio:
-            for stream in info.audio_streams:
-                if not self._should_keep_audio(stream, audio_keep_languages):
-                    return True
+            audio_keep = [
+                s for s in info.audio_streams if self._should_keep_audio(s, audio_keep_languages)
+            ]
+            if audio_keep and len(audio_keep) < len(info.audio_streams):
+                return True
 
         # Check if any subtitle streams should be removed
         if self.config.clean_subtitles:
@@ -189,7 +195,9 @@ class StreamCleanup:
             original_lang = self._detect_original_language(input_file)
 
         # Build separate keep sets for audio vs subtitles
-        audio_keep_languages = self._get_audio_languages_to_keep(original_lang, is_anime=is_anime)
+        audio_keep_languages = self._get_audio_languages_to_keep(
+            original_lang, is_anime=is_anime, audio_stream_count=len(info.audio_streams)
+        )
         sub_keep_languages = self._get_languages_to_keep(original_lang)
 
         # Determine which streams to keep
@@ -503,13 +511,14 @@ class StreamCleanup:
         return keep
 
     def _get_audio_languages_to_keep(
-        self, original_lang: str, *, is_anime: bool = False
+        self, original_lang: str, *, is_anime: bool = False, audio_stream_count: int = 1
     ) -> set[str]:
         """Build set of language codes to keep for audio streams.
 
         For anime content (when anime_keep_original_audio is enabled),
         the original language is additionally kept for dual-audio support.
-        For live-action content, only configured keep_languages are kept.
+        For live-action content, keep_original_audio does the same when
+        the file has more than one audio track.
         """
         keep = self._get_languages_to_keep(original_lang)
 
@@ -533,6 +542,9 @@ class StreamCleanup:
                 }
                 if original_lang in alternates:
                     keep.add(alternates[original_lang])
+        elif not is_anime and self.config.keep_original_audio and audio_stream_count > 1:
+            if original_lang and original_lang != "und":
+                keep.add(original_lang)
 
         return keep
 

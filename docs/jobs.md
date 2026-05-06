@@ -114,8 +114,12 @@ Each job card has action buttons depending on its status:
 | **Pending** | Cancel (removes from queue) |
 | **Running** | Cancel (stops FFmpeg, marks as cancelled) |
 | **Completed** | Delete (removes from history) |
-| **Failed** | Delete (removes from history) |
+| **Failed** | Retry (↺) — requeues the job for the same file; Delete (removes from history) |
 | **Cancelled** | Delete (removes from history) |
+
+### Retrying a Failed Job
+
+The **↺** button on a failed job card creates a new job for the same file and immediately removes the failed record. If the source file no longer exists when you click Retry, an inline error is shown instead.
 
 ---
 

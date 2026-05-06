@@ -42,13 +42,37 @@ An API key is auto-generated and stored in `config/.api_key`.
 
 ---
 
-## 3. Configure via Settings Page
+## 3. Configure Sonarr / Radarr
 
-Open `http://localhost:7889/config` and fill in your **Sonarr/Radarr connection details** (URL and API key). All other settings — encoding, audio, cleanup, languages — can be tuned here too.
+Edit `config/config.yaml` (created on first run) and add your connection details:
+
+```yaml
+sonarr:
+  url: "http://192.168.1.100:8989"
+  api_key: "your-sonarr-api-key"
+
+radarr:
+  url: "http://192.168.1.100:7878"
+  api_key: "your-radarr-api-key"
+```
+
+API keys are in each app under **Settings → General → Security**.
+
+Restart the container after editing config.yaml:
+
+```bash
+docker compose restart
+```
 
 ---
 
-## 4. Verify
+## 4. Configure Encoding Settings
+
+Open `http://localhost:7889/config` to tune audio conversion, video encoding, stream cleanup, language preferences, and system settings.
+
+---
+
+## 5. Verify
 
 ```bash
 # Health check
@@ -60,7 +84,7 @@ cat config/.api_key
 
 ---
 
-## 5. Configure Sonarr / Radarr Webhook
+## 6. Configure Sonarr / Radarr Webhook
 
 ### Sonarr
 
@@ -90,7 +114,7 @@ Click **Test** on either — you should see a `{"status":"ok"}` response.
 
 ---
 
-## 6. Watch It Work
+## 7. Watch It Work
 
 ```bash
 # Live logs

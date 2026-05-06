@@ -91,6 +91,9 @@ class CleanupConfig:
     keep_audio_description: bool = True
     keep_sdh: bool = True
     anime_keep_original_audio: bool = True
+    keep_original_audio: bool = (
+        False  # Keep original-language audio in live-action multi-track files
+    )
 
 
 @dataclass
@@ -337,6 +340,7 @@ class Config:
             keep_audio_description=self._get("cleanup.keep_audio_description", True),
             keep_sdh=self._get("cleanup.keep_sdh", True),
             anime_keep_original_audio=self._get("cleanup.anime_keep_original_audio", True),
+            keep_original_audio=self._get("cleanup.keep_original_audio", False),
         )
 
     def _parse_video_config(self) -> VideoConfig:
@@ -490,6 +494,7 @@ class Config:
             "keep_audio_description",
             "keep_sdh",
             "anime_keep_original_audio",
+            "keep_original_audio",
         ):
             self._raw_config["cleanup"][key] = getattr(self.cleanup, key)
 

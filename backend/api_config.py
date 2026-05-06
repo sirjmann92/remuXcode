@@ -90,6 +90,7 @@ async def get_config_summary() -> dict[str, Any]:
             "keep_languages": cfg.cleanup.keep_languages,
             "keep_commentary": cfg.cleanup.keep_commentary,
             "anime_keep_original_audio": cfg.cleanup.anime_keep_original_audio,
+            "keep_original_audio": cfg.cleanup.keep_original_audio,
             # Advanced
             "keep_undefined": cfg.cleanup.keep_undefined,
             "keep_audio_description": cfg.cleanup.keep_audio_description,
@@ -234,6 +235,7 @@ class CleanupUpdate(BaseModel):
     keep_audio_description: bool | None = None
     keep_sdh: bool | None = None
     anime_keep_original_audio: bool | None = None
+    keep_original_audio: bool | None = None
 
     @field_validator("keep_languages")
     @classmethod

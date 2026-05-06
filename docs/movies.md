@@ -18,6 +18,7 @@ Movies are displayed as a poster grid fetched from Radarr. Each poster shows:
   - **Video** — video codec meets your encode criteria
   - **Cleanup** — has tracks outside your keep-languages list
   - **Legacy** — has a legacy codec (VC-1, MPEG-2, MPEG-4/XviD/DivX)
+- An **Open in Radarr** icon button (bottom-left of poster, only shown when Radarr is configured)
 
 The badges are config-aware — they reflect your current Settings, so toggling a worker or changing codec preferences updates which movies show as needing work.
 
@@ -72,6 +73,7 @@ Click a poster to open the detail panel for that movie. It shows:
 
 - **Queue** — add this movie to the job queue for full conversion
 - Choose a specific job type: **Full**, **Audio**, **Video**, or **Cleanup**
+- **Open in Radarr** — opens this movie's Radarr page in a new tab (only shown when Radarr is configured)
 
 ---
 

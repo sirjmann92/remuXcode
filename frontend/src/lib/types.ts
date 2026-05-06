@@ -160,6 +160,7 @@ export interface ConfigSummary {
     keep_languages: string[];
     keep_commentary: boolean;
     anime_keep_original_audio: boolean;
+    keep_original_audio: boolean;
     // Advanced
     keep_undefined: boolean;
     keep_audio_description: boolean;
@@ -208,6 +209,7 @@ export interface HealthStatus {
 
 export interface BrowseMovie {
   id: number;
+  tmdb_id: number | null;
   title: string;
   year: number;
   path: string;
@@ -246,6 +248,7 @@ export interface MoviesResponse {
 
 export interface BrowseSeries {
   id: number;
+  title_slug: string;
   title: string;
   year: number;
   path: string;
@@ -312,6 +315,7 @@ export interface Season {
 
 export interface SeriesDetail {
   id: number;
+  title_slug: string;
   title: string;
   year: number;
   path: string;

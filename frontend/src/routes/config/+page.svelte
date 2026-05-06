@@ -623,6 +623,7 @@ $effect(() => {
               { field: 'clean_subtitles', label: 'Clean Subtitles', hint: 'Remove subtitle tracks not in your language list' },
               { field: 'keep_commentary', label: 'Keep Commentary', hint: 'Preserve director/cast commentary tracks regardless of language' },
               { field: 'anime_keep_original_audio', label: 'Anime Keep Original Audio', hint: 'Always keep the original-language audio in anime files (Japanese, Korean, etc.)' },
+              { field: 'keep_original_audio', label: 'Keep Original Audio', hint: 'When a live-action file has multiple audio tracks, always keep the original language even if not in your language list' },
             ] as item}
               <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
                 <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>

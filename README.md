@@ -11,11 +11,11 @@ The web UI lets you browse your entire Sonarr/Radarr library — movies and show
 - **Audio conversion** — DTS/DTS-HD → AC3 (5.1), EAC3 (7.1+), or AAC (stereo); configurable bitrate caps; optional keep-original; TrueHD passthrough
 - **Video encoding** — 10-bit H.264, 8-bit H.264 (optional), and legacy codecs (VC-1, MPEG-2, MPEG-4/XviD/DivX) → HEVC or AV1
 - **Hardware acceleration** — Intel QSV/VAAPI and NVIDIA NVENC auto-detected at startup; software fallback when no GPU is available
-- **Stream cleanup** — remove audio and subtitle tracks outside your keep-languages list; preserve forced subtitles, SDH, commentary, and audio description
+- **Stream cleanup** — remove audio and subtitle tracks outside your keep-languages list; preserve forced subtitles, SDH, commentary, and audio description; always-keep-original option for anime and live-action
 - **Anime support** — per-worker anime-only mode, anime-optimized encoding presets, dual-audio preservation
-- **Library browse** — Movies and Shows pages backed by Radarr/Sonarr APIs with poster art, filters, sort, multi-select batch queue
+- **Library browse** — Movies and Shows pages backed by Radarr/Sonarr APIs with poster art, filters, sort, multi-select batch queue; deep links back to Radarr/Sonarr
 - **Analyze modal** — full stream detail (video, audio, subtitle streams) for any file via ffprobe
-- **Job queue** — persistent SQLite-backed queue, resumable after restart, drag-and-drop reordering of pending jobs
+- **Job queue** — persistent SQLite-backed queue, resumable after restart, drag-and-drop reordering, retry failed jobs
 - **Webhook-driven** — fire-and-forget automation; also fully usable in manual mode
 - **Single container** — FastAPI backend + SvelteKit frontend, port 7889
 
@@ -55,7 +55,9 @@ services:
 docker compose up -d
 ```
 
-`config/config.yaml` is created automatically on first run with sensible defaults. Open `http://localhost:7889/config` to enter your Sonarr/Radarr connection details.
+`config/config.yaml` is created automatically on first run with sensible defaults. Open `http://localhost:7889/config` to configure your encoding, audio, and cleanup settings.
+
+To connect Sonarr and Radarr, edit `config/config.yaml` and add your URLs and API keys (see [Integrations](docs/integrations.md)).
 
 Your API key is auto-generated on first start and stored in `config/.api_key`. It's also shown on the Settings page.
 
@@ -79,6 +81,16 @@ Then:
 ```bash
 docker compose up -d --build
 ```
+
+---
+
+## Recommended Workflow
+
+Configure Sonarr and Radarr to prefer **remux releases** — full lossless Blu-ray remuxes with no re-encoding. A remux retains the original video bitrate and lossless audio (DTS-HD MA, TrueHD), giving remuXcode the best possible source to work from.
+
+Re-encoding an already-compressed video introduces *generation loss*: the encoder makes a second round of approximations on top of the first, compounding artifacts that cannot be undone. Starting from a remux means any re-encoding remuXcode does happens exactly once, from a lossless source.
+
+See [docs/integrations.md](docs/integrations.md) for suggested quality profile tips and full setup instructions.
 
 ---
 
@@ -157,6 +169,7 @@ curl "http://localhost:7889/api/analyze?path=/share/movies/Movie/movie.mkv" \
 | [Shows](docs/shows.md) | Browse and process your TV library |
 | [Jobs](docs/jobs.md) | Job history, filtering, controls |
 | [Settings](docs/settings.md) | Complete settings reference |
+| [Integrations](docs/integrations.md) | Sonarr/Radarr setup, webhooks, and recommended workflow |
 
 ---
 
