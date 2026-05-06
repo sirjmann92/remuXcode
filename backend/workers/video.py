@@ -273,11 +273,19 @@ class VideoConverter:
 
         output_path = Path(output_file)
 
-        # Create temp file in same volume as source (for instant rename)
+        # Create temp file in same volume as OUTPUT (for instant rename).
+        # For in-place replacement the output IS the input, so get_volume_root
+        # applies normally.  For chain phases the output path (chain file or
+        # original file) may be on a different mergerfs branch than the input;
+        # placing the temp dir next to the output guarantees a same-device
+        # rename and avoids EXDEV errors.
         if job_id is None:
             job_id = uuid.uuid4().hex[:12]
 
-        volume_root = self.get_volume_root(input_file)
+        if replace_input:
+            volume_root = self.get_volume_root(input_file)
+        else:
+            volume_root = str(Path(output_file).parent)
         temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
         temp_dir.mkdir(parents=True, exist_ok=True)
         temp_suffix = "av1" if codec_to == "av1" else "hevc"
