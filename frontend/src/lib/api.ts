@@ -81,6 +81,10 @@ export async function cancelJob(id: string): Promise<{ message: string }> {
   return request(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
 }
 
+export async function retryJob(id: string): Promise<{ job_id: string; message: string }> {
+  return request(`/api/jobs/${encodeURIComponent(id)}/retry`, { method: 'POST' });
+}
+
 export async function cancelAllPending(): Promise<{ message: string; cancelled: number }> {
   return request('/api/jobs/cancel-pending', { method: 'POST' });
 }

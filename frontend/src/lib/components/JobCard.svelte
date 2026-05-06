@@ -1,5 +1,5 @@
 <script lang="ts">
-import { cancelJob, deleteJob } from '$lib/api';
+import { cancelJob, deleteJob, retryJob } from '$lib/api';
 import { channelLabel, formatSize, formatTimestamp } from '$lib/format';
 import type { Job, JobPhase } from '$lib/types';
 import StatusBadge from './StatusBadge.svelte';
@@ -13,6 +13,8 @@ interface Props {
 const { job, onRemoved, detailed = false }: Props = $props();
 let deleting = $state(false);
 let cancelling = $state(false);
+let retrying = $state(false);
+let retryError = $state('');
 let copiedError = $state('');
 let expandedErrors = $state(new Set<string>());
 
@@ -127,6 +129,23 @@ async function handleCancel() {
     cancelling = false;
   }
 }
+
+async function handleRetry() {
+  retrying = true;
+  retryError = '';
+  try {
+    await retryJob(job.id);
+    onRemoved?.();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    retryError =
+      msg.includes('409') || msg.toLowerCase().includes('no longer exists')
+        ? 'File no longer exists at its original path'
+        : 'Failed to requeue job';
+  } finally {
+    retrying = false;
+  }
+}
 </script>
 
 <div class="card-glass rounded-box">
@@ -188,7 +207,32 @@ async function handleCancel() {
               </svg>
             {/if}
           </button>
-        {:else if job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled'}
+        {:else if job.status === 'failed'}
+          <button
+            class="btn btn-ghost btn-xs text-success opacity-50 hover:opacity-100 transition-opacity"
+            onclick={handleRetry}
+            disabled={retrying}
+            title="Retry"
+          >
+            {#if retrying}
+              <span class="loading loading-spinner loading-xs"></span>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            {/if}
+          </button>
+          <button
+            class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
+            onclick={handleDelete}
+            disabled={deleting}
+            title="Remove"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        {:else if job.status === 'completed' || job.status === 'cancelled'}
           <button
             class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
             onclick={handleDelete}
@@ -204,6 +248,10 @@ async function handleCancel() {
     </div>
 
     <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
+
+    {#if retryError}
+      <p class="text-xs text-error/70">{retryError}</p>
+    {/if}
 
     {#if job.planned_phases?.length && (job.status === 'running' || job.status === 'completed' || job.status === 'failed')}
       {#if detailed}
