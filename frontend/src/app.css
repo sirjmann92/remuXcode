@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@import "daisyui/daisyui.css";
 
 @theme {
   --color-base-100: #1d232a;
