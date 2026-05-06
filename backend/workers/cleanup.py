@@ -298,11 +298,19 @@ class StreamCleanup:
 
         output_path = Path(output_file)
 
-        # Create temp directory in same volume as source (for instant rename)
+        # Create temp directory next to the OUTPUT file (for instant rename).
+        # For in-place replacement the output IS the input, so get_volume_root
+        # applies normally.  For chain phases the output (chain file or original
+        # file) may be on a different mergerfs branch than the input; placing
+        # the temp dir next to the output guarantees a same-device rename and
+        # avoids EXDEV errors.
         if job_id is None:
             job_id = uuid.uuid4().hex[:12]
 
-        volume_root = self.get_volume_root(input_file)
+        if replace_input:
+            volume_root = self.get_volume_root(input_file)
+        else:
+            volume_root = str(Path(output_file).parent)
         temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
         temp_dir.mkdir(parents=True, exist_ok=True)
         temp_output = temp_dir / input_path.name
