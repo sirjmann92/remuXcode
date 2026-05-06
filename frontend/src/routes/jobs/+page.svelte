@@ -279,9 +279,21 @@ function handleDragEnd() {
       <input
         type="text"
         placeholder="Search files…"
-        class="input input-sm input-bordered w-full pl-9"
+        class="input input-sm input-bordered w-full pl-9 {search ? 'pr-8' : ''}"
         bind:value={search}
       />
+      {#if search}
+        <button
+          class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/40"
+          onclick={() => (search = '')}
+          title="Clear search"
+          aria-label="Clear search"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      {/if}
     </div>
     <button
       class="btn btn-sm btn-ghost gap-1 {showFilters || hasActiveFilters ? 'text-primary' : 'text-base-content/40'}"

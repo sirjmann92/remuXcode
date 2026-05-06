@@ -39,6 +39,14 @@ The main Shows page displays a list of all series in your Sonarr library. Each r
 
 Click a series to open the detail view, which shows all seasons and their episodes.
 
+### Series Header Actions
+
+The header row for a selected series includes:
+
+- **Open in Sonarr** — opens this series in Sonarr in a new tab (only shown when Sonarr is configured)
+- **Queue All** — queues every episode across all seasons that needs conversion
+- **Clear** — deselects all checked episodes (shown when episodes are selected)
+
 ### Season Level
 
 Each season row shows:

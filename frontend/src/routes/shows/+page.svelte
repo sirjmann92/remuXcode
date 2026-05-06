@@ -581,6 +581,20 @@ const sortOptions: { value: string; label: string }[] = [
             {/each}
           </div>
           <div class="flex gap-2 mt-2">
+            {#if config?.sonarr?.configured}
+              <a
+                href="{config.sonarr.url}/series/{selectedSeries.title_slug}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-ghost btn-sm gap-1"
+                title="Open in Sonarr"
+              >
+                Open in Sonarr
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
+            {/if}
             {#if selectedEps.size > 0}
               <button class="btn btn-ghost btn-sm" onclick={clearEpSelection}>
                 Clear ({selectedEps.size})
@@ -830,9 +844,21 @@ const sortOptions: { value: string; label: string }[] = [
         <input
           type="text"
           placeholder="Search shows…"
-          class="input input-sm input-bordered w-full pl-9"
+          class="input input-sm input-bordered w-full pl-9 {search ? 'pr-8' : ''}"
           bind:value={search}
         />
+        {#if search}
+          <button
+            class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/40"
+            onclick={() => (search = '')}
+            title="Clear search"
+            aria-label="Clear search"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        {/if}
       </div>
     </div>
 

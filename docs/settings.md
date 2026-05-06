@@ -1,8 +1,10 @@
 # Settings Reference
 
-The Settings page (`/config`) lets you configure every aspect of remuXcode without editing any files. Changes take effect immediately — no restart required.
+The Settings page (`/config`) configures all conversion workers, encoding quality, language preferences, and system settings. Changes take effect immediately — no restart required.
 
-`config/config.yaml` is the backing store. You can edit it directly if you prefer, but the UI is the recommended approach. The file uses `${ENV_VAR:-default}` syntax for environment variable overrides.
+`config/config.yaml` is the backing store. You can edit it directly if you prefer. The file uses `${ENV_VAR:-default}` syntax for environment variable overrides.
+
+> **Sonarr and Radarr** connection details (URL and API key) are set directly in `config/config.yaml` — they are not editable from the Settings UI. See [Integrations](integrations.md) for setup instructions.
 
 ---
 
@@ -10,7 +12,7 @@ The Settings page (`/config`) lets you configure every aspect of remuXcode witho
 
 Your API key is shown at the top of the Settings page. All API requests (except `/health`) require this key in an `X-API-Key` header.
 
-The key is auto-generated on first start and stored in `config/.api_key`. You can view it at any time:
+The key is auto-generated on first start and stored in `config/.api_key`. You can view or regenerate it from the Settings page, or via:
 
 ```bash
 cat config/.api_key
@@ -23,37 +25,8 @@ cat config/.api_key
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Concurrent Workers** | Number of jobs that run simultaneously. Each job runs one FFmpeg process. Software encoding saturates all CPU cores, so `1` is recommended unless using hardware acceleration. | `1` |
-| **Job Retention (days)** | How long completed, failed, and cancelled jobs are kept in the database before automatic cleanup on startup. | `30` |
-
----
-
-## Sonarr
-
-| Setting | Description |
-|---------|-------------|
-| **Enabled** | Whether remuXcode uses the Sonarr API for metadata, rename triggers, and library browsing |
-| **URL** | Full base URL of your Sonarr instance, e.g. `http://192.168.1.100:8989` |
-| **API Key** | Found in Sonarr → Settings → General → Security |
-
-When Sonarr is configured, remuXcode:
-- Queries Sonarr for series metadata (poster art, genres, original language) to improve detection accuracy
-- Triggers a rename command after converting an episode file so Sonarr updates its file path
-- Powers the Shows page library browse
-
----
-
-## Radarr
-
-| Setting | Description |
-|---------|-------------|
-| **Enabled** | Whether remuXcode uses the Radarr API for metadata, rename triggers, and library browsing |
-| **URL** | Full base URL of your Radarr instance, e.g. `http://192.168.1.100:7878` |
-| **API Key** | Found in Radarr → Settings → General → Security |
-
-When Radarr is configured, remuXcode:
-- Queries Radarr for movie metadata (poster art, genres, original language, studio) to improve detection accuracy
-- Triggers a rename command after converting a movie file so Radarr updates its file path
-- Powers the Movies page library browse
+| **FFmpeg Threads** | Maximum CPU threads FFmpeg may use per job. `0` = auto (~80% of available CPUs). Lower values leave headroom for other tasks. | `0` (auto) |
+| **Job History (days)** | How long completed, failed, and cancelled jobs are kept before automatic cleanup on startup. | `30` |
 
 ---
 
@@ -209,6 +182,7 @@ Certain tracks are always preserved regardless of language:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Anime Keep Original Audio** | For anime content, keep the original-language audio track (e.g. Japanese) even if it's not in your keep-languages list. This enables dual-audio output (original + English). Has no effect on non-anime content. | `true` |
+| **Keep Original Audio** | For live-action content with more than one audio track, always keep the detected original-language track even if it's not in your keep-languages list. Useful for foreign-language films in your library that you still want to process for other reasons. Defaults to off so English-only setups are unaffected. | `false` |
 
 ---
 
