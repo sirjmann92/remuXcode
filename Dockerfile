@@ -5,8 +5,6 @@
 # Node.js uses CPU instructions that QEMU cannot emulate, causing SIGILL
 # (exit 132) when building for arm64 under QEMU. The output is pure static
 # files (JS/CSS/HTML), so the build architecture does not matter.
-# Node 24 (LTS) — Node 25 introduced stricter ESM loading that breaks
-# DaisyUI v5's @plugin CSS-in-JS resolution via Rolldown at build time.
 FROM --platform=linux/amd64 node:24-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
