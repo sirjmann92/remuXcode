@@ -273,15 +273,23 @@ class VideoConverter:
 
         output_path = Path(output_file)
 
-        # Create temp file in same volume as source (for instant rename)
         if job_id is None:
             job_id = uuid.uuid4().hex[:12]
 
-        volume_root = self.get_volume_root(input_file)
-        temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        temp_suffix = "av1" if codec_to == "av1" else "hevc"
-        temp_file = temp_dir / f"{input_path.name}.{temp_suffix}-tmp.mkv"
+        # For in-place replacement: write to a temp dir so safe_replace can
+        # atomically swap the original without risking data loss.
+        # For chain phases (explicit output_file): the chain file is new —
+        # write ffmpeg directly to it, no temp dir or safe_replace needed.
+        temp_dir: Path | None
+        if replace_input:
+            volume_root = self.get_volume_root(input_file)
+            temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_suffix = "av1" if codec_to == "av1" else "hevc"
+            ffmpeg_output = temp_dir / f"{input_path.name}.{temp_suffix}-tmp.mkv"
+        else:
+            temp_dir = None
+            ffmpeg_output = output_path
 
         try:
             # Clean up any leftover temp files
@@ -298,7 +306,9 @@ class VideoConverter:
                 _src_mtime = None
                 _src_size = None
 
-            cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type, video)
+            cmd = self._build_ffmpeg_command(
+                str(input_path), str(ffmpeg_output), content_type, video
+            )
             logger.debug("Running: %s", " ".join(cmd))
 
             # Estimate total frames for progress when out_time_us is N/A
@@ -333,13 +343,14 @@ class VideoConverter:
                     error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
-            # Move temp file to output location
-            if temp_file.exists():
-                # Check if original still exists (could be deleted during conversion)
+            # For in-place replacement, atomically swap temp file → original.
+            # For chain phases, ffmpeg already wrote directly to output_path.
+            if replace_input:
+                assert temp_dir is not None  # always set when replace_input
                 original_exists = output_path.exists()
 
                 # Detect mid-job file replacement
-                if replace_input and original_exists and _src_mtime is not None:
+                if original_exists and _src_mtime is not None:
                     try:
                         cur_stat = output_path.stat()
                         if cur_stat.st_mtime != _src_mtime or cur_stat.st_size != _src_size:
@@ -349,7 +360,7 @@ class VideoConverter:
                                 "to avoid overwriting the new file: %s",
                                 output_path,
                             )
-                            temp_file.unlink(missing_ok=True)
+                            ffmpeg_output.unlink(missing_ok=True)
                             shutil.rmtree(temp_dir, ignore_errors=True)
                             return VideoConversionResult(
                                 success=False,
@@ -365,25 +376,20 @@ class VideoConverter:
                     except OSError:
                         pass
 
-                if not original_exists and replace_input:
+                if not original_exists:
                     # Original was deleted during conversion (e.g., Radarr upgrade)
-                    # Ensure parent directory exists
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     logger.warning(
                         "Original file deleted during conversion, placing converted file at: %s",
                         output_path,
                     )
-                elif replace_input:
-                    pass  # safe_replace handles backup + move atomically
 
                 if detail_callback:
                     detail_callback("Replacing file safely...")
-                safe_replace(temp_file, output_path)
+                safe_replace(ffmpeg_output, output_path)
 
-                # Clean up temp directory after successful move
                 try:
-                    if temp_dir.exists():
-                        shutil.rmtree(temp_dir, ignore_errors=True)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
                 except Exception:
                     pass
 
@@ -408,8 +414,8 @@ class VideoConverter:
             )
 
         except subprocess.TimeoutExpired:
-            # Clean up
-            if temp_dir.exists():
+            # Clean up (temp_dir is None for chain phases)
+            if temp_dir is not None and temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
             return VideoConversionResult(
@@ -425,8 +431,8 @@ class VideoConverter:
             )
 
         except Exception as e:
-            # Clean up
-            if temp_dir.exists():
+            # Clean up (temp_dir is None for chain phases)
+            if temp_dir is not None and temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
             logger.exception("Conversion failed")
