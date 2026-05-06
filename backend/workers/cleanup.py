@@ -298,14 +298,22 @@ class StreamCleanup:
 
         output_path = Path(output_file)
 
-        # Create temp directory in same volume as source (for instant rename)
         if job_id is None:
             job_id = uuid.uuid4().hex[:12]
 
-        volume_root = self.get_volume_root(input_file)
-        temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        temp_output = temp_dir / input_path.name
+        # For in-place replacement: write to a temp dir so safe_replace can
+        # atomically swap the original without risking data loss.
+        # For chain phases (explicit output_file): the chain file is new —
+        # write ffmpeg directly to it, no temp dir or safe_replace needed.
+        temp_dir: Path | None
+        if replace_input:
+            volume_root = self.get_volume_root(input_file)
+            temp_dir = Path(volume_root) / f".remuxcode-temp-{job_id}"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            ffmpeg_output = temp_dir / input_path.name
+        else:
+            temp_dir = None
+            ffmpeg_output = output_path
 
         try:
             # Snapshot source file identity before encoding
@@ -320,7 +328,7 @@ class StreamCleanup:
             # Build and run ffmpeg command
             cmd = self._build_ffmpeg_command(
                 str(input_path),
-                str(temp_output),
+                str(ffmpeg_output),
                 info,
                 audio_keep if self.config.clean_audio else info.audio_streams,
                 subtitle_keep if self.config.clean_subtitles else info.subtitle_streams,
@@ -364,13 +372,14 @@ class StreamCleanup:
                     error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
-            # Move temp file to output location
-            if temp_output.exists():
-                # Check if original still exists (could be deleted during conversion)
+            # For in-place replacement, atomically swap temp file → original.
+            # For chain phases, ffmpeg already wrote directly to output_path.
+            if replace_input:
+                assert temp_dir is not None  # always set when replace_input
                 original_exists = output_path.exists()
 
                 # Detect mid-job file replacement
-                if replace_input and original_exists and _src_mtime is not None:
+                if original_exists and _src_mtime is not None:
                     try:
                         cur_stat = output_path.stat()
                         if cur_stat.st_mtime != _src_mtime or cur_stat.st_size != _src_size:
@@ -380,7 +389,7 @@ class StreamCleanup:
                                 "to avoid overwriting the new file: %s",
                                 output_path,
                             )
-                            temp_output.unlink(missing_ok=True)
+                            ffmpeg_output.unlink(missing_ok=True)
                             shutil.rmtree(temp_dir, ignore_errors=True)
                             return CleanupResult(
                                 success=False,
@@ -398,25 +407,20 @@ class StreamCleanup:
                     except OSError:
                         pass
 
-                if not original_exists and replace_input:
+                if not original_exists:
                     # Original was deleted during conversion (e.g., Radarr upgrade)
-                    # Ensure parent directory exists
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     logger.warning(
                         "Original file deleted during conversion, placing converted file at: %s",
                         output_path,
                     )
-                elif replace_input:
-                    pass  # safe_replace handles backup + move atomically
 
                 if detail_callback:
                     detail_callback("Replacing file safely...")
-                safe_replace(temp_output, output_path)
+                safe_replace(ffmpeg_output, output_path)
 
-                # Clean up temp directory after successful move
                 try:
-                    if temp_dir.exists():
-                        shutil.rmtree(temp_dir, ignore_errors=True)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
                 except Exception:
                     pass
 
@@ -476,8 +480,8 @@ class StreamCleanup:
             )
 
         finally:
-            # Clean up temp directory
-            if temp_dir.exists():
+            # Clean up temp directory (only exists for in-place replacements)
+            if temp_dir is not None and temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
     def _detect_original_language(self, file_path: str) -> str:
