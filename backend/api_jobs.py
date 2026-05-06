@@ -2,6 +2,7 @@
 
 import calendar
 import logging
+from pathlib import Path
 import time
 from typing import Any
 
@@ -223,6 +224,36 @@ async def cancel_all_pending() -> dict[str, Any]:
                 cancelled += 1
 
     return {"message": f"Cancelled {cancelled} pending job(s)", "cancelled": cancelled}
+
+
+@router.post("/jobs/{job_id}/retry")
+async def retry_job(job_id: str) -> dict[str, Any]:
+    """Re-queue a failed job with the same parameters."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    job = core.job_queue.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status.value != "failed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not in a failed state: {job.status.value}",
+        )
+    if not Path(job.file_path).exists():
+        raise HTTPException(
+            status_code=409,
+            detail="Original file no longer exists at the original path",
+        )
+    new_job = core.create_job(
+        job.file_path,
+        job.job_type,
+        source=job.source,
+        poster_url=job.poster_url,
+        media_type=job.media_type,
+    )
+    # Remove the original failed record so it doesn't linger in the failed list.
+    core.job_queue.delete_job(job_id)
+    return {"job_id": new_job.id, "message": "Job requeued"}
 
 
 @router.post("/jobs/cancel-running")
