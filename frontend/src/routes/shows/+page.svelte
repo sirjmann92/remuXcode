@@ -993,7 +993,7 @@ const sortOptions: { value: string; label: string }[] = [
       <div class="space-y-2">
         {#each filtered as series (series.id)}
           <button
-            class="card-glass rounded-box w-full text-left hover:bg-base-content/5 transition-colors"
+            class="card-glass rounded-box w-full text-left cursor-pointer hover:bg-base-content/5 transition-colors"
             onclick={() => openDetail(series)}
           >
             <div class="flex items-center gap-4 p-3">
