@@ -37,6 +37,7 @@ export interface Job {
   planned_phases: JobPhase[] | null;
   poster_url: string | null;
   media_type: MediaType | null;
+  output_path: string | null;
 }
 
 export interface JobsCounts {

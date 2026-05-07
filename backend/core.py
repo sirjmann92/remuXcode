@@ -110,6 +110,7 @@ class ConversionJob:
     planned_phases: list[str] | None = None
     poster_url: str | None = None
     media_type: str | None = None
+    output_path: str | None = None
     log_lines: list[dict[str, Any]] = field(default_factory=list)
 
     def log(self, source: str, level: str, message: str) -> None:
@@ -140,6 +141,7 @@ class ConversionJob:
             "planned_phases": self.planned_phases,
             "poster_url": self.poster_url,
             "media_type": self.media_type,
+            "output_path": self.output_path,
         }
 
 
@@ -565,6 +567,9 @@ class JobQueue:
                 # media DB with the Sonarr/Radarr file ID so browse lookups
                 # find the updated analysis immediately.
                 analyze_path = rename_result.new_path or job.file_path
+                if rename_result.new_path and rename_result.new_path != job.file_path:
+                    job.output_path = rename_result.new_path
+                    job.log("app", "info", f"Renamed to: {Path(rename_result.new_path).name}")
                 try:
                     from backend.api_analyze import analyze_and_store
 

@@ -126,7 +126,8 @@ const fileName = $derived(job.file_path.split('/').pop() ?? job.file_path);
 const libraryLink = $derived.by(() => {
   const isShow = /\/Season \d+\//i.test(job.file_path);
   const page = isShow ? '/shows' : '/movies';
-  return `${page}?file=${encodeURIComponent(job.file_path)}`;
+  const linkPath = job.output_path ?? job.file_path;
+  return `${page}?file=${encodeURIComponent(linkPath)}`;
 });
 const elapsed = $derived.by(() => {
   if (!job.started_at) return null;
