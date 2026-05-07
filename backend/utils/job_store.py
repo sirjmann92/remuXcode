@@ -269,7 +269,10 @@ class JobStore:
             rows = conn.execute("""
                     SELECT * FROM jobs
                     WHERE status IN ('pending', 'running')
-                    ORDER BY queue_position ASC, created_at ASC
+                    ORDER BY
+                        CASE WHEN status = 'running' THEN 0 ELSE 1 END ASC,
+                        queue_position ASC,
+                        created_at ASC
                 """).fetchall()
             return [dict(row) for row in rows]
 

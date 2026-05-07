@@ -181,8 +181,10 @@ class JobQueue:
         with self.lock:
             self.jobs[job.id] = job
             self.pending_queue.append(job.id)
+            queue_pos = len(self.pending_queue) - 1
         if self.job_store:
             self._save_job_to_store(job)
+            self.job_store.update_queue_position(job.id, queue_pos)
         logger.info(
             "Queued job %s: %s for %s", job.id, job.job_type.value, Path(job.file_path).name
         )
@@ -313,6 +315,13 @@ class JobQueue:
             count += 1
         if count > 0:
             logger.info("Loaded %d pending job(s) from database", count)
+            # Normalize queue_positions to 0,1,2,... so sparse/stale positions
+            # from previous runs don't cause newly-added jobs (which land at the
+            # tail of the in-memory queue) to sort ahead of older pending jobs.
+            with self.lock:
+                ordered = list(self.pending_queue)
+            for pos, job_id in enumerate(ordered):
+                self.job_store.update_queue_position(job_id, pos)
         return count
 
     def load_finished_jobs(self) -> int:
