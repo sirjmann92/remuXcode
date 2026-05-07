@@ -119,7 +119,15 @@ class ConversionJob:
             {"ts": time.time(), "source": source, "level": level, "message": message}
         )
         if len(self.log_lines) > 600:
-            self.log_lines = self.log_lines[-500:]
+            # Preserve all non-stats entries; fill remaining slots with recent stats
+            non_stats = [
+                e for e in self.log_lines if not (e["source"] == "ffmpeg" and e["level"] == "stats")
+            ]
+            stats_only = [
+                e for e in self.log_lines if e["source"] == "ffmpeg" and e["level"] == "stats"
+            ]
+            keep_stats = max(0, 500 - len(non_stats))
+            self.log_lines = non_stats + stats_only[-keep_stats:] if keep_stats > 0 else non_stats
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for API responses."""
