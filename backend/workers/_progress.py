@@ -24,6 +24,7 @@ def run_ffmpeg_with_progress(
     timeout: float | None = None,
     cancel_event: threading.Event | None = None,
     total_frames: float | None = None,
+    log_cb: Callable[[str, str, str], None] | None = None,
 ) -> tuple[int, str]:
     """Run an ffmpeg command, reporting progress via callback.
 
@@ -91,11 +92,33 @@ def run_ffmpeg_with_progress(
     def _read_stderr() -> None:
         """Drain stderr in a background thread to prevent pipe deadlock."""
         assert proc.stderr is not None
+        line_buf = ""
         while True:
             chunk = proc.stderr.read(8192)
             if not chunk:
                 break
             stderr_chunks.append(chunk)
+            if log_cb:
+                line_buf += chunk
+                while "\n" in line_buf:
+                    line, line_buf = line_buf.split("\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if "fps=" in line and "speed=" in line:
+                        log_cb("ffmpeg", "stats", line)
+                    elif "error" in line.lower():
+                        log_cb("ffmpeg", "error", line)
+                    else:
+                        log_cb("ffmpeg", "warning", line)
+        if log_cb and line_buf.strip():
+            line = line_buf.strip()
+            if "fps=" in line and "speed=" in line:
+                log_cb("ffmpeg", "stats", line)
+            elif "error" in line.lower():
+                log_cb("ffmpeg", "error", line)
+            else:
+                log_cb("ffmpeg", "warning", line)
 
     stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
     stderr_thread.start()

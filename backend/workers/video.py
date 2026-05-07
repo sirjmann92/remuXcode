@@ -177,6 +177,7 @@ class VideoConverter:
         progress_callback: Callable[[float], None] | None = None,
         cancel_event: threading.Event | None = None,
         detail_callback: Callable[[str], None] | None = None,
+        log_cb: Callable[[str, str, str], None] | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -188,6 +189,7 @@ class VideoConverter:
             progress_callback: Optional callback receiving progress 0-100.
             cancel_event: Event to signal cancellation (kills ffmpeg).
             detail_callback: Optional callback receiving status detail strings.
+            log_cb: Optional callback receiving (source, level, message) log entries.
 
         Returns:
             VideoConversionResult with conversion details
@@ -326,6 +328,7 @@ class VideoConverter:
                 timeout=self.config.job_timeout or None,  # 0 = no timeout
                 cancel_event=cancel_event,
                 total_frames=_total_frames,
+                log_cb=log_cb,
             )
 
             if returncode != 0:

@@ -1,7 +1,7 @@
 <script lang="ts">
-import { cancelJob, deleteJob, retryJob } from '$lib/api';
+import { cancelJob, deleteJob, getJobLogs, retryJob } from '$lib/api';
 import { channelLabel, formatSize, formatTimestamp } from '$lib/format';
-import type { Job, JobPhase } from '$lib/types';
+import type { Job, JobLogEntry, JobPhase, LogLevel, LogSource } from '$lib/types';
 import StatusBadge from './StatusBadge.svelte';
 
 interface Props {
@@ -17,6 +17,91 @@ let retrying = $state(false);
 let retryError = $state('');
 let copiedError = $state('');
 let expandedErrors = $state(new Set<string>());
+
+// Log panel state
+let showLogs = $state(false);
+let logEntries = $state<JobLogEntry[]>([]);
+let filterSource = $state(new Set<LogSource>(['app', 'ffmpeg']));
+let filterLevel = $state(new Set<LogLevel>(['info', 'warning', 'error', 'stats']));
+let logEl = $state<HTMLElement | undefined>(undefined);
+let autoScroll = $state(true);
+
+const filteredEntries = $derived(
+  logEntries.filter((e) => filterSource.has(e.source) && filterLevel.has(e.level)),
+);
+
+function toggleSource(s: LogSource) {
+  const next = new Set(filterSource);
+  next.has(s) ? next.delete(s) : next.add(s);
+  filterSource = next;
+}
+function toggleLevel(l: LogLevel) {
+  const next = new Set(filterLevel);
+  next.has(l) ? next.delete(l) : next.add(l);
+  filterLevel = next;
+}
+
+function onLogScroll() {
+  if (!logEl) return;
+  autoScroll = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 24;
+}
+
+$effect(() => {
+  filteredEntries;
+  if (autoScroll && logEl) {
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+});
+
+async function fetchLogs() {
+  try {
+    const res = await getJobLogs(job.id);
+    logEntries = res.entries;
+  } catch {
+    // ignore transient errors
+  }
+}
+
+$effect(() => {
+  if (!showLogs) return;
+  fetchLogs();
+  if (job.status !== 'running') return;
+  const id = setInterval(fetchLogs, 2000);
+  return () => clearInterval(id);
+});
+
+function downloadLog() {
+  if (!logEntries.length) return;
+  const lines = logEntries
+    .map((e) => `${new Date(e.ts * 1000).toISOString()} [${e.source}] [${e.level}] ${e.message}`)
+    .join('\n');
+  const blob = new Blob([lines], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `remuxcode-${job.id.slice(0, 8)}.log`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatLogTs(ts: number): string {
+  return new Date(ts * 1000).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+const levelClass: Record<LogLevel, string> = {
+  info: 'text-info/70',
+  warning: 'text-warning/80',
+  error: 'text-error/80',
+  stats: 'text-base-content/30',
+};
+const sourceClass: Record<LogSource, string> = {
+  app: 'text-primary/60',
+  ffmpeg: 'text-secondary/60',
+};
 
 function copyError(text: string) {
   navigator.clipboard.writeText(text).then(() => {
@@ -192,6 +277,17 @@ async function handleRetry() {
             <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
           </svg>
         </a>
+        {#if job.status !== 'pending'}
+          <button
+            class="btn btn-ghost btn-xs transition-opacity {showLogs ? 'text-accent opacity-100' : 'opacity-30 hover:opacity-70'}"
+            onclick={() => { showLogs = !showLogs; autoScroll = true; }}
+            title="Toggle log"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+            </svg>
+          </button>
+        {/if}
         {#if job.status === 'running' || job.status === 'pending'}
           <button
             class="btn btn-ghost btn-xs text-warning opacity-60 hover:opacity-100 transition-opacity"
@@ -589,6 +685,68 @@ async function handleRetry() {
       <div class="flex items-center gap-1.5 pt-1 border-t border-base-content/5">
         <span class="text-xs font-medium text-base-content/50">Total</span>
         <span class="text-xs text-base-content/40">{overallSize}</span>
+      </div>
+    {/if}
+
+    {#if showLogs}
+      <div class="mt-1 border-t border-base-content/10 pt-2 space-y-2">
+        <!-- Filter bar -->
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="text-xs text-base-content/30 mr-0.5">Source</span>
+          <button
+            class="btn btn-xs {filterSource.has('app') ? 'btn-primary' : 'btn-ghost opacity-40'}"
+            onclick={() => toggleSource('app')}
+          >App</button>
+          <button
+            class="btn btn-xs {filterSource.has('ffmpeg') ? 'btn-primary' : 'btn-ghost opacity-40'}"
+            onclick={() => toggleSource('ffmpeg')}
+          >ffmpeg</button>
+          <span class="text-xs text-base-content/30 ml-2 mr-0.5">Level</span>
+          <button
+            class="btn btn-xs {filterLevel.has('info') ? 'btn-success' : 'btn-ghost opacity-40'}"
+            onclick={() => toggleLevel('info')}
+          >Info</button>
+          <button
+            class="btn btn-xs {filterLevel.has('warning') ? 'btn-warning' : 'btn-ghost opacity-40'}"
+            onclick={() => toggleLevel('warning')}
+          >Warn</button>
+          <button
+            class="btn btn-xs {filterLevel.has('error') ? 'btn-error' : 'btn-ghost opacity-40'}"
+            onclick={() => toggleLevel('error')}
+          >Error</button>
+          <button
+            class="btn btn-xs {filterLevel.has('stats') ? 'btn-secondary' : 'btn-ghost opacity-40'}"
+            onclick={() => toggleLevel('stats')}
+          >Stats</button>
+          <button
+            class="btn btn-ghost btn-xs ml-auto opacity-40 hover:opacity-80"
+            onclick={downloadLog}
+            title="Download full log"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+          </button>
+        </div>
+        <!-- Log entries -->
+        <div
+          bind:this={logEl}
+          onscroll={onLogScroll}
+          class="h-48 overflow-y-auto font-mono text-xs bg-base-300/40 rounded p-2 space-y-0.5"
+        >
+          {#if filteredEntries.length === 0}
+            <p class="text-base-content/25 text-center py-6">No log entries</p>
+          {:else}
+            {#each filteredEntries as entry (entry.ts + entry.message)}
+              <div class="flex gap-2 leading-relaxed">
+                <span class="shrink-0 text-base-content/25">{formatLogTs(entry.ts)}</span>
+                <span class="shrink-0 w-10 {sourceClass[entry.source]}">{entry.source}</span>
+                <span class="shrink-0 w-12 {levelClass[entry.level]}">{entry.level}</span>
+                <span class="text-base-content/70 break-all whitespace-pre-wrap">{entry.message}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
       </div>
     {/if}
   </div>
