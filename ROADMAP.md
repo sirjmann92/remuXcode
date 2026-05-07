@@ -44,6 +44,10 @@
 - **Multi-node federation** — coordinate jobs across multiple remuXcode instances (e.g. a dedicated encode box picking up work from a lighter-duty host)
 - **Plex/Jellyfin webhook support** *(stretch)* — for setups without Sonarr/Radarr; metadata sourcing is a significant undertaking
 
+### Security
+
+- **Full API authentication** — all endpoints currently rely on same-origin trust; external callers (curl, scripts) and the UI should use a consistent auth mechanism. Plan: frontend fetches the API key once from a localhost-only bootstrap endpoint on first load, stores it as an `HttpOnly` session cookie, and FastAPI accepts either the cookie or the `X-Api-Key` header. Closes the Sonarr/Radarr key leak via `GET /api/config` and prevents unauthenticated write access to config, job queue, and file processing endpoints from other LAN devices.
+
 ### Quality of Life
 
 - **Retry from UI** — re-queue failed jobs from the Jobs page with one click
