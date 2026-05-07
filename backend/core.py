@@ -485,10 +485,10 @@ class JobQueue:
         while self.running:
             job_id = None
             with self.lock:
-                # Scale-down: if we have more alive workers than max_workers,
-                # this thread volunteers to exit when it has no work to pick up.
+                # Scale-down: excess workers exit after finishing their current
+                # job, without picking up new work.
                 alive = sum(1 for w in self.workers if w.is_alive())
-                if alive > self.max_workers and not self.pending_queue:
+                if alive > self.max_workers:
                     with contextlib.suppress(ValueError):
                         self.workers.remove(threading.current_thread())
                     return
