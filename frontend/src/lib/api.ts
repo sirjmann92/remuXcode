@@ -4,6 +4,7 @@ import type {
   AnalyzeResult,
   ConfigSummary,
   HealthStatus,
+  JobLogsResponse,
   JobsResponse,
   MoviesResponse,
   ScanProgress,
@@ -99,6 +100,10 @@ export async function cancelAllJobs(): Promise<{ message: string; cancelled: num
 
 export async function deleteFinished(): Promise<{ message: string; deleted: number }> {
   return request('/api/jobs/finished', { method: 'DELETE' });
+}
+
+export async function getJobLogs(id: string): Promise<JobLogsResponse> {
+  return request(`/api/jobs/${encodeURIComponent(id)}/logs`);
 }
 
 export async function reorderJobs(order: string[]): Promise<{ order: string[] }> {

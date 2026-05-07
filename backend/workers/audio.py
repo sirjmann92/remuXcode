@@ -195,6 +195,7 @@ class AudioConverter:
         progress_callback: Callable[[float], None] | None = None,
         cancel_event: threading.Event | None = None,
         detail_callback: Callable[[str], None] | None = None,
+        log_cb: Callable[[str, str, str], None] | None = None,
     ) -> AudioConversionResult:
         """Convert incompatible audio in a media file.
 
@@ -205,6 +206,7 @@ class AudioConverter:
             progress_callback: Optional callback receiving progress 0-100.
             cancel_event: Event to signal cancellation (kills ffmpeg).
             detail_callback: Optional callback receiving status detail strings.
+            log_cb: Optional callback receiving (source, level, message) log entries.
 
         Returns:
             AudioConversionResult with conversion details
@@ -389,6 +391,7 @@ class AudioConverter:
                 timeout=self.config.job_timeout or None,  # 0 = no timeout
                 cancel_event=cancel_event,
                 total_frames=total_frames,
+                log_cb=log_cb,
             )
 
             if returncode != 0:

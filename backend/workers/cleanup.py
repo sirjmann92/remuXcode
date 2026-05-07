@@ -140,6 +140,7 @@ class StreamCleanup:
         is_anime: bool = False,
         cancel_event: threading.Event | None = None,
         detail_callback: Callable[[str], None] | None = None,
+        log_cb: Callable[[str, str, str], None] | None = None,
     ) -> CleanupResult:
         """Remove unwanted streams from a media file.
 
@@ -152,6 +153,7 @@ class StreamCleanup:
             is_anime: Whether the content is anime (affects audio language keep logic).
             cancel_event: Event to signal cancellation (kills ffmpeg).
             detail_callback: Optional callback receiving status detail strings.
+            log_cb: Optional callback receiving (source, level, message) log entries.
 
         Returns:
             CleanupResult with details of streams removed
@@ -363,6 +365,7 @@ class StreamCleanup:
                 timeout=3600,
                 cancel_event=cancel_event,
                 total_frames=total_frames,
+                log_cb=log_cb,
             )
 
             if returncode != 0:

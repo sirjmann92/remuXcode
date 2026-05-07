@@ -5,6 +5,20 @@ export type JobPhase = 'audio' | 'video' | 'cleanup';
 
 export type MediaType = 'movie' | 'episode';
 
+export type LogSource = 'app' | 'ffmpeg';
+export type LogLevel = 'info' | 'warning' | 'error' | 'stats';
+
+export interface JobLogEntry {
+  ts: number;
+  source: LogSource;
+  level: LogLevel;
+  message: string;
+}
+
+export interface JobLogsResponse {
+  entries: JobLogEntry[];
+}
+
 export interface Job {
   id: string;
   job_type: JobType;

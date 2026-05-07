@@ -6,7 +6,7 @@ component initialization, and Sonarr/Radarr integration.
 
 from collections.abc import Callable
 import contextlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import json as _json
@@ -110,6 +110,15 @@ class ConversionJob:
     planned_phases: list[str] | None = None
     poster_url: str | None = None
     media_type: str | None = None
+    log_lines: list[dict[str, Any]] = field(default_factory=list)
+
+    def log(self, source: str, level: str, message: str) -> None:
+        """Append a timestamped log entry. Keeps the last 500 entries."""
+        self.log_lines.append(
+            {"ts": time.time(), "source": source, "level": level, "message": message}
+        )
+        if len(self.log_lines) > 600:
+            self.log_lines = self.log_lines[-500:]
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for API responses."""
@@ -513,6 +522,7 @@ class JobQueue:
         job.status = JobStatus.RUNNING
         job.started_at = time.time()
         job.last_progress_at = time.time()
+        job.log("app", "info", f"Job started: {Path(job.file_path).name}")
         if self.job_store:
             self._save_job_to_store(job)
 
@@ -579,17 +589,21 @@ class JobQueue:
                     for r in [result.get("video"), result.get("audio"), result.get("cleanup")]
                     if r and not r.get("success") and r.get("error")
                 )
+                job.log("app", "error", f"Job failed: {job.error}")
                 logger.error("Job %s failed: all phases failed", job_id)
             else:
                 job.status = JobStatus.COMPLETED
+                job.log("app", "info", "Job completed successfully")
                 logger.info("Job %s completed successfully", job_id)
         except Exception as e:
             # CancelledError from workers is expected when user cancels
             if job.status == JobStatus.CANCELLED:
+                job.log("app", "info", "Job cancelled by user")
                 logger.info("Job %s was cancelled during processing", job_id)
                 return
             job.error = str(e)
             job.status = JobStatus.FAILED
+            job.log("app", "error", f"Job failed: {job.error}")
             logger.error("Job %s failed: %s", job_id, e)
         finally:
             job.completed_at = time.time()
@@ -792,8 +806,14 @@ def process_file(
             with contextlib.suppress(OSError):
                 chain_temps[0].parent.rmdir()
 
+    def _log_cb(source: str, level: str, message: str) -> None:
+        if job:
+            job.log(source, level, message)
+
     if will_audio:
         _set_phase("audio", "Analyzing audio streams...")
+        if job:
+            job.log("app", "info", "Starting audio conversion")
         logger.info("Converting audio: %s", Path(file_path).name)
         assert audio_converter is not None
         _in = _phase_input()
@@ -805,6 +825,7 @@ def process_file(
             progress_callback=make_phase_cb(phase_idx),
             cancel_event=cancel_event,
             detail_callback=lambda detail: _set_phase("audio", detail),
+            log_cb=_log_cb,
         )
         _complete_phase("audio")
         phase_idx += 1
@@ -818,15 +839,24 @@ def process_file(
             "error": audio_result.error,
         }
         if not audio_result.success:
+            if job:
+                job.log("app", "error", f"Audio failed: {audio_result.error}")
             logger.error("Audio conversion failed: %s", audio_result.error)
             _cleanup_chain_temps()
             return results
+        if job:
+            streams_msg = f"{audio_result.streams_converted} stream(s) converted"
+            if audio_result.streams_dropped:
+                streams_msg += f", {audio_result.streams_dropped} dropped"
+            job.log("app", "info", f"Audio complete: {streams_msg}")
         # Advance chain: next phase reads from the output we just produced
         if _out is not None:
             chain_current = _out
 
     if will_video:
         _set_phase("video", "Analyzing video streams...")
+        if job:
+            job.log("app", "info", "Starting video encode")
         logger.info("Converting video: %s", Path(file_path).name)
         assert video_converter is not None
         _in = _phase_input()
@@ -838,6 +868,7 @@ def process_file(
             progress_callback=make_phase_cb(phase_idx),
             cancel_event=cancel_event,
             detail_callback=lambda detail: _set_phase("video", detail),
+            log_cb=_log_cb,
         )
         _complete_phase("video")
         phase_idx += 1
@@ -852,14 +883,23 @@ def process_file(
             "error": video_result.error,
         }
         if not video_result.success:
+            if job:
+                job.log("app", "error", f"Video encode failed: {video_result.error}")
             logger.error("Video conversion failed: %s", video_result.error)
             _cleanup_chain_temps()
             return results
+        if job:
+            codec_msg = f"{video_result.codec_from} → {video_result.codec_to}"
+            if video_result.content_type:
+                codec_msg += f" ({video_result.content_type})"
+            job.log("app", "info", f"Video encode complete: {codec_msg}")
         if _out is not None:
             chain_current = _out
 
     if will_cleanup:
         _set_phase("cleanup", "Analyzing streams...")
+        if job:
+            job.log("app", "info", "Starting stream cleanup")
         logger.info("Cleaning streams: %s", Path(file_path).name)
         assert stream_cleanup is not None
         _in = _phase_input()
@@ -872,6 +912,7 @@ def process_file(
             is_anime=file_is_anime,
             cancel_event=cancel_event,
             detail_callback=lambda detail: _set_phase("cleanup", detail),
+            log_cb=_log_cb,
         )
         _complete_phase("cleanup")
         results["cleanup"] = {
@@ -886,9 +927,14 @@ def process_file(
             "error": cleanup_result.error,
         }
         if not cleanup_result.success:
+            if job:
+                job.log("app", "error", f"Cleanup failed: {cleanup_result.error}")
             logger.error("Stream cleanup failed: %s", cleanup_result.error)
             _cleanup_chain_temps()
             return results
+        if job:
+            removed = cleanup_result.audio_removed + cleanup_result.subtitle_removed
+            job.log("app", "info", f"Cleanup complete: {removed} stream(s) removed")
 
     # All phases completed — clean up any leftover intermediate chain temps
     # (the last phase wrote directly to file_path so they are now orphaned).
