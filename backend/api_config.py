@@ -312,6 +312,8 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
 
     if body.workers is not None:
         cfg.workers = body.workers
+        if core.job_queue:
+            core.job_queue.scale_workers(body.workers)
 
     if body.ffmpeg_threads is not None:
         cfg.ffmpeg_threads = body.ffmpeg_threads
