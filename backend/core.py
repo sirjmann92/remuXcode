@@ -168,6 +168,38 @@ class JobQueue:
         self._watchdog_thread.start()
         logger.info("Started %d job worker(s) + watchdog", self.max_workers)
 
+    def scale_workers(self, new_count: int) -> None:
+        """Dynamically adjust the number of worker threads.
+
+        Scale up: spawn additional threads immediately.
+        Scale down: excess threads self-exit after finishing their current job.
+        """
+        with self.lock:
+            current_alive = sum(1 for w in self.workers if w.is_alive())
+            self.max_workers = new_count
+            if new_count > current_alive:
+                for i in range(new_count - current_alive):
+                    worker = threading.Thread(
+                        target=self._worker_loop,
+                        name=f"Worker-{current_alive + i}",
+                        daemon=True,
+                    )
+                    worker.start()
+                    self.workers.append(worker)
+                logger.info(
+                    "Scaled workers: %d → %d (spawned %d)",
+                    current_alive,
+                    new_count,
+                    new_count - current_alive,
+                )
+            elif new_count < current_alive:
+                logger.info(
+                    "Scaled workers: %d → %d (excess will exit when idle)",
+                    current_alive,
+                    new_count,
+                )
+            # Scale-down is handled in _worker_loop via max_workers check
+
     def stop(self) -> None:
         """Stop all worker threads."""
         self.running = False
@@ -453,6 +485,13 @@ class JobQueue:
         while self.running:
             job_id = None
             with self.lock:
+                # Scale-down: if we have more alive workers than max_workers,
+                # this thread volunteers to exit when it has no work to pick up.
+                alive = sum(1 for w in self.workers if w.is_alive())
+                if alive > self.max_workers and not self.pending_queue:
+                    with contextlib.suppress(ValueError):
+                        self.workers.remove(threading.current_thread())
+                    return
                 if self.pending_queue:
                     job_id = self.pending_queue.pop(0)
             if job_id:
