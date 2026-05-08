@@ -109,16 +109,26 @@ def run_ffmpeg_with_progress(
                         log_cb("ffmpeg", "stats", line)
                     elif "error" in line.lower():
                         log_cb("ffmpeg", "error", line)
-                    else:
+                    elif any(
+                        kw in line.lower()
+                        for kw in ("warning", "deprecated", "unsupported", "invalid", "corrupt")
+                    ):
                         log_cb("ffmpeg", "warning", line)
+                    else:
+                        log_cb("ffmpeg", "info", line)
         if log_cb and line_buf.strip():
             line = line_buf.strip()
             if "fps=" in line and "speed=" in line:
                 log_cb("ffmpeg", "stats", line)
             elif "error" in line.lower():
                 log_cb("ffmpeg", "error", line)
-            else:
+            elif any(
+                kw in line.lower()
+                for kw in ("warning", "deprecated", "unsupported", "invalid", "corrupt")
+            ):
                 log_cb("ffmpeg", "warning", line)
+            else:
+                log_cb("ffmpeg", "info", line)
 
     stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
     stderr_thread.start()
