@@ -23,6 +23,28 @@ See [docs/](docs/) for the full feature reference.
 
 ---
 
+## Screenshots
+
+![Dashboard](images/dashboard.png)
+*Dashboard — live job progress with poster art, phase badges, and ETA*
+
+![Movies](images/movies.png)
+*Movies — Radarr library browse with poster grid, filters, and batch queue*
+
+![Shows](images/shows.png)
+*Shows — Sonarr series and episode browser with per-file actions*
+
+![Jobs](images/jobs.png)
+*Jobs — full job history with per-job log viewer and stream details*
+
+![Settings](images/settings.png)
+*Settings — encoding, audio, cleanup, and integration config*
+
+![Integrations](images/integrations.png)
+*Integrations — Sonarr and Radarr connection status*
+
+---
+
 ## Quick Start
 
 ### Option 1 — Prebuilt Image (recommended)
