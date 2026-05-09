@@ -5,6 +5,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'README.md'
+      - 'QUICKSTART.md'
+      - 'ROADMAP.md'
+      - 'docs/**'
+      - 'images/**'
+      - 'tests/**'
+      - 'legacy/**'
   workflow_dispatch:
 
 jobs:

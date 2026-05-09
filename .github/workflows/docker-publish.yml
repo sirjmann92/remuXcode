@@ -8,6 +8,7 @@ on:
       - 'QUICKSTART.md'
       - 'ROADMAP.md'
       - 'docs/**'
+      - 'images/**'
       - 'tests/**'
       - 'legacy/**'
   workflow_dispatch:
