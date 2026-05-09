@@ -191,6 +191,7 @@ class VideoConverter:
             cancel_event: Event to signal cancellation (kills ffmpeg).
             detail_callback: Optional callback receiving status detail strings.
             log_cb: Optional callback receiving (source, level, message) log entries.
+            encode_options: Optional custom encode overrides (resolution, HDR strip, force).
 
         Returns:
             VideoConversionResult with conversion details
