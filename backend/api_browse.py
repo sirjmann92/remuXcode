@@ -57,27 +57,30 @@ def invalidate_cache(key: str | None = None) -> None:
 router = APIRouter(tags=["browse"])
 
 
-def _has_compatible_companion(lang: str, compatible_langs: set[str]) -> bool:
-    """Check if a stream's language already has a compatible (non-DTS/TrueHD) track.
+def _has_compatible_companion(lang: str, stream_channels: int, companions: dict[str, int]) -> bool:
+    """Check if a stream has a compatible companion with at least as many channels.
 
-    When keep_original* is enabled, the converted companion track persists
-    alongside the original.  This detects that situation to avoid re-flagging
-    already-processed files.
+    A companion is only considered compatible if it has >= channels as the source
+    stream.  A 2ch FLAC is NOT a companion for a 6ch DTS-HD MA stream.
     """
     if lang == "und":
-        return bool(compatible_langs)
-    return lang in compatible_langs
+        return any(ch >= stream_channels for ch in companions.values())
+    return companions.get(lang, 0) >= stream_channels
 
 
-def _compatible_track_languages(streams: Any, *, use_dicts: bool = False) -> set[str]:
-    """Build set of languages that have a compatible (non-DTS, non-TrueHD) track."""
-    langs: set[str] = set()
+def _compatible_track_languages(streams: Any, *, use_dicts: bool = False) -> dict[str, int]:
+    """Build map of language -> max channels for compatible (non-DTS, non-TrueHD) tracks."""
+    langs: dict[str, int] = {}
     for s in streams:
         if use_dicts:
             if not s.get("is_dts", False) and not s.get("is_truehd", False):
-                langs.add((s.get("language") or "und").lower())
+                lang = (s.get("language") or "und").lower()
+                channels = s.get("channels") or 0
+                langs[lang] = max(langs.get(lang, 0), channels)
         elif not s.is_dts and not s.is_truehd:
-            langs.add((s.language or "und").lower())
+            lang = (s.language or "und").lower()
+            channels = s.channels or 0
+            langs[lang] = max(langs.get(lang, 0), channels)
     return langs
 
 
@@ -94,16 +97,17 @@ def _needs_audio_conversion(info: Any) -> bool:
     compat = _compatible_track_languages(info.audio_streams)
     for s in info.audio_streams:
         lang = (s.language or "und").lower()
+        channels = s.channels or 0
         if cfg.convert_dts and s.is_dts and not s.is_dts_x:
-            if cfg.keep_original and _has_compatible_companion(lang, compat):
+            if cfg.keep_original and _has_compatible_companion(lang, channels, compat):
                 continue
             return True
         if cfg.convert_dts_x and s.is_dts_x:
-            if cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+            if cfg.keep_original_dts_x and _has_compatible_companion(lang, channels, compat):
                 continue
             return True
         if cfg.convert_truehd and s.is_truehd:
-            if cfg.keep_original and _has_compatible_companion(lang, compat):
+            if cfg.keep_original and _has_compatible_companion(lang, channels, compat):
                 continue
             return True
     return False
@@ -121,16 +125,17 @@ def _needs_audio_conversion_from_streams(streams: list[dict[str, Any]]) -> bool:
         is_dts_x = s.get("is_dts_x", False)
         is_truehd = s.get("is_truehd", False)
         lang = (s.get("language") or "und").lower()
+        channels = s.get("channels") or 0
         if cfg.convert_dts and is_dts and not is_dts_x:
-            if cfg.keep_original and _has_compatible_companion(lang, compat):
+            if cfg.keep_original and _has_compatible_companion(lang, channels, compat):
                 continue
             return True
         if cfg.convert_dts_x and is_dts_x:
-            if cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
+            if cfg.keep_original_dts_x and _has_compatible_companion(lang, channels, compat):
                 continue
             return True
         if cfg.convert_truehd and is_truehd:
-            if cfg.keep_original and _has_compatible_companion(lang, compat):
+            if cfg.keep_original and _has_compatible_companion(lang, channels, compat):
                 continue
             return True
     return False
@@ -147,6 +152,7 @@ def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
     if not cfg or not cfg.enabled:
         return []
     compat = _compatible_track_languages(streams, use_dicts=True)
+    seen: set[str] = set()
     codecs: list[str] = []
     for s in streams:
         is_dts = s.get("is_dts", False)
@@ -154,18 +160,27 @@ def _audio_codecs_to_convert(streams: list[dict[str, Any]]) -> list[str]:
         is_truehd = s.get("is_truehd", False)
         codec = s.get("codec", "")
         lang = (s.get("language") or "und").lower()
+        channels = s.get("channels") or 0
         if cfg.convert_dts and is_dts and not is_dts_x:
-            if _has_compatible_companion(lang, compat):
+            if _has_compatible_companion(lang, channels, compat):
                 continue
-            codecs.append(codec.upper() or "DTS")
+            name = codec.upper() or "DTS"
+            if name not in seen:
+                seen.add(name)
+                codecs.append(name)
         elif cfg.convert_dts_x and is_dts_x:
-            if _has_compatible_companion(lang, compat):
+            if _has_compatible_companion(lang, channels, compat):
                 continue
-            codecs.append("DTS:X")
+            if "DTS:X" not in seen:
+                seen.add("DTS:X")
+                codecs.append("DTS:X")
         elif cfg.convert_truehd and is_truehd:
-            if _has_compatible_companion(lang, compat):
+            if _has_compatible_companion(lang, channels, compat):
                 continue
-            codecs.append(codec.upper() or "TrueHD")
+            name = codec.upper() or "TrueHD"
+            if name not in seen:
+                seen.add(name)
+                codecs.append(name)
     return codecs
 
 
@@ -175,6 +190,7 @@ def _audio_codecs_to_drop(streams: list[dict[str, Any]]) -> list[str]:
     if not cfg or not cfg.enabled:
         return []
     compat = _compatible_track_languages(streams, use_dicts=True)
+    seen: set[str] = set()
     codecs: list[str] = []
     for s in streams:
         is_dts = s.get("is_dts", False)
@@ -182,15 +198,24 @@ def _audio_codecs_to_drop(streams: list[dict[str, Any]]) -> list[str]:
         is_truehd = s.get("is_truehd", False)
         codec = s.get("codec", "")
         lang = (s.get("language") or "und").lower()
+        channels = s.get("channels") or 0
         if cfg.convert_dts and is_dts and not is_dts_x:
-            if not cfg.keep_original and _has_compatible_companion(lang, compat):
-                codecs.append(codec.upper() or "DTS")
+            if not cfg.keep_original and _has_compatible_companion(lang, channels, compat):
+                name = codec.upper() or "DTS"
+                if name not in seen:
+                    seen.add(name)
+                    codecs.append(name)
         elif cfg.convert_dts_x and is_dts_x:
-            if not cfg.keep_original_dts_x and _has_compatible_companion(lang, compat):
-                codecs.append("DTS:X")
+            if not cfg.keep_original_dts_x and _has_compatible_companion(lang, channels, compat):
+                if "DTS:X" not in seen:
+                    seen.add("DTS:X")
+                    codecs.append("DTS:X")
         elif cfg.convert_truehd and is_truehd:
-            if not cfg.keep_original and _has_compatible_companion(lang, compat):
-                codecs.append(codec.upper() or "TrueHD")
+            if not cfg.keep_original and _has_compatible_companion(lang, channels, compat):
+                name = codec.upper() or "TrueHD"
+                if name not in seen:
+                    seen.add(name)
+                    codecs.append(name)
     return codecs
 
 
@@ -238,6 +263,19 @@ def _split_slash_field(value: Any) -> list[str]:
     return []
 
 
+def _subtitle_langs_to_remove(subtitle_streams: list[dict[str, Any]]) -> list[str]:
+    """Return list of subtitle language codes that will be removed by cleanup."""
+    cfg = core.config.cleanup if core.config else None
+    if not cfg or not cfg.enabled or not cfg.clean_subtitles:
+        return []
+    keep = {lang.lower() for lang in cfg.keep_languages}
+    return [
+        s.get("language") or "und"
+        for s in subtitle_streams
+        if (s.get("language") or "").lower() not in keep
+    ]
+
+
 def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> bool:
     """Check if a file likely needs subtitle/audio cleanup based on Sonarr/Radarr mediaInfo.
 
@@ -265,6 +303,11 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
             # For anime, all audio tracks are potentially kept (original + keep_languages),
             # so we can't reliably determine cleanup need from mediaInfo alone.
             # Skip audio-based cleanup flagging for anime — subtitles above still apply.
+            pass
+        elif not is_anime and cfg.keep_original_audio:
+            # For live action with keep_original_audio, the detected original language is
+            # always kept regardless of keep_languages — we can't determine it here.
+            # Skip audio-based cleanup flagging to avoid false positives.
             pass
         else:
             keep_audio = [a for a in audio_langs if not a or a == "und" or a in keep]
@@ -294,6 +337,9 @@ def _needs_cleanup_from_streams(
 
     if cfg.clean_audio and audio_streams:
         if is_anime and cfg.anime_keep_original_audio:
+            pass
+        elif not is_anime and cfg.keep_original_audio:
+            # Can't determine original language here; skip to avoid false positives.
             pass
         else:
             keep_audio = []
@@ -429,6 +475,7 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
     audio_stream_dicts = [
         {
             "codec": a.codec_name,
+            "channels": a.channels,
             "language": a.language,
             "is_dts": a.is_dts,
             "is_dts_x": a.is_dts_x,
@@ -436,6 +483,9 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
         }
         for a in info.audio_streams
     ]
+    subtitle_stream_dicts = [{"language": s.language} for s in info.subtitle_streams]
+    subtitle_langs = [s.language or "und" for s in info.subtitle_streams]
+    audio_stream_dicts_for_cleanup = [{"language": a.language} for a in info.audio_streams]
 
     return {
         "file": str(info.path),
@@ -450,6 +500,10 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
         "audio_codecs_to_convert": _audio_codecs_to_convert(audio_stream_dicts),
         "audio_codecs_to_drop": _audio_codecs_to_drop(audio_stream_dicts),
         "needs_video_conversion": _needs_video_conversion(info, is_anime),
+        "needs_cleanup": _needs_cleanup_from_streams(
+            audio_stream_dicts_for_cleanup, subtitle_langs, is_anime=is_anime
+        ),
+        "subtitle_langs_to_remove": _subtitle_langs_to_remove(subtitle_stream_dicts),
         "video_streams": video_streams,
         "audio_streams": audio_streams,
         "subtitle_streams": subtitle_streams,

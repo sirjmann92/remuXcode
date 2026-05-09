@@ -398,6 +398,8 @@ export interface AnalyzeResult {
   audio_codecs_to_convert?: string[];
   audio_codecs_to_drop?: string[];
   needs_video_conversion: boolean;
+  needs_cleanup: boolean;
+  subtitle_langs_to_remove?: string[];
   video_streams: AnalyzeVideoStream[];
   audio_streams: AnalyzeAudioStream[];
   subtitle_streams: AnalyzeSubtitleStream[];
