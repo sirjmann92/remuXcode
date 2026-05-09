@@ -146,15 +146,14 @@ Settings → Connect → Add → Webhook:
 
 ## API
 
-All endpoints (except `/health`) require an `X-API-Key` header. Interactive API docs are available at `http://localhost:7889/docs`.
+Interactive API docs are available at `http://localhost:7889/docs`.
 
 ```bash
-# Health check (no auth required)
+# Health check
 curl http://localhost:7889/health
 
 # Queue a single file for full conversion
 curl -X POST http://localhost:7889/api/convert \
-  -H "X-API-Key: your-key" \
   -H "Content-Type: application/json" \
   -d '{"path": "/share/movies/Movie (2024)/movie.mkv", "type": "full"}'
 
@@ -162,22 +161,19 @@ curl -X POST http://localhost:7889/api/convert \
 
 # Queue all files in a Radarr library (by Radarr movie IDs)
 curl -X POST http://localhost:7889/api/convert/movies \
-  -H "X-API-Key: your-key" \
   -H "Content-Type: application/json" \
   -d '{"movie_ids": [123, 456], "type": "full"}'
 
 # Queue all episodes in a Sonarr series (by Sonarr series ID)
 curl -X POST http://localhost:7889/api/convert/series \
-  -H "X-API-Key: your-key" \
   -H "Content-Type: application/json" \
   -d '{"series_ids": [42], "type": "audio"}'
 
 # List jobs
-curl http://localhost:7889/api/jobs -H "X-API-Key: your-key"
+curl http://localhost:7889/api/jobs
 
 # Analyze a file
-curl "http://localhost:7889/api/analyze?path=/share/movies/Movie/movie.mkv" \
-  -H "X-API-Key: your-key"
+curl "http://localhost:7889/api/analyze?path=/share/movies/Movie/movie.mkv"
 ```
 
 ---
