@@ -56,7 +56,10 @@ async function handleQueue() {
   }
   queuing = false;
   if (errors.length > 0) {
-    error = errors.length === 1 ? errors[0] : `${errors.length} of ${pathArray.length} files failed to queue`;
+    error =
+      errors.length === 1
+        ? errors[0]
+        : `${errors.length} of ${pathArray.length} files failed to queue`;
     if (errors.length === pathArray.length) return;
   }
   onqueued?.();

@@ -310,7 +310,9 @@ class VideoConverter:
                 _src_mtime = None
                 _src_size = None
 
-            cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type, video, encode_options=encode_options)
+            cmd = self._build_ffmpeg_command(
+                str(input_path), str(temp_file), content_type, video, encode_options=encode_options
+            )
             logger.debug("Running: %s", " ".join(cmd))
 
             # Estimate total frames for progress when out_time_us is N/A
@@ -469,33 +471,67 @@ class VideoConverter:
         # HW-accelerated encoders
         if encoder == "hevc_qsv":
             return self._build_qsv_command(
-                input_file, output_file, content_type, codec="hevc", video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                codec="hevc",
+                video=video,
+                encode_options=encode_options,
             )
         if encoder == "av1_qsv":
             return self._build_qsv_command(
-                input_file, output_file, content_type, codec="av1", video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                codec="av1",
+                video=video,
+                encode_options=encode_options,
             )
         if encoder == "hevc_vaapi":
             return self._build_vaapi_command(
-                input_file, output_file, content_type, codec="hevc", video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                codec="hevc",
+                video=video,
+                encode_options=encode_options,
             )
         if encoder == "av1_vaapi":
             return self._build_vaapi_command(
-                input_file, output_file, content_type, codec="av1", video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                codec="av1",
+                video=video,
+                encode_options=encode_options,
             )
         if encoder == "hevc_nvenc":
             return self._build_nvenc_command(
-                input_file, output_file, content_type, codec="hevc", video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                codec="hevc",
+                video=video,
+                encode_options=encode_options,
             )
         if encoder == "av1_nvenc":
             return self._build_nvenc_command(
-                input_file, output_file, content_type, codec="av1", video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                codec="av1",
+                video=video,
+                encode_options=encode_options,
             )
 
         # Software encoders
         if self.target_codec == "av1":
-            return self._build_av1_command(input_file, output_file, content_type, video=video, encode_options=encode_options)
-        return self._build_hevc_command(input_file, output_file, content_type, video=video, encode_options=encode_options)
+            return self._build_av1_command(
+                input_file, output_file, content_type, video=video, encode_options=encode_options
+            )
+        return self._build_hevc_command(
+            input_file, output_file, content_type, video=video, encode_options=encode_options
+        )
 
     @staticmethod
     @staticmethod
@@ -557,14 +593,16 @@ class VideoConverter:
         if encode_options and encode_options.get("strip_hdr"):
             # zscale-based tone-map: linear light → hable → BT.709 SDR
             # Outputs yuv420p regardless of what pix_fmt says (SDR = 8-bit)
-            parts.extend([
-                "zscale=t=linear:npl=100",
-                "format=gbrpf32le",
-                "zscale=p=bt709",
-                "tonemap=tonemap=hable:desat=0",
-                "zscale=t=bt709:m=bt709:r=tv",
-                "format=yuv420p",
-            ])
+            parts.extend(
+                [
+                    "zscale=t=linear:npl=100",
+                    "format=gbrpf32le",
+                    "zscale=p=bt709",
+                    "tonemap=tonemap=hable:desat=0",
+                    "zscale=t=bt709:m=bt709:r=tv",
+                    "format=yuv420p",
+                ]
+            )
         else:
             parts.append(f"format={pix_fmt}")
 
@@ -665,7 +703,11 @@ class VideoConverter:
         # This prevents FFmpeg 7.x from auto-inserting ``auto_scale`` for
         # colour-space or fps-mode reasons, which conflicts with an explicit
         # filter graph and causes "Impossible to convert" errors on some files.
-        cmd.extend(self._build_sw_vf_filter(self.config.pix_fmt, framerate, encode_options=encode_options, video=video))
+        cmd.extend(
+            self._build_sw_vf_filter(
+                self.config.pix_fmt, framerate, encode_options=encode_options, video=video
+            )
+        )
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -781,7 +823,11 @@ class VideoConverter:
 
         # Pixel format, framerate, and optional scale/tone-map filters.
         # Prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
-        cmd.extend(self._build_sw_vf_filter("yuv420p10le", framerate, encode_options=encode_options, video=video))
+        cmd.extend(
+            self._build_sw_vf_filter(
+                "yuv420p10le", framerate, encode_options=encode_options, video=video
+            )
+        )
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -877,14 +923,16 @@ class VideoConverter:
                     parts.append(f"scale=-2:{target_height}:flags=lanczos")
 
             if encode_options.get("strip_hdr"):
-                parts.extend([
-                    "zscale=t=linear:npl=100",
-                    "format=gbrpf32le",
-                    "zscale=p=bt709",
-                    "tonemap=tonemap=hable:desat=0",
-                    "zscale=t=bt709:m=bt709:r=tv",
-                    "format=nv12",  # SDR output → 8-bit nv12 before HW upload
-                ])
+                parts.extend(
+                    [
+                        "zscale=t=linear:npl=100",
+                        "format=gbrpf32le",
+                        "zscale=p=bt709",
+                        "tonemap=tonemap=hable:desat=0",
+                        "zscale=t=bt709:m=bt709:r=tv",
+                        "format=nv12",  # SDR output → 8-bit nv12 before HW upload
+                    ]
+                )
                 return ",".join(parts)
 
         parts.append(f"format={upload_fmt}")
@@ -894,9 +942,12 @@ class VideoConverter:
     def _sdr_color_args() -> list[str]:
         """Return BT.709 SDR color flags for use when stripping HDR."""
         return [
-            "-color_primaries", "bt709",
-            "-color_trc", "bt709",
-            "-colorspace", "bt709",
+            "-color_primaries",
+            "bt709",
+            "-color_trc",
+            "bt709",
+            "-colorspace",
+            "bt709",
         ]
 
     def _build_qsv_command(
@@ -964,7 +1015,8 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to QSV surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload=extra_hw_frames=64",
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
+                + ",hwupload=extra_hw_frames=64",
                 "-c:v:0",
                 encoder,
                 "-global_quality",
@@ -1147,7 +1199,8 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to CUDA surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload_cuda",
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
+                + ",hwupload_cuda",
                 "-c:v:0",
                 encoder,
                 "-cq",
