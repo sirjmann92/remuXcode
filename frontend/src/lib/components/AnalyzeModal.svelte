@@ -3,18 +3,22 @@ import { analyzeFile } from '$lib/api';
 import { channelLabel, videoCodecLabel } from '$lib/format';
 import { langLabel } from '$lib/languages';
 import type { AnalyzeResult } from '$lib/types';
+import ConvertOptionsModal from './ConvertOptionsModal.svelte';
 
 interface Props {
   path: string;
+  poster_url?: string;
+  media_type?: string;
   onclose: () => void;
 }
 
-const { path, onclose }: Props = $props();
+const { path, poster_url, media_type, onclose }: Props = $props();
 
 let result: AnalyzeResult | null = $state(null);
 let loading = $state(true);
 let error = $state('');
 let activeTab: 'video' | 'audio' | 'subtitles' | 'general' = $state('general');
+let showCustomEncode = $state(false);
 
 $effect(() => {
   loading = true;
@@ -278,6 +282,23 @@ function fileName(path: string): string {
       {/if}
       </div><!-- end min-h tab content -->
     {/if}
+
+    <div class="modal-action">
+      <button class="btn btn-ghost btn-sm" onclick={() => (showCustomEncode = true)}>
+        Custom Encode
+      </button>
+      <button class="btn btn-sm" onclick={onclose}>Close</button>
+    </div>
   </div>
   <div class="modal-backdrop" role="button" tabindex="-1" aria-label="Close" onclick={onclose} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onclose(); }}></div>
 </div>
+
+{#if showCustomEncode}
+  <ConvertOptionsModal
+    paths={path}
+    {poster_url}
+    {media_type}
+    onclose={() => (showCustomEncode = false)}
+    onqueued={() => { showCustomEncode = false; onclose(); }}
+  />
+{/if}
