@@ -1,6 +1,23 @@
 import { langName } from '$lib/languages';
 import type { ConfigSummary } from '$lib/types';
 
+const VIDEO_CODEC_NAMES: Record<string, string> = {
+  h264: 'AVC',
+  hevc: 'HEVC',
+  av1: 'AV1',
+  vc1: 'VC-1',
+  mpeg2video: 'MPEG-2',
+  mpeg4: 'MPEG-4',
+  vp9: 'VP9',
+  vp8: 'VP8',
+};
+
+/** Human-readable label for a raw ffprobe video codec name. */
+export function videoCodecLabel(codec: string): string {
+  if (!codec) return 'Video';
+  return VIDEO_CODEC_NAMES[codec.toLowerCase()] ?? codec.toUpperCase();
+}
+
 /** Human-readable file size. */
 export function formatSize(bytes: number | null | undefined): string {
   if (!bytes) return '—';
@@ -24,6 +41,10 @@ export function removableTracks(
 ): string[] {
   if (!config) return [];
   if (isAnimeAudio && config.cleanup.anime_keep_original_audio) return [];
+  // When keep_original_audio is on for live action we don't know the original language,
+  // so we can't reliably determine which tracks will be removed. Return empty to avoid
+  // showing incorrect removal info.
+  if (!isAnimeAudio && config.cleanup.keep_original_audio) return [];
   const keep = new Set(config.cleanup.keep_languages.map((l) => l.toLowerCase()));
   return tracks.filter((t) => !keep.has(t.toLowerCase()));
 }

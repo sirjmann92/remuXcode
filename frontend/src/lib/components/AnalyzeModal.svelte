@@ -1,6 +1,6 @@
 <script lang="ts">
 import { analyzeFile } from '$lib/api';
-import { channelLabel } from '$lib/format';
+import { channelLabel, videoCodecLabel } from '$lib/format';
 import { langLabel } from '$lib/languages';
 import type { AnalyzeResult } from '$lib/types';
 
@@ -129,20 +129,23 @@ function fileName(path: string): string {
           <div>{result.video_streams.length}V / {result.audio_streams.length}A / {result.subtitle_streams.length}S</div>
         </div>
 
-        {#if result.needs_audio_conversion || result.needs_video_conversion}
+        {#if result.needs_audio_conversion || result.needs_video_conversion || result.needs_cleanup}
           <div class="divider text-xs text-base-content/30">Work Needed</div>
           <div class="flex flex-wrap gap-2">
             {#if result.audio_codecs_to_convert?.length}
-              <span class="badge badge-warning badge-sm">{result.audio_codecs_to_convert.join(', ')} to convert</span>
+              <span class="badge badge-warning badge-sm">{result.audio_codecs_to_convert.join(', ')} will be converted</span>
             {/if}
             {#if result.audio_codecs_to_drop?.length}
-              <span class="badge badge-warning badge-sm">{result.audio_codecs_to_drop.join(', ')} to remove</span>
+              <span class="badge badge-warning badge-sm">{result.audio_codecs_to_drop.join(', ')} will be removed</span>
             {/if}
             {#if result.needs_audio_conversion && !result.audio_codecs_to_convert?.length && !result.audio_codecs_to_drop?.length}
               <span class="badge badge-warning badge-sm">Audio conversion needed</span>
             {/if}
             {#if result.needs_video_conversion}
-              <span class="badge badge-warning badge-sm">Video conversion needed</span>
+              <span class="badge badge-warning badge-sm">{videoCodecLabel(result.video_streams[0]?.codec ?? '')} will be re-encoded</span>
+            {/if}
+            {#if result.needs_cleanup}
+              <span class="badge badge-info badge-sm" title={result.subtitle_langs_to_remove?.join(', ')}>Subtitles will be cleaned</span>
             {/if}
           </div>
         {/if}
