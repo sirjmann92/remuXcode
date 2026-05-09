@@ -732,7 +732,9 @@ def process_file(
         and audio_converter.should_convert(file_path, is_anime=file_is_anime)
     )
     will_video = (
-        do_video and video_converter is not None and (
+        do_video
+        and video_converter is not None
+        and (
             video_converter.should_convert(file_path)
             or (job and job.encode_options and job.encode_options.get("force_encode"))
         )
