@@ -721,6 +721,9 @@ class VideoConverter:
             ]
         )
 
+        # Clear stale video stream tags from source MKV
+        cmd.extend(self._clear_video_stream_tags())
+
         # Output file
         cmd.append(output_file)
 
@@ -841,6 +844,9 @@ class VideoConverter:
             ]
         )
 
+        # Clear stale video stream tags from source MKV
+        cmd.extend(self._clear_video_stream_tags())
+
         # Output file
         cmd.append(output_file)
 
@@ -899,6 +905,29 @@ class VideoConverter:
     def _append_copy_streams(cmd: list[str]) -> None:
         """Append flags to copy audio, subtitles, and attachments."""
         cmd.extend(["-c:a", "copy", "-c:s", "copy", "-c:t", "copy"])
+
+    @staticmethod
+    def _clear_video_stream_tags() -> list[str]:
+        """Return args that clear stale per-stream tags on the output video track.
+
+        MKV remuxes carry source-side tags (BPS, NUMBER_OF_BYTES, title, …)
+        that MediaInfo displays as the video stream bitrate/size/title.  After
+        re-encoding these values are wrong, so we explicitly blank them out.
+        FFmpeg writes fresh stats tags when muxing, so the fields won't be
+        missing — they'll be regenerated from the actual output.
+        """
+        stale_tags = [
+            "title",
+            "BPS",
+            "NUMBER_OF_BYTES",
+            "NUMBER_OF_FRAMES",
+            "_STATISTICS_WRITING_APP",
+            "_STATISTICS_TAGS",
+        ]
+        args: list[str] = []
+        for tag in stale_tags:
+            args.extend(["-metadata:s:v:0", f"{tag}="])
+        return args
 
     @staticmethod
     def _build_preupload_sw_filter(
@@ -1040,6 +1069,7 @@ class VideoConverter:
 
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
+        cmd.extend(self._clear_video_stream_tags())
         cmd.append(output_file)
         return cmd
 
@@ -1132,6 +1162,7 @@ class VideoConverter:
 
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
+        cmd.extend(self._clear_video_stream_tags())
         cmd.append(output_file)
         return cmd
 
@@ -1223,5 +1254,6 @@ class VideoConverter:
 
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
+        cmd.extend(self._clear_video_stream_tags())
         cmd.append(output_file)
         return cmd
