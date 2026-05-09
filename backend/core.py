@@ -111,6 +111,7 @@ class ConversionJob:
     poster_url: str | None = None
     media_type: str | None = None
     output_path: str | None = None
+    encode_options: dict[str, Any] | None = None
     log_lines: list[dict[str, Any]] = field(default_factory=list)
 
     def log(self, source: str, level: str, message: str) -> None:
@@ -337,6 +338,7 @@ class JobQueue:
             ),
             "poster_url": job.poster_url,
             "media_type": job.media_type,
+            "encode_options": job.encode_options,
         }
         if job.result:
             job_data["video_converted"] = (
@@ -358,6 +360,11 @@ class JobQueue:
         count = 0
         for job_data in pending:
             job = self._row_to_job(job_data)
+            # If this is a custom encode job (has encode_options) that was saved
+            # with the old 'video'-only type, upgrade it to 'full' so audio and
+            # cleanup also run on resume.
+            if job.encode_options and job.job_type == JobType.VIDEO:
+                job.job_type = JobType.FULL
             job.status = JobStatus.PENDING
             job.progress = 0.0
             with self.lock:
@@ -444,6 +451,12 @@ class JobQueue:
         if result:
             phases = [p for p in ("audio", "video", "cleanup") if result.get(p)]
 
+        encode_options: dict[str, Any] | None = None
+        encode_options_json = row.get("encode_options_json")
+        if encode_options_json:
+            with contextlib.suppress(ValueError, TypeError):
+                encode_options = _json.loads(encode_options_json)
+
         return ConversionJob(
             id=row["id"],
             job_type=job_type,
@@ -460,6 +473,7 @@ class JobQueue:
             completed_phases=phases,
             poster_url=row.get("poster_url"),
             media_type=row.get("media_type"),
+            encode_options=encode_options,
         )
 
     def _watchdog_loop(self) -> None:
@@ -718,7 +732,10 @@ def process_file(
         and audio_converter.should_convert(file_path, is_anime=file_is_anime)
     )
     will_video = (
-        do_video and video_converter is not None and video_converter.should_convert(file_path)
+        do_video and video_converter is not None and (
+            video_converter.should_convert(file_path)
+            or (job and job.encode_options and job.encode_options.get("force_encode"))
+        )
     )
     will_cleanup = (
         do_cleanup
@@ -874,6 +891,7 @@ def process_file(
         assert video_converter is not None
         _in = _phase_input()
         _out = _phase_output("video")
+        _encode_opts = job.encode_options if job else None
         video_result = video_converter.convert(
             _in,
             output_file=_out,
@@ -882,6 +900,7 @@ def process_file(
             cancel_event=cancel_event,
             detail_callback=lambda detail: _set_phase("video", detail),
             log_cb=_log_cb,
+            encode_options=_encode_opts,
         )
         _complete_phase("video")
         phase_idx += 1
@@ -1253,6 +1272,7 @@ def create_job(
     source: str = "api",
     poster_url: str | None = None,
     media_type: str | None = None,
+    encode_options: dict[str, Any] | None = None,
 ) -> ConversionJob:
     """Create and queue a new conversion job."""
     # Deduplicate: if a pending/running job already exists for this file+type,
@@ -1281,6 +1301,7 @@ def create_job(
         source=source,
         poster_url=poster_url,
         media_type=media_type,
+        encode_options=encode_options,
     )
     if job_queue:
         job_queue.add_job(job)

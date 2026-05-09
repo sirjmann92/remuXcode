@@ -8,6 +8,14 @@ export type MediaType = 'movie' | 'episode';
 export type LogSource = 'app' | 'ffmpeg';
 export type LogLevel = 'info' | 'warning' | 'error' | 'stats';
 
+export type TargetResolution = 'original' | '1080p' | '720p';
+
+export interface EncodeOptions {
+  target_resolution: TargetResolution;
+  strip_hdr: boolean;
+  force_encode: boolean;
+}
+
 export interface JobLogEntry {
   ts: number;
   source: LogSource;

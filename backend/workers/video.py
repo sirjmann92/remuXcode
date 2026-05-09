@@ -178,6 +178,7 @@ class VideoConverter:
         cancel_event: threading.Event | None = None,
         detail_callback: Callable[[str], None] | None = None,
         log_cb: Callable[[str, str, str], None] | None = None,
+        encode_options: dict | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -308,7 +309,7 @@ class VideoConverter:
                 _src_mtime = None
                 _src_size = None
 
-            cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type, video)
+            cmd = self._build_ffmpeg_command(str(input_path), str(temp_file), content_type, video, encode_options=encode_options)
             logger.debug("Running: %s", " ".join(cmd))
 
             # Estimate total frames for progress when out_time_us is N/A
@@ -459,6 +460,7 @@ class VideoConverter:
         output_file: str,
         content_type: ContentType,
         video: VideoStream | None = None,
+        encode_options: dict | None = None,
     ) -> list[str]:
         """Build ffmpeg command with content-appropriate settings."""
         encoder = resolve_encoder(self.target_codec, self.hw_accel, self.hw_caps)
@@ -466,33 +468,33 @@ class VideoConverter:
         # HW-accelerated encoders
         if encoder == "hevc_qsv":
             return self._build_qsv_command(
-                input_file, output_file, content_type, codec="hevc", video=video
+                input_file, output_file, content_type, codec="hevc", video=video, encode_options=encode_options
             )
         if encoder == "av1_qsv":
             return self._build_qsv_command(
-                input_file, output_file, content_type, codec="av1", video=video
+                input_file, output_file, content_type, codec="av1", video=video, encode_options=encode_options
             )
         if encoder == "hevc_vaapi":
             return self._build_vaapi_command(
-                input_file, output_file, content_type, codec="hevc", video=video
+                input_file, output_file, content_type, codec="hevc", video=video, encode_options=encode_options
             )
         if encoder == "av1_vaapi":
             return self._build_vaapi_command(
-                input_file, output_file, content_type, codec="av1", video=video
+                input_file, output_file, content_type, codec="av1", video=video, encode_options=encode_options
             )
         if encoder == "hevc_nvenc":
             return self._build_nvenc_command(
-                input_file, output_file, content_type, codec="hevc", video=video
+                input_file, output_file, content_type, codec="hevc", video=video, encode_options=encode_options
             )
         if encoder == "av1_nvenc":
             return self._build_nvenc_command(
-                input_file, output_file, content_type, codec="av1", video=video
+                input_file, output_file, content_type, codec="av1", video=video, encode_options=encode_options
             )
 
         # Software encoders
         if self.target_codec == "av1":
-            return self._build_av1_command(input_file, output_file, content_type, video=video)
-        return self._build_hevc_command(input_file, output_file, content_type, video=video)
+            return self._build_av1_command(input_file, output_file, content_type, video=video, encode_options=encode_options)
+        return self._build_hevc_command(input_file, output_file, content_type, video=video, encode_options=encode_options)
 
     @staticmethod
     @staticmethod
@@ -519,22 +521,52 @@ class VideoConverter:
     def _build_sw_vf_filter(
         pix_fmt: str,
         framerate: str,
+        encode_options: dict | None = None,
+        video: VideoStream | None = None,
     ) -> list[str]:
         """Build a single -vf filter chain for software encoders (HEVC, AV1).
 
+        Handles optional scale (target_resolution) and HDR→SDR tone-mapping
+        (strip_hdr).  When both are requested they are chained in the correct
+        order: scale → tone-map → format.
+
         Only pixel-format conversion and optional fps normalisation are done
-        here.  Color metadata tags are intentionally omitted: declaring a
-        colorspace that differs from the source causes FFmpeg 7.x to insert an
-        ``auto_scale`` filter for the implied conversion, which then conflicts
-        with the explicit filter graph and raises
-        "Impossible to convert … auto_scale_0".  Leaving the tags unset lets
-        players apply the standard BT.709 assumption for HD content, which is
-        correct for the vast majority of encodes.
+        here when no encode_options are provided.  Color metadata tags are
+        intentionally omitted: declaring a colorspace that differs from the
+        source causes FFmpeg 7.x to insert an ``auto_scale`` filter for the
+        implied conversion, which then conflicts with the explicit filter graph
+        and raises "Impossible to convert … auto_scale_0".
         """
         parts: list[str] = []
+
+        # --- Optional scale (downscale only) ---
+        if encode_options:
+            target_res = encode_options.get("target_resolution")
+            if target_res and target_res != "original":
+                target_height = int(target_res.rstrip("p"))
+                src_height = video.height if video else None
+                if src_height is None or src_height > target_height:
+                    parts.append(f"scale=-2:{target_height}:flags=lanczos")
+
+        # --- FPS normalisation ---
         if framerate:
             parts.append(f"fps=fps={framerate}")
-        parts.append(f"format={pix_fmt}")
+
+        # --- HDR → SDR tone-mapping ---
+        if encode_options and encode_options.get("strip_hdr"):
+            # zscale-based tone-map: linear light → hable → BT.709 SDR
+            # Outputs yuv420p regardless of what pix_fmt says (SDR = 8-bit)
+            parts.extend([
+                "zscale=t=linear:npl=100",
+                "format=gbrpf32le",
+                "zscale=p=bt709",
+                "tonemap=tonemap=hable:desat=0",
+                "zscale=t=bt709:m=bt709:r=tv",
+                "format=yuv420p",
+            ])
+        else:
+            parts.append(f"format={pix_fmt}")
+
         return ["-vf", ",".join(parts)]
 
     def _build_hevc_command(
@@ -543,6 +575,7 @@ class VideoConverter:
         output_file: str,
         content_type: ContentType,
         video: VideoStream | None = None,
+        encode_options: dict | None = None,
     ) -> list[str]:
         """Build ffmpeg command for HEVC (libx265) encoding."""
 
@@ -572,11 +605,13 @@ class VideoConverter:
             "scenecut=40",
         ]
 
-        # Pass through HDR10 mastering display metadata if present
-        if video and video.hdr_master_display:
-            x265_params.append(f"master-display={video.hdr_master_display}")
-        if video and video.hdr_max_cll:
-            x265_params.append(f"max-cll={video.hdr_max_cll}")
+        # Pass through HDR10 mastering display metadata if present (skip when stripping to SDR)
+        strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
+        if not strip_hdr:
+            if video and video.hdr_master_display:
+                x265_params.append(f"master-display={video.hdr_master_display}")
+            if video and video.hdr_max_cll:
+                x265_params.append(f"max-cll={video.hdr_max_cll}")
 
         cmd = [
             "ffmpeg",
@@ -625,12 +660,11 @@ class VideoConverter:
         # Add x265 params
         cmd.extend(["-x265-params", ":".join(x265_params)])
 
-        # Pixel format, framerate, and color metadata all go into one explicit
-        # filter chain.  This prevents FFmpeg 7.x from auto-inserting
-        # ``auto_scale`` for colour-space or fps-mode reasons, which conflicts
-        # with an explicit filter graph and causes "Impossible to convert"
-        # errors on some source files.
-        cmd.extend(self._build_sw_vf_filter(self.config.pix_fmt, framerate))
+        # Pixel format, framerate, and optional scale/tone-map filters.
+        # This prevents FFmpeg 7.x from auto-inserting ``auto_scale`` for
+        # colour-space or fps-mode reasons, which conflicts with an explicit
+        # filter graph and causes "Impossible to convert" errors on some files.
+        cmd.extend(self._build_sw_vf_filter(self.config.pix_fmt, framerate, encode_options=encode_options, video=video))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -655,6 +689,7 @@ class VideoConverter:
         output_file: str,
         content_type: ContentType,
         video: VideoStream | None = None,
+        encode_options: dict | None = None,
     ) -> list[str]:
         """Build ffmpeg command for AV1 (libsvtav1) encoding."""
 
@@ -694,11 +729,13 @@ class VideoConverter:
             svtav1_params.append("enable-overlay=0")
             svtav1_params.append("film-grain=0")
 
-        # Pass through HDR10 metadata if present
-        if video and video.hdr_master_display:
-            svtav1_params.append(f"mastering-display={video.hdr_master_display}")
-        if video and video.hdr_max_cll:
-            svtav1_params.append(f"content-light={video.hdr_max_cll}")
+        # Pass through HDR10 metadata if present (skip when stripping to SDR)
+        strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
+        if not strip_hdr:
+            if video and video.hdr_master_display:
+                svtav1_params.append(f"mastering-display={video.hdr_master_display}")
+            if video and video.hdr_max_cll:
+                svtav1_params.append(f"content-light={video.hdr_max_cll}")
 
         cmd = [
             "ffmpeg",
@@ -741,9 +778,9 @@ class VideoConverter:
         # Add SVT-AV1 params
         cmd.extend(["-svtav1-params", ":".join(svtav1_params)])
 
-        # Pixel format, framerate, and color metadata all in one explicit filter
-        # chain — prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
-        cmd.extend(self._build_sw_vf_filter("yuv420p10le", framerate))
+        # Pixel format, framerate, and optional scale/tone-map filters.
+        # Prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
+        cmd.extend(self._build_sw_vf_filter("yuv420p10le", framerate, encode_options=encode_options, video=video))
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -816,6 +853,51 @@ class VideoConverter:
         """Append flags to copy audio, subtitles, and attachments."""
         cmd.extend(["-c:a", "copy", "-c:s", "copy", "-c:t", "copy"])
 
+    @staticmethod
+    def _build_preupload_sw_filter(
+        upload_fmt: str,
+        encode_options: dict | None,
+        video: VideoStream | None,
+    ) -> str:
+        """Build the SW filter chain run *before* hwupload for HW encoders.
+
+        Handles optional scale (target_resolution) and HDR→SDR tone-mapping
+        (strip_hdr).  Returns the complete comma-joined filter string ready to
+        be concatenated with the hwupload command (e.g. ``…,hwupload``).
+        """
+        parts: list[str] = []
+
+        if encode_options:
+            target_res = encode_options.get("target_resolution")
+            if target_res and target_res != "original":
+                target_height = int(target_res.rstrip("p"))
+                src_height = video.height if video else None
+                if src_height is None or src_height > target_height:
+                    parts.append(f"scale=-2:{target_height}:flags=lanczos")
+
+            if encode_options.get("strip_hdr"):
+                parts.extend([
+                    "zscale=t=linear:npl=100",
+                    "format=gbrpf32le",
+                    "zscale=p=bt709",
+                    "tonemap=tonemap=hable:desat=0",
+                    "zscale=t=bt709:m=bt709:r=tv",
+                    "format=nv12",  # SDR output → 8-bit nv12 before HW upload
+                ])
+                return ",".join(parts)
+
+        parts.append(f"format={upload_fmt}")
+        return ",".join(parts)
+
+    @staticmethod
+    def _sdr_color_args() -> list[str]:
+        """Return BT.709 SDR color flags for use when stripping HDR."""
+        return [
+            "-color_primaries", "bt709",
+            "-color_trc", "bt709",
+            "-colorspace", "bt709",
+        ]
+
     def _build_qsv_command(
         self,
         input_file: str,
@@ -824,6 +906,7 @@ class VideoConverter:
         *,
         codec: str = "hevc",
         video: VideoStream | None = None,
+        encode_options: dict | None = None,
     ) -> list[str]:
         """Build ffmpeg command for Intel QSV encoding (HEVC or AV1).
 
@@ -836,8 +919,11 @@ class VideoConverter:
         encoder = "hevc_qsv" if codec == "hevc" else "av1_qsv"
         quality, framerate = self._get_quality_params(content_type, encoder)
 
-        # Pick upload pixel format:  p010le for 10-bit output, nv12 for 8-bit.
-        is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        # When stripping HDR → SDR the output is 8-bit regardless of config.
+        strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
+        is_10bit = (not strip_hdr) and (
+            "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        )
         upload_fmt = "p010le" if is_10bit else "nv12"
 
         cmd = [
@@ -877,7 +963,7 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to QSV surface for HW encoding
                 "-filter:v:0",
-                f"format={upload_fmt},hwupload=extra_hw_frames=64",
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload=extra_hw_frames=64",
                 "-c:v:0",
                 encoder,
                 "-global_quality",
@@ -899,7 +985,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
-        cmd.extend(self._build_color_args(video))
+        cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.append(output_file)
         return cmd
@@ -912,6 +998,7 @@ class VideoConverter:
         *,
         codec: str = "hevc",
         video: VideoStream | None = None,
+        encode_options: dict | None = None,
     ) -> list[str]:
         """Build ffmpeg command for VAAPI encoding (HEVC or AV1).
 
@@ -926,8 +1013,11 @@ class VideoConverter:
         if self.hw_caps and self.hw_caps.render_devices:
             device = self.hw_caps.render_devices[0]
 
-        # Pick upload pixel format:  p010 for 10-bit output, nv12 for 8-bit.
-        is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        # When stripping HDR → SDR the output is 8-bit regardless of config.
+        strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
+        is_10bit = (not strip_hdr) and (
+            "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        )
         upload_fmt = "p010" if is_10bit else "nv12"
 
         cmd = [
@@ -967,7 +1057,7 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to VAAPI surface for HW encoding
                 "-filter:v:0",
-                f"format={upload_fmt},hwupload",
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload",
                 "-c:v:0",
                 encoder,
                 "-rc_mode",
@@ -987,7 +1077,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
-        cmd.extend(self._build_color_args(video))
+        cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.append(output_file)
         return cmd
@@ -1000,6 +1090,7 @@ class VideoConverter:
         *,
         codec: str = "hevc",
         video: VideoStream | None = None,
+        encode_options: dict | None = None,
     ) -> list[str]:
         """Build ffmpeg command for NVENC encoding (HEVC or AV1).
 
@@ -1011,8 +1102,11 @@ class VideoConverter:
         encoder = "hevc_nvenc" if codec == "hevc" else "av1_nvenc"
         quality, framerate = self._get_quality_params(content_type, encoder)
 
-        # Pick upload pixel format:  p010le for 10-bit output, nv12 for 8-bit.
-        is_10bit = "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        # When stripping HDR → SDR the output is 8-bit regardless of config.
+        strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
+        is_10bit = (not strip_hdr) and (
+            "10" in (self.config.pix_fmt or "") or "10" in (self.config.profile or "")
+        )
         upload_fmt = "p010le" if is_10bit else "nv12"
 
         cmd = [
@@ -1052,7 +1146,7 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to CUDA surface for HW encoding
                 "-filter:v:0",
-                f"format={upload_fmt},hwupload_cuda",
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload_cuda",
                 "-c:v:0",
                 encoder,
                 "-cq",
@@ -1073,7 +1167,7 @@ class VideoConverter:
         if framerate:
             cmd.extend(["-r", framerate])
 
-        cmd.extend(self._build_color_args(video))
+        cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.append(output_file)
         return cmd

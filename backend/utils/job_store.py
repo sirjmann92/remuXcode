@@ -79,6 +79,7 @@ class JobStore:
                 "poster_url": "TEXT",
                 "media_type": "TEXT",
                 "queue_position": "INTEGER DEFAULT 0",
+                "encode_options_json": "TEXT",
             }
             for col, typedef in migrations.items():
                 if col not in existing:
@@ -150,6 +151,10 @@ class JobStore:
             if job_data.get("result"):
                 with suppress(TypeError, ValueError):
                     result_json = json.dumps(job_data["result"])
+            encode_options_json = None
+            if job_data.get("encode_options"):
+                with suppress(TypeError, ValueError):
+                    encode_options_json = json.dumps(job_data["encode_options"])
 
             with self._get_connection() as conn:
                 existing = conn.execute(
@@ -173,7 +178,8 @@ class JobStore:
                             source = COALESCE(?, source),
                             result_json = COALESCE(?, result_json),
                             poster_url = COALESCE(?, poster_url),
-                            media_type = COALESCE(?, media_type)
+                            media_type = COALESCE(?, media_type),
+                            encode_options_json = COALESCE(?, encode_options_json)
                         WHERE id = ?
                     """,
                         (
@@ -191,6 +197,7 @@ class JobStore:
                             result_json,
                             job_data.get("poster_url"),
                             job_data.get("media_type"),
+                            encode_options_json,
                             job_data["id"],
                         ),
                     )
@@ -202,8 +209,8 @@ class JobStore:
                             created_at, updated_at, started_at, completed_at,
                             video_converted, audio_converted, streams_cleaned,
                             job_type, source, result_json, poster_url,
-                            media_type
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            media_type, encode_options_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             job_data["id"],
@@ -223,6 +230,7 @@ class JobStore:
                             result_json,
                             job_data.get("poster_url"),
                             job_data.get("media_type"),
+                            encode_options_json,
                         ),
                     )
 

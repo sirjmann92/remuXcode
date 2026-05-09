@@ -35,6 +35,7 @@ async def convert_file(data: dict[str, Any]) -> dict[str, Any]:
         source="api",
         poster_url=data.get("poster_url"),
         media_type=data.get("media_type"),
+        encode_options=data.get("encode_options") or None,
     )
     return {
         "message": "Job queued",

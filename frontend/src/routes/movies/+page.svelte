@@ -18,6 +18,7 @@ import {
   videoCodecMatches,
 } from '$lib/codecs';
 import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
+import ConvertOptionsModal from '$lib/components/ConvertOptionsModal.svelte';
 import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
 import { langName } from '$lib/languages';
 import {
@@ -42,7 +43,8 @@ let queueingAll = $state(false);
 let selected: Set<number> = $state(new Set());
 let queueingSelected = $state(false);
 let detailMovie: BrowseMovie | null = $state(null);
-let analyzePath: string | null = $state(null);
+let analyzePath: { path: string; poster?: string } | null = $state(null);
+let customEncodePath: { path: string; poster?: string } | null = $state(null);
 let activeJobs: ActiveJobsMap = $state({});
 let showRefreshConfirm = $state(false);
 let refreshingLibrary = $state(false);
@@ -673,7 +675,7 @@ const sortOptions: { value: string; label: string }[] = [
             <button
               class="absolute bottom-2 right-2 btn btn-circle btn-xs btn-ghost bg-black/40 hover:bg-black/70 text-white pointer-events-auto"
               title="Analyze file"
-              onclick={(e) => { e.stopPropagation(); analyzePath = movie.path; }}
+              onclick={(e) => { e.stopPropagation(); analyzePath = { path: movie.path, poster: movie.poster }; }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -804,9 +806,15 @@ const sortOptions: { value: string; label: string }[] = [
         <div class="modal-action">
           <button
             class="btn btn-ghost btn-sm"
-            onclick={() => { analyzePath = detailMovie!.path; }}
+            onclick={() => { analyzePath = { path: detailMovie!.path, poster: detailMovie!.poster }; }}
           >
             Analyze
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            onclick={() => { customEncodePath = { path: detailMovie!.path, poster: detailMovie!.poster }; detailMovie = null; }}
+          >
+            Custom Encode
           </button>
           {#if config?.radarr?.configured}
             <a
@@ -850,9 +858,15 @@ const sortOptions: { value: string; label: string }[] = [
         <div class="modal-action">
           <button
             class="btn btn-ghost btn-sm"
-            onclick={() => { analyzePath = detailMovie!.path; }}
+            onclick={() => { analyzePath = { path: detailMovie!.path, poster: detailMovie!.poster }; }}
           >
             Analyze
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            onclick={() => { customEncodePath = { path: detailMovie!.path, poster: detailMovie!.poster }; detailMovie = null; }}
+          >
+            Custom Encode
           </button>
           {#if config?.radarr?.configured}
             <a
@@ -875,7 +889,16 @@ const sortOptions: { value: string; label: string }[] = [
 {/if}
 
 {#if analyzePath}
-  <AnalyzeModal path={analyzePath} onclose={() => (analyzePath = null)} />
+  <AnalyzeModal path={analyzePath.path} poster_url={analyzePath.poster} media_type="movie" onclose={() => (analyzePath = null)} />
+{/if}
+
+{#if customEncodePath}
+  <ConvertOptionsModal
+    paths={customEncodePath.path}
+    poster_url={customEncodePath.poster}
+    media_type="movie"
+    onclose={() => (customEncodePath = null)}
+  />
 {/if}
 
 {#if showRefreshConfirm}
