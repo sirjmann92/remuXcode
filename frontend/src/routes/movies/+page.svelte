@@ -55,6 +55,11 @@ let scanPollTimer: ReturnType<typeof setInterval> | null = null;
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 
+/** Strip leading articles for Sonarr/Radarr-style title sorting. */
+function sortTitle(title: string): string {
+  return title.replace(/^(The|A|An)\s+/i, '').trim();
+}
+
 async function handleStartScan() {
   try {
     await startMovieScan();
@@ -181,17 +186,22 @@ const filtered = $derived.by(() => {
       result = result.toSorted((a, b) => {
         const aw = needsWork(a) ? 0 : 1;
         const bw = needsWork(b) ? 0 : 1;
-        return aw - bw || a.title.localeCompare(b.title);
+        return aw - bw || sortTitle(a.title).localeCompare(sortTitle(b.title));
       });
       break;
     case 'title':
-      result = result.toSorted((a, b) => a.title.localeCompare(b.title));
+      result = result.toSorted((a, b) => sortTitle(a.title).localeCompare(sortTitle(b.title)));
       break;
     case 'year':
-      result = result.toSorted((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+      result = result.toSorted(
+        (a, b) => b.year - a.year || sortTitle(a.title).localeCompare(sortTitle(b.title)),
+      );
       break;
     case 'size':
       result = result.toSorted((a, b) => (b.size ?? 0) - (a.size ?? 0));
+      break;
+    case 'dateAdded':
+      result = result.toSorted((a, b) => Date.parse(b.added ?? '') - Date.parse(a.added ?? ''));
       break;
   }
   return result;
@@ -379,6 +389,7 @@ const sortOptions: { value: string; label: string }[] = [
   { value: 'title', label: 'Title' },
   { value: 'year', label: 'Year' },
   { value: 'size', label: 'Size' },
+  { value: 'dateAdded', label: 'Date Added' },
 ];
 </script>
 
