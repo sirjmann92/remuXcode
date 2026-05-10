@@ -903,6 +903,7 @@ def process_file(
             detail_callback=lambda detail: _set_phase("video", detail),
             log_cb=_log_cb,
             encode_options=_encode_opts,
+            title=Path(file_path).parent.name,
         )
         _complete_phase("video")
         phase_idx += 1
