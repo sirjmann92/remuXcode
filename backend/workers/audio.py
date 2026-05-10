@@ -735,12 +735,22 @@ class AudioConverter:
 
                     map_args.extend(["-map", f"0:{stream.index}"])
                     codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
+                    # Preserve source title since -map_metadata:s -1 suppresses stream tags
+                    if stream.title:
+                        codec_args.extend(
+                            [f"-metadata:s:a:{audio_output_index}", f"title={stream.title}"]
+                        )
                     audio_output_index += 1
 
                 elif keep_orig:
                     # Original first, converted second
                     map_args.extend(["-map", f"0:{stream.index}"])
                     codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
+                    # Preserve source title since -map_metadata:s -1 suppresses stream tags
+                    if stream.title:
+                        codec_args.extend(
+                            [f"-metadata:s:a:{audio_output_index}", f"title={stream.title}"]
+                        )
                     audio_output_index += 1
 
                     map_args.extend(["-map", f"0:{stream.index}"])
@@ -780,6 +790,11 @@ class AudioConverter:
                 # Copy non-converted streams as-is
                 map_args.extend(["-map", f"0:{stream.index}"])
                 codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
+                # Preserve source title since -map_metadata:s -1 suppresses stream tags
+                if stream.title:
+                    codec_args.extend(
+                        [f"-metadata:s:a:{audio_output_index}", f"title={stream.title}"]
+                    )
                 audio_output_index += 1
 
         # Map subtitle and attachment streams
@@ -798,6 +813,12 @@ class AudioConverter:
 
         # Tag the container so Sonarr detects a size change and re-reads MediaInfo
         cmd.extend(["-metadata:g", "ENCODED_BY=remuxcode"])
+
+        # Suppress per-stream metadata from source so FFmpeg auto-generates correct
+        # BPS / NUMBER_OF_BYTES / NUMBER_OF_FRAMES for re-encoded and copied streams.
+        # Titles are set explicitly above; language is a structural MKV element
+        # preserved automatically during stream copy.
+        cmd.extend(["-map_metadata:s", "-1"])
 
         cmd.append(output_file)
         return cmd
