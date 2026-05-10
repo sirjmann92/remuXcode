@@ -235,6 +235,7 @@ export interface BrowseMovie {
   tmdb_id: number | null;
   title: string;
   year: number;
+  added?: string;
   path: string;
   size: number | null;
   genres: string[];
@@ -274,6 +275,7 @@ export interface BrowseSeries {
   title_slug: string;
   title: string;
   year: number;
+  added?: string;
   path: string;
   genres: string[];
   poster: string;

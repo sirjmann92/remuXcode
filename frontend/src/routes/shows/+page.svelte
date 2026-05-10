@@ -70,6 +70,11 @@ let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 let deepLinkFile: string | null = $page.url.searchParams.get('file');
 
+/** Strip leading articles for Sonarr/Radarr-style title sorting. */
+function sortTitle(title: string): string {
+  return title.replace(/^(The|A|An)\s+/i, '').trim();
+}
+
 async function handleStartScan() {
   try {
     await startSeriesScan();
@@ -234,17 +239,20 @@ const filtered = $derived.by(() => {
       result = result.toSorted((a, b) => {
         const aw = a.needs_work_count ?? 0;
         const bw = b.needs_work_count ?? 0;
-        return bw - aw || a.title.localeCompare(b.title);
+        return bw - aw || sortTitle(a.title).localeCompare(sortTitle(b.title));
       });
       break;
     case 'title':
-      result = result.toSorted((a, b) => a.title.localeCompare(b.title));
+      result = result.toSorted((a, b) => sortTitle(a.title).localeCompare(sortTitle(b.title)));
       break;
     case 'episodes':
       result = result.toSorted((a, b) => b.episode_file_count - a.episode_file_count);
       break;
     case 'size':
       result = result.toSorted((a, b) => b.size_on_disk - a.size_on_disk);
+      break;
+    case 'dateAdded':
+      result = result.toSorted((a, b) => Date.parse(b.added ?? '') - Date.parse(a.added ?? ''));
       break;
   }
   return result;
@@ -541,6 +549,7 @@ const sortOptions: { value: string; label: string }[] = [
   { value: 'title', label: 'Title' },
   { value: 'episodes', label: 'Episodes' },
   { value: 'size', label: 'Size' },
+  { value: 'dateAdded', label: 'Date Added' },
 ];
 </script>
 
