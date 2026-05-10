@@ -908,38 +908,20 @@ class VideoConverter:
 
     @staticmethod
     def _clear_video_stream_tags() -> list[str]:
-        """Return args that clear stale per-stream tags on the output video and audio tracks.
+        """Suppress source video stream metadata so FFmpeg auto-generates correct stats.
 
-        MKV remuxes carry source-side tags (BPS, NUMBER_OF_BYTES, title, …)
-        that MediaInfo displays as the video stream bitrate/size/title, and
-        the audio stream size (e.g. the original DTS-HD size after converting
-        to E-AC-3).  After re-encoding these values are wrong, so we blank
-        them out.  FFmpeg regenerates accurate stats tags from the actual output.
+        Default ``-map_metadata 0`` copies BPS, NUMBER_OF_BYTES, SOURCE_ID, title,
+        and other per-stream tags from the source MKV into the output video stream.
+        After re-encoding these values are stale (e.g. the original 4K HEVC bitrate
+        instead of the new AV1 bitrate).
+
+        Using ``-map_metadata:s:v:0 -1`` prevents any source stream metadata from
+        being copied to the output video track.  FFmpeg's MKV muxer then
+        auto-generates correct BPS / NUMBER_OF_BYTES / NUMBER_OF_FRAMES values
+        from the actual encoded output.  Global container metadata (title, IMDB,
+        TMDB, Encoded_By, etc.) is unaffected.
         """
-        video_tags = [
-            "title",
-            "BPS",
-            "NUMBER_OF_BYTES",
-            "NUMBER_OF_FRAMES",
-            "SOURCE_ID",
-            "_STATISTICS_WRITING_APP",
-            "_STATISTICS_WRITING_DATE_UTC",
-            "_STATISTICS_TAGS",
-        ]
-        audio_tags = [
-            "BPS",
-            "NUMBER_OF_BYTES",
-            "NUMBER_OF_FRAMES",
-            "_STATISTICS_WRITING_APP",
-            "_STATISTICS_WRITING_DATE_UTC",
-            "_STATISTICS_TAGS",
-        ]
-        args: list[str] = []
-        for tag in video_tags:
-            args.extend(["-metadata:s:v:0", f"{tag}="])
-        for tag in audio_tags:
-            args.extend(["-metadata:s:a:0", f"{tag}="])
-        return args
+        return ["-map_metadata:s:v:0", "-1"]
 
     @staticmethod
     def _build_preupload_sw_filter(
