@@ -179,6 +179,7 @@ class VideoConverter:
         detail_callback: Callable[[str], None] | None = None,
         log_cb: Callable[[str, str, str], None] | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -192,6 +193,7 @@ class VideoConverter:
             detail_callback: Optional callback receiving status detail strings.
             log_cb: Optional callback receiving (source, level, message) log entries.
             encode_options: Optional custom encode overrides (resolution, HDR strip, force).
+            title: Clean container title to write into output MKV global metadata.
 
         Returns:
             VideoConversionResult with conversion details
@@ -311,7 +313,12 @@ class VideoConverter:
                 _src_size = None
 
             cmd = self._build_ffmpeg_command(
-                str(input_path), str(temp_file), content_type, video, encode_options=encode_options
+                str(input_path),
+                str(temp_file),
+                content_type,
+                video,
+                encode_options=encode_options,
+                title=title,
             )
             logger.debug("Running: %s", " ".join(cmd))
 
@@ -464,6 +471,7 @@ class VideoConverter:
         content_type: ContentType,
         video: VideoStream | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command with content-appropriate settings."""
         encoder = resolve_encoder(self.target_codec, self.hw_accel, self.hw_caps)
@@ -477,6 +485,7 @@ class VideoConverter:
                 codec="hevc",
                 video=video,
                 encode_options=encode_options,
+                title=title,
             )
         if encoder == "av1_qsv":
             return self._build_qsv_command(
@@ -486,6 +495,7 @@ class VideoConverter:
                 codec="av1",
                 video=video,
                 encode_options=encode_options,
+                title=title,
             )
         if encoder == "hevc_vaapi":
             return self._build_vaapi_command(
@@ -495,6 +505,7 @@ class VideoConverter:
                 codec="hevc",
                 video=video,
                 encode_options=encode_options,
+                title=title,
             )
         if encoder == "av1_vaapi":
             return self._build_vaapi_command(
@@ -504,6 +515,7 @@ class VideoConverter:
                 codec="av1",
                 video=video,
                 encode_options=encode_options,
+                title=title,
             )
         if encoder == "hevc_nvenc":
             return self._build_nvenc_command(
@@ -513,6 +525,7 @@ class VideoConverter:
                 codec="hevc",
                 video=video,
                 encode_options=encode_options,
+                title=title,
             )
         if encoder == "av1_nvenc":
             return self._build_nvenc_command(
@@ -522,15 +535,26 @@ class VideoConverter:
                 codec="av1",
                 video=video,
                 encode_options=encode_options,
+                title=title,
             )
 
         # Software encoders
         if self.target_codec == "av1":
             return self._build_av1_command(
-                input_file, output_file, content_type, video=video, encode_options=encode_options
+                input_file,
+                output_file,
+                content_type,
+                video=video,
+                encode_options=encode_options,
+                title=title,
             )
         return self._build_hevc_command(
-            input_file, output_file, content_type, video=video, encode_options=encode_options
+            input_file,
+            output_file,
+            content_type,
+            video=video,
+            encode_options=encode_options,
+            title=title,
         )
 
     @staticmethod
@@ -615,6 +639,7 @@ class VideoConverter:
         content_type: ContentType,
         video: VideoStream | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command for HEVC (libx265) encoding."""
 
@@ -724,6 +749,10 @@ class VideoConverter:
         # Clear stale video stream tags from source MKV
         cmd.extend(self._clear_video_stream_tags())
 
+        # Override container title with clean version (strips scene-group garbage)
+        if title:
+            cmd.extend(["-metadata", f"title={title}"])
+
         # Output file
         cmd.append(output_file)
 
@@ -736,6 +765,7 @@ class VideoConverter:
         content_type: ContentType,
         video: VideoStream | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command for AV1 (libsvtav1) encoding."""
 
@@ -846,6 +876,10 @@ class VideoConverter:
 
         # Clear stale video stream tags from source MKV
         cmd.extend(self._clear_video_stream_tags())
+
+        # Override container title with clean version (strips scene-group garbage)
+        if title:
+            cmd.extend(["-metadata", f"title={title}"])
 
         # Output file
         cmd.append(output_file)
@@ -982,6 +1016,7 @@ class VideoConverter:
         codec: str = "hevc",
         video: VideoStream | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command for Intel QSV encoding (HEVC or AV1).
 
@@ -1064,6 +1099,8 @@ class VideoConverter:
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.extend(self._clear_video_stream_tags())
+        if title:
+            cmd.extend(["-metadata", f"title={title}"])
         cmd.append(output_file)
         return cmd
 
@@ -1076,6 +1113,7 @@ class VideoConverter:
         codec: str = "hevc",
         video: VideoStream | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command for VAAPI encoding (HEVC or AV1).
 
@@ -1157,6 +1195,8 @@ class VideoConverter:
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.extend(self._clear_video_stream_tags())
+        if title:
+            cmd.extend(["-metadata", f"title={title}"])
         cmd.append(output_file)
         return cmd
 
@@ -1169,6 +1209,7 @@ class VideoConverter:
         codec: str = "hevc",
         video: VideoStream | None = None,
         encode_options: dict | None = None,
+        title: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command for NVENC encoding (HEVC or AV1).
 
@@ -1249,5 +1290,7 @@ class VideoConverter:
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
         cmd.extend(self._clear_video_stream_tags())
+        if title:
+            cmd.extend(["-metadata", f"title={title}"])
         cmd.append(output_file)
         return cmd
