@@ -137,11 +137,18 @@ def run_ffmpeg_with_progress(
     out_time_us = 0
     current_frame = 0
     progress_blocks = 0
-    # Stall watchdog: kill ffmpeg if it stops writing progress for too long.
-    # This catches hangs (e.g. DV RPU decoder deadlock) that keep the process
-    # alive but frozen.  300 s is generous for any legitimate encoding pause.
+    # Stall watchdog: kill ffmpeg if encoding progress stops advancing.
+    # Two complementary checks:
+    #   1. No FIFO data at all for _STALL_TIMEOUT seconds (complete silence).
+    #   2. FIFO data arriving but out_time_us/frame haven't advanced for
+    #      _PROGRESS_STALL_TIMEOUT seconds (ffmpeg alive but encoder frozen —
+    #      e.g. DV RPU decoder stall mid-stream that keeps sending repeating
+    #      progress=continue blocks without producing new output frames).
     _STALL_TIMEOUT = 300.0
+    _PROGRESS_STALL_TIMEOUT = 120.0
     last_fifo_activity = time.monotonic()
+    last_progress_value = -1  # tracks highest out_time_us (or frame) seen
+    last_progress_advance = time.monotonic()
     try:
         buf = ""
         while True:
@@ -163,11 +170,11 @@ def run_ffmpeg_with_progress(
                     except OSError:
                         pass
                     break
-                # Stall watchdog: no FIFO data and ffmpeg still alive
+                # Watchdog 1: no FIFO data at all
                 stall_secs = time.monotonic() - last_fifo_activity
                 if stall_secs > _STALL_TIMEOUT:
                     logger.error(
-                        "FFmpeg stall detected: no progress for %.0f s — killing process",
+                        "FFmpeg stall detected: no FIFO data for %.0f s — killing process",
                         stall_secs,
                     )
                     proc.kill()
@@ -201,6 +208,23 @@ def run_ffmpeg_with_progress(
                             current_frame = val
                 elif line.startswith("progress="):
                     progress_blocks += 1
+                    # Watchdog 2: FIFO data arriving but progress not advancing
+                    progress_value = out_time_us if out_time_us > 0 else current_frame
+                    if progress_value > last_progress_value:
+                        last_progress_value = progress_value
+                        last_progress_advance = time.monotonic()
+                    elif progress_blocks > 10:
+                        # Only start checking after initial startup (10 blocks)
+                        frozen_secs = time.monotonic() - last_progress_advance
+                        if frozen_secs > _PROGRESS_STALL_TIMEOUT:
+                            logger.error(
+                                "FFmpeg encoder stall detected: progress frozen for %.0f s "
+                                "(out_time_us=%d, frame=%d) — killing process",
+                                frozen_secs,
+                                out_time_us,
+                                current_frame,
+                            )
+                            proc.kill()
                     if can_report:
                         pct = 0.0
                         if out_time_us > 0 and has_duration:
