@@ -295,7 +295,7 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
     subs = [s.lower() for s in _split_slash_field(media_info.get("subtitles", ""))]
 
     if cfg.clean_subtitles and subs:
-        extra_subs = [s for s in subs if s not in keep]
+        extra_subs = [s for s in subs if s and s != "und" and s not in keep]
         if extra_subs:
             return True
     if cfg.clean_audio and audio_langs:
@@ -331,7 +331,9 @@ def _needs_cleanup_from_streams(
     keep = {lang.lower() for lang in cfg.keep_languages}
 
     if cfg.clean_subtitles and subtitle_langs:
-        extra_subs = [s for s in subtitle_langs if s.lower() not in keep]
+        extra_subs = [
+            s for s in subtitle_langs if s.lower() and s.lower() != "und" and s.lower() not in keep
+        ]
         if extra_subs:
             return True
 
