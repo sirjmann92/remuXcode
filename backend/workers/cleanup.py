@@ -577,9 +577,15 @@ class StreamCleanup:
         """Determine if a subtitle stream should be kept."""
         lang = stream.language.lower() if stream.language else ""
 
-        # Always keep forced subtitles in kept languages (or untagged)
+        # Never remove untagged streams — we can't identify them as unwanted,
+        # and removing the only subtitle in a file based on a missing tag would
+        # silently destroy content (mirrors the same policy in _should_keep_audio).
+        if not lang or lang == "und":
+            return True
+
+        # Always keep forced subtitles in kept languages
         if stream.is_forced:
-            return not lang or lang in keep_languages
+            return lang in keep_languages
 
         # Language must match to keep (SDH/CC alone is not enough)
         if lang and lang not in keep_languages:

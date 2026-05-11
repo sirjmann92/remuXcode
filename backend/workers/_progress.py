@@ -9,6 +9,7 @@ import select
 import subprocess
 import tempfile
 import threading
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,11 @@ def run_ffmpeg_with_progress(
     out_time_us = 0
     current_frame = 0
     progress_blocks = 0
+    # Stall watchdog: kill ffmpeg if it stops writing progress for too long.
+    # This catches hangs (e.g. DV RPU decoder deadlock) that keep the process
+    # alive but frozen.  300 s is generous for any legitimate encoding pause.
+    _STALL_TIMEOUT = 300.0
+    last_fifo_activity = time.monotonic()
     try:
         buf = ""
         while True:
@@ -157,7 +163,18 @@ def run_ffmpeg_with_progress(
                     except OSError:
                         pass
                     break
+                # Stall watchdog: no FIFO data and ffmpeg still alive
+                stall_secs = time.monotonic() - last_fifo_activity
+                if stall_secs > _STALL_TIMEOUT:
+                    logger.error(
+                        "FFmpeg stall detected: no progress for %.0f s — killing process",
+                        stall_secs,
+                    )
+                    proc.kill()
+                    break
                 continue
+
+            last_fifo_activity = time.monotonic()
 
             try:
                 chunk = os.read(fifo_fd, 4096)
