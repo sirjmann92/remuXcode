@@ -688,6 +688,13 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
+        # DV HEVC streams embed RPU SEI NAL units that can cause PTS to become
+        # invalid mid-stream, freezing the muxer.  Regenerate PTS from DTS so
+        # the encoder receives monotonically-increasing timestamps regardless.
+        is_dv_source = bool(video and video.is_dolby_vision)
+        if is_dv_source:
+            cmd.extend(["-fflags", "+genpts"])
+
         cmd.extend(
             [
                 "-analyzeduration",
@@ -745,6 +752,10 @@ class VideoConverter:
                 "copy",
             ]
         )
+
+        cmd.extend(["-fps_mode", "cfr"])
+        if framerate:
+            cmd.extend(["-r", framerate])
 
         # Clear stale video stream tags from source MKV
         cmd.extend(self._clear_video_stream_tags())
@@ -824,6 +835,13 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
+        # DV HEVC streams embed RPU SEI NAL units that can cause PTS to become
+        # invalid mid-stream, freezing the muxer.  Regenerate PTS from DTS so
+        # the encoder receives monotonically-increasing timestamps regardless.
+        is_dv_source = bool(video and video.is_dolby_vision)
+        if is_dv_source:
+            cmd.extend(["-fflags", "+genpts"])
+
         cmd.extend(
             [
                 "-analyzeduration",
@@ -873,6 +891,10 @@ class VideoConverter:
                 "copy",
             ]
         )
+
+        cmd.extend(["-fps_mode", "cfr"])
+        if framerate:
+            cmd.extend(["-r", framerate])
 
         # Clear stale video stream tags from source MKV
         cmd.extend(self._clear_video_stream_tags())
