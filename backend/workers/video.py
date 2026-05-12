@@ -737,11 +737,16 @@ class VideoConverter:
         # This prevents FFmpeg 7.x from auto-inserting ``auto_scale`` for
         # colour-space or fps-mode reasons, which conflicts with an explicit
         # filter graph and causes "Impossible to convert" errors on some files.
-        cmd.extend(
-            self._build_sw_vf_filter(
-                self.config.pix_fmt, framerate, encode_options=encode_options, video=video
-            )
+        vf_args = self._build_sw_vf_filter(
+            self.config.pix_fmt, framerate, encode_options=encode_options, video=video
         )
+        if is_dv_source:
+            # DV RPU SEI NAL units corrupt the HEVC decoder's output PTS at
+            # scene boundaries mid-stream.  Prepending setpts recomputes every
+            # decoded frame's timestamp from its sequential frame number,
+            # completely bypassing whatever the decoder emits.
+            vf_args[1] = "setpts=STARTPTS+N/FRAME_RATE/TB," + vf_args[1]
+        cmd.extend(vf_args)
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
@@ -878,11 +883,16 @@ class VideoConverter:
 
         # Pixel format, framerate, and optional scale/tone-map filters.
         # Prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
-        cmd.extend(
-            self._build_sw_vf_filter(
-                "yuv420p10le", framerate, encode_options=encode_options, video=video
-            )
+        vf_args = self._build_sw_vf_filter(
+            "yuv420p10le", framerate, encode_options=encode_options, video=video
         )
+        if is_dv_source:
+            # DV RPU SEI NAL units corrupt the HEVC decoder's output PTS at
+            # scene boundaries mid-stream.  Prepending setpts recomputes every
+            # decoded frame's timestamp from its sequential frame number,
+            # completely bypassing whatever the decoder emits.
+            vf_args[1] = "setpts=STARTPTS+N/FRAME_RATE/TB," + vf_args[1]
+        cmd.extend(vf_args)
 
         # Copy audio, subtitles, and attachments
         cmd.extend(
