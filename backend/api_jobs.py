@@ -261,6 +261,7 @@ async def retry_job(job_id: str) -> dict[str, Any]:
         source=job.source,
         poster_url=job.poster_url,
         media_type=job.media_type,
+        encode_options=job.encode_options,
     )
     # Remove the original failed record so it doesn't linger in the failed list.
     core.job_queue.delete_job(job_id)
