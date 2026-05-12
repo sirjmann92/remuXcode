@@ -688,12 +688,14 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        # DV HEVC streams embed RPU SEI NAL units that can cause PTS to become
-        # invalid mid-stream, freezing the muxer.  Regenerate PTS from DTS so
-        # the encoder receives monotonically-increasing timestamps regardless.
+        # DV HEVC streams embed RPU SEI NAL units that can cause PTS and DTS
+        # to become invalid at multiple points mid-stream, freezing the muxer.
+        # +genpts regenerates PTS from DTS; +igndts ignores container DTS too,
+        # forcing ffmpeg to derive all timestamps purely from frame rate.
+        # Both flags together survive even streams with multiple DTS/PTS breaks.
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts"])
+            cmd.extend(["-fflags", "+genpts+igndts"])
 
         cmd.extend(
             [
@@ -835,12 +837,14 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        # DV HEVC streams embed RPU SEI NAL units that can cause PTS to become
-        # invalid mid-stream, freezing the muxer.  Regenerate PTS from DTS so
-        # the encoder receives monotonically-increasing timestamps regardless.
+        # DV HEVC streams embed RPU SEI NAL units that can cause PTS and DTS
+        # to become invalid at multiple points mid-stream, freezing the muxer.
+        # +genpts regenerates PTS from DTS; +igndts ignores container DTS too,
+        # forcing ffmpeg to derive all timestamps purely from frame rate.
+        # Both flags together survive even streams with multiple DTS/PTS breaks.
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts"])
+            cmd.extend(["-fflags", "+genpts+igndts"])
 
         cmd.extend(
             [
