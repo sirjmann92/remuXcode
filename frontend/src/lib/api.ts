@@ -201,6 +201,10 @@ export async function refreshRadarr(): Promise<{ message: string }> {
   return request('/api/config/refresh/radarr', { method: 'POST' });
 }
 
+export async function cleanupTempDirs(): Promise<{ cleaned: number; message: string }> {
+  return request('/api/config/cleanup-temp', { method: 'POST' });
+}
+
 // Library analysis scan
 export async function startMovieScan(): Promise<{ message: string }> {
   return request('/api/analyze/scan/movies', { method: 'POST' });

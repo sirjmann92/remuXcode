@@ -159,6 +159,15 @@ def refresh_radarr_library() -> dict[str, str]:
         raise HTTPException(status_code=502, detail=f"Radarr refresh failed: {e}") from e
 
 
+@router.post("/config/cleanup-temp")
+def cleanup_temp_files() -> dict[str, Any]:
+    """Remove orphaned temp/chain directories left by failed or interrupted jobs."""
+    if not core.job_queue:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    count = core.cleanup_temp_dirs(core.job_store)
+    return {"cleaned": count, "message": f"Cleaned up {count} orphaned item(s)"}
+
+
 class AudioUpdate(BaseModel):
     """Partial audio config update."""
 

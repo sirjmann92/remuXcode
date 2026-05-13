@@ -1,5 +1,5 @@
 <script lang="ts">
-import { getConfig, getSystemInfo, updateConfig } from '$lib/api';
+import { cleanupTempDirs, getConfig, getSystemInfo, updateConfig } from '$lib/api';
 import LanguageSelect from '$lib/components/LanguageSelect.svelte';
 import type { ConfigSummary, HWAccelCaps } from '$lib/types';
 
@@ -10,6 +10,8 @@ let loading = $state(true);
 let error = $state('');
 let saving = $state(false);
 let saveMsg = $state('');
+let cleaningTemp = $state(false);
+let cleanTempMsg = $state('');
 
 const effectiveMethod = $derived.by(() => {
   if (!config) return 'none';
@@ -717,6 +719,34 @@ $effect(() => {
                 onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 1, 365); config!.job_history_days = v; saveTop('job_history_days', v); }}
               />
             </div>
+            <div class="flex items-center justify-between" title="Remove leftover .remuxcode-temp-* and .remuxcode-chain-* directories from failed or interrupted jobs">
+              <span class="text-xs">Temp Files<span class="block text-xs text-base-content/30 font-normal">Remove orphaned temp dirs from failed encodes</span></span>
+              <button
+                class="btn btn-xs btn-outline"
+                disabled={cleaningTemp}
+                onclick={async () => {
+                  cleaningTemp = true;
+                  cleanTempMsg = '';
+                  try {
+                    const r = await cleanupTempDirs();
+                    cleanTempMsg = r.cleaned > 0 ? `Removed ${r.cleaned} item(s)` : 'Nothing to clean';
+                  } catch (e) {
+                    cleanTempMsg = e instanceof Error ? e.message : 'Failed';
+                  } finally {
+                    cleaningTemp = false;
+                  }
+                }}
+              >
+                {#if cleaningTemp}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                  Clean Up
+                {/if}
+              </button>
+            </div>
+            {#if cleanTempMsg}
+              <p class="text-xs text-base-content/50">{cleanTempMsg}</p>
+            {/if}
           </div>
         </div>
       </div>
