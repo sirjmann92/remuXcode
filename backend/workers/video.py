@@ -343,6 +343,8 @@ class VideoConverter:
             )
 
             if returncode != 0:
+                temp_file.unlink(missing_ok=True)
+                shutil.rmtree(temp_dir, ignore_errors=True)
                 return VideoConversionResult(
                     success=False,
                     input_file=input_file,
@@ -742,11 +744,10 @@ class VideoConverter:
             self.config.pix_fmt, framerate, encode_options=encode_options, video=video
         )
         if is_dv_source:
-            # DV RPU SEI NAL units corrupt the HEVC decoder's output PTS at
-            # scene boundaries mid-stream.  Prepending setpts recomputes every
-            # decoded frame's timestamp from its sequential frame number,
-            # completely bypassing whatever the decoder emits.
-            vf_args[1] = "setpts=STARTPTS+N/FRAME_RATE/TB," + vf_args[1]
+            # Placeholder: DV filter-layer workarounds would go here.
+            # setpts was tried but caused ~4% duplicate frames via fps filter
+            # interaction without fixing the underlying Profile 7 EL decode stall.
+            pass
         cmd.extend(vf_args)
 
         # Copy audio, subtitles, and attachments
@@ -889,11 +890,10 @@ class VideoConverter:
             "yuv420p10le", framerate, encode_options=encode_options, video=video
         )
         if is_dv_source:
-            # DV RPU SEI NAL units corrupt the HEVC decoder's output PTS at
-            # scene boundaries mid-stream.  Prepending setpts recomputes every
-            # decoded frame's timestamp from its sequential frame number,
-            # completely bypassing whatever the decoder emits.
-            vf_args[1] = "setpts=STARTPTS+N/FRAME_RATE/TB," + vf_args[1]
+            # Placeholder: DV filter-layer workarounds would go here.
+            # setpts was tried but caused ~4% duplicate frames via fps filter
+            # interaction without fixing the underlying Profile 7 EL decode stall.
+            pass
         cmd.extend(vf_args)
 
         # Copy audio, subtitles, and attachments
