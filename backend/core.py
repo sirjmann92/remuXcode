@@ -834,7 +834,7 @@ def process_file(
             _t.unlink(missing_ok=True)
         if chain_temps:
             with contextlib.suppress(OSError):
-                chain_temps[0].parent.rmdir()
+                shutil.rmtree(chain_temps[0].parent, ignore_errors=True)
 
     def _log_cb(source: str, level: str, message: str) -> None:
         if job:
@@ -1405,6 +1405,16 @@ def initialize_components() -> None:
     # Clean up old finished jobs on startup
     job_store.cleanup_old_jobs(days=config.job_history_days)
 
+    # Clean up orphaned temp/chain dirs from previously failed or interrupted jobs.
+    # Runs in a background thread: scanning file-parent directories on a NAS can
+    # be slow and we don't want to block the startup sequence.
+    threading.Thread(
+        target=cleanup_temp_dirs,
+        args=(job_store,),
+        name="startup-cleanup-temp",
+        daemon=True,
+    ).start()
+
     job_queue = JobQueue(max_workers=config.workers, job_store=job_store)
     job_queue.start()
 
@@ -1451,33 +1461,130 @@ def update_integration_config() -> None:
         language_detector.radarr_api_key = config.radarr.api_key
 
 
-def cleanup_temp_dirs() -> None:
-    """Clean up orphaned temp directories on startup."""
+def cleanup_temp_dirs(job_store: Any | None = None) -> int:
+    """Clean up orphaned temp directories from failed/interrupted jobs.
+
+    Primary strategy: scan each known job's file parent directory for its
+    specific temp/chain dirs by job ID.  This is precise and fast because
+    get_volume_root() returns the file's parent directory (not the volume
+    root), so temp dirs live next to the source file.
+
+    Fallback strategy: glob the volume roots for any leftover dirs using
+    the standard name patterns (catches legacy dirs with unknown job IDs).
+
+    Safety rules:
+    - Never removes temp/chain dirs belonging to currently RUNNING jobs.
+    - Only removes .remuxcode-backup files when the corresponding real file
+      also exists (i.e. the backup is a leftover from a successful encode).
+      If only the backup exists the original was never restored; logs a
+      warning and leaves it in place.
+
+    Returns the number of paths removed.
+    """
     logger.info("Cleaning up orphaned temp directories...")
+    count = 0
+
+    # Collect IDs of jobs that are currently running so we can protect them.
+    running_ids: set[str] = set()
+    seen_dirs: set[Path] = set()
+    all_jobs: list[dict[str, Any]] = []
+
+    if job_store is not None:
+        try:
+            all_jobs = job_store.get_all_jobs()
+        except Exception:
+            all_jobs = []
+        for job_data in all_jobs:
+            if job_data.get("status") == "running":
+                running_ids.add(job_data.get("id", ""))
+            fp = job_data.get("file_path", "")
+            if fp:
+                seen_dirs.add(Path(fp).parent)
+
+    # Primary: job-ID-based scan (precise, O(n jobs), no NAS traversal)
+    for job_data in all_jobs:
+        job_id = job_data.get("id", "")
+        file_path = job_data.get("file_path", "")
+        if not file_path or not job_id:
+            continue
+        if job_id in running_ids:
+            logger.debug("Skipping temp dirs for running job %s", job_id)
+            continue
+        parent = Path(file_path).parent
+        for candidate in (
+            parent / f".remuxcode-temp-{job_id}",
+            parent / f".remuxcode-chain-{job_id}",
+        ):
+            if candidate.exists():
+                try:
+                    shutil.rmtree(candidate)
+                    count += 1
+                    logger.debug("Removed orphaned dir: %s", candidate)
+                except Exception as e:
+                    logger.warning("Failed to remove %s: %s", candidate, e)
+
+    # Backup files: only delete when the real file exists alongside it.
+    # If the backup is the only copy the original was never restored — warn.
+    for parent in seen_dirs:
+        if not parent.exists():
+            continue
+        try:
+            backups = list(parent.glob("*.remuxcode-backup"))
+        except OSError:
+            continue
+        for backup in backups:
+            real_file = backup.with_suffix("")  # strips .remuxcode-backup
+            if real_file.exists():
+                try:
+                    backup.unlink()
+                    count += 1
+                    logger.debug("Removed orphaned backup: %s", backup.name)
+                except Exception as e:
+                    logger.warning("Failed to remove backup %s: %s", backup, e)
+            else:
+                logger.warning(
+                    "Orphaned backup with no matching real file — leaving in place: %s",
+                    backup,
+                )
+
+    # Fallback: glob volume roots for any remaining dirs by pattern.
+    # Extract job ID from dir name to skip running jobs.
     patterns = [
+        ".remuxcode-temp-*",
+        ".remuxcode-chain-*",
         ".dts-temp-*",
         ".audio-temp-*",
         ".cleanup-temp-*",
         ".hevc-tmp*",
-        ".remuxcode-temp-*",
     ]
-    volumes = {host for _, host in PATH_MAPPINGS}
-    volumes.add(os.getenv("TEMP_DIR", tempfile.gettempdir()))
+    volumes: set[str] = {host for _, host in PATH_MAPPINGS}
+    temp_override = os.getenv("TEMP_DIR", "").strip()
+    volumes.add(temp_override or tempfile.gettempdir())
 
-    count = 0
     for volume in volumes:
-        if not Path(volume).exists():
+        vol_path = Path(volume)
+        if not vol_path.exists():
             continue
         for pattern in patterns:
-            for path in Path(volume).glob(pattern):
+            for path in vol_path.glob(pattern):
+                # Extract trailing job ID and skip if job is running.
+                # Dir names end with "-{job_id}" (12-char hex).
+                dir_job_id = path.name.rsplit("-", 1)[-1]
+                if dir_job_id in running_ids:
+                    logger.debug("Skipping temp dir for running job %s: %s", dir_job_id, path)
+                    continue
                 try:
                     if path.is_dir():
                         shutil.rmtree(path)
                     else:
                         path.unlink()
                     count += 1
+                    logger.debug("Removed orphaned path: %s", path)
                 except Exception as e:
                     logger.warning("Failed to remove %s: %s", path, e)
 
     if count:
         logger.info("Cleaned up %d orphaned temp file(s)/directory(ies)", count)
+    else:
+        logger.info("No orphaned temp directories found")
+    return count
