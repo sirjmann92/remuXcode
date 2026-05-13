@@ -688,14 +688,15 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        # DV HEVC streams embed RPU SEI NAL units that can cause PTS and DTS
-        # to become invalid at multiple points mid-stream, freezing the muxer.
-        # +genpts regenerates PTS from DTS; +igndts ignores container DTS too,
-        # forcing ffmpeg to derive all timestamps purely from frame rate.
-        # Both flags together survive even streams with multiple DTS/PTS breaks.
+        # DV HEVC streams embed RPU SEI NAL units that corrupt timestamps and
+        # can cause the HEVC decoder to stall on malformed bitstream data.
+        # +genpts+igndts: regenerate all timestamps from frame rate at demux
+        # ignore_err: skip malformed NAL/RPU data the decoder can't handle
+        # setpts (in vf chain): recompute decoded frame PTS from frame index
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
             cmd.extend(["-fflags", "+genpts+igndts"])
+            cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
@@ -842,14 +843,15 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        # DV HEVC streams embed RPU SEI NAL units that can cause PTS and DTS
-        # to become invalid at multiple points mid-stream, freezing the muxer.
-        # +genpts regenerates PTS from DTS; +igndts ignores container DTS too,
-        # forcing ffmpeg to derive all timestamps purely from frame rate.
-        # Both flags together survive even streams with multiple DTS/PTS breaks.
+        # DV HEVC streams embed RPU SEI NAL units that corrupt timestamps and
+        # can cause the HEVC decoder to stall on malformed bitstream data.
+        # +genpts+igndts: regenerate all timestamps from frame rate at demux
+        # ignore_err: skip malformed NAL/RPU data the decoder can't handle
+        # setpts (in vf chain): recompute decoded frame PTS from frame index
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
             cmd.extend(["-fflags", "+genpts+igndts"])
+            cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
