@@ -1533,7 +1533,25 @@ def cleanup_temp_dirs(job_store: Any | None = None) -> int:
         except OSError:
             continue
         for backup in backups:
+            # Strip .remuxcode-backup to get the expected real filename.
+            # Some older backups were created without preserving the .mkv
+            # extension in their name (e.g. "file.remuxcode-backup" instead of
+            # "file.mkv.remuxcode-backup"), so fall back to checking common
+            # media extensions when the bare stem has no recognised extension.
             real_file = backup.with_suffix("")  # strips .remuxcode-backup
+            if not real_file.exists() and real_file.suffix not in {
+                ".mkv",
+                ".mp4",
+                ".avi",
+                ".mov",
+                ".ts",
+                ".m2ts",
+            }:
+                for _ext in (".mkv", ".mp4", ".avi", ".mov", ".ts", ".m2ts"):
+                    _candidate = backup.parent / (real_file.name + _ext)
+                    if _candidate.exists():
+                        real_file = _candidate
+                        break
             if real_file.exists():
                 try:
                     backup.unlink()
