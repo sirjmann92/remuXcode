@@ -88,6 +88,7 @@ class CleanupConfig:
     keep_languages: list[str] = field(default_factory=lambda: ["eng"])
     keep_undefined: bool = False
     keep_commentary: bool = True
+    deprioritize_commentary: bool = True  # Sort commentary tracks after non-commentary ones
     keep_audio_description: bool = True
     keep_sdh: bool = True
     anime_keep_original_audio: bool = True
@@ -337,6 +338,7 @@ class Config:
             keep_languages=self._get("cleanup.keep_languages", ["eng"]),
             keep_undefined=self._get("cleanup.keep_undefined", False),
             keep_commentary=self._get("cleanup.keep_commentary", True),
+            deprioritize_commentary=self._get("cleanup.deprioritize_commentary", True),
             keep_audio_description=self._get("cleanup.keep_audio_description", True),
             keep_sdh=self._get("cleanup.keep_sdh", True),
             anime_keep_original_audio=self._get("cleanup.anime_keep_original_audio", True),
@@ -491,6 +493,7 @@ class Config:
             "keep_languages",
             "keep_undefined",
             "keep_commentary",
+            "deprioritize_commentary",
             "keep_audio_description",
             "keep_sdh",
             "anime_keep_original_audio",

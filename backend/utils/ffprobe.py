@@ -218,6 +218,7 @@ class SubtitleStream:
     is_default: bool
     is_forced: bool
     is_hearing_impaired: bool
+    is_commentary: bool = False
 
     @property
     def is_sdh(self) -> bool:
@@ -566,6 +567,9 @@ class FFProbe:
             or "cc" in title
         )
 
+        # Commentary: disposition.comment set, or title contains the word
+        is_commentary = disposition.get("comment", 0) == 1 or "commentary" in title
+
         return SubtitleStream(
             index=stream.get("index", 0),
             codec_name=stream.get("codec_name", ""),
@@ -574,6 +578,7 @@ class FFProbe:
             is_default=disposition.get("default", 0) == 1,
             is_forced=disposition.get("forced", 0) == 1,
             is_hearing_impaired=is_hi,
+            is_commentary=is_commentary,
         )
 
     def _parse_attachment_stream(self, stream: dict) -> AttachmentStream:

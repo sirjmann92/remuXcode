@@ -182,6 +182,7 @@ export interface ConfigSummary {
     clean_subtitles: boolean;
     keep_languages: string[];
     keep_commentary: boolean;
+    deprioritize_commentary: boolean;
     anime_keep_original_audio: boolean;
     keep_original_audio: boolean;
     // Advanced
