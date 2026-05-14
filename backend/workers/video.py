@@ -586,6 +586,7 @@ class VideoConverter:
         framerate: str,
         encode_options: dict | None = None,
         video: VideoStream | None = None,
+        reset_pts: bool = False,
     ) -> list[str]:
         """Build a single -vf filter chain for software encoders (HEVC, AV1).
 
@@ -614,6 +615,14 @@ class VideoConverter:
         # --- FPS normalisation ---
         if framerate:
             parts.append(f"fps=fps={framerate}")
+
+        # --- PTS reset for DV sources ---
+        # DV HEVC streams produce frames with broken or frozen PTS after demux.
+        # setpts=N/FRAME_RATE/TB regenerates monotonically-increasing timestamps
+        # from the output frame counter.  Must come AFTER the fps filter so any
+        # fps-induced duplicates/drops are included in N before PTS is assigned.
+        if reset_pts:
+            parts.append("setpts=N/FRAME_RATE/TB")
 
         # --- HDR → SDR tone-mapping ---
         if encode_options and encode_options.get("strip_hdr"):
@@ -741,13 +750,12 @@ class VideoConverter:
         # colour-space or fps-mode reasons, which conflicts with an explicit
         # filter graph and causes "Impossible to convert" errors on some files.
         vf_args = self._build_sw_vf_filter(
-            self.config.pix_fmt, framerate, encode_options=encode_options, video=video
+            self.config.pix_fmt,
+            framerate,
+            encode_options=encode_options,
+            video=video,
+            reset_pts=is_dv_source,
         )
-        if is_dv_source:
-            # Placeholder: DV filter-layer workarounds would go here.
-            # setpts was tried but caused ~4% duplicate frames via fps filter
-            # interaction without fixing the underlying Profile 7 EL decode stall.
-            pass
         cmd.extend(vf_args)
 
         # Copy audio, subtitles, and attachments
@@ -887,13 +895,12 @@ class VideoConverter:
         # Pixel format, framerate, and optional scale/tone-map filters.
         # Prevents FFmpeg 7.x auto_scale insertion (see _build_hevc_command).
         vf_args = self._build_sw_vf_filter(
-            "yuv420p10le", framerate, encode_options=encode_options, video=video
+            "yuv420p10le",
+            framerate,
+            encode_options=encode_options,
+            video=video,
+            reset_pts=is_dv_source,
         )
-        if is_dv_source:
-            # Placeholder: DV filter-layer workarounds would go here.
-            # setpts was tried but caused ~4% duplicate frames via fps filter
-            # interaction without fixing the underlying Profile 7 EL decode stall.
-            pass
         cmd.extend(vf_args)
 
         # Copy audio, subtitles, and attachments
@@ -1000,6 +1007,7 @@ class VideoConverter:
         upload_fmt: str,
         encode_options: dict | None,
         video: VideoStream | None,
+        reset_pts: bool = False,
     ) -> str:
         """Build the SW filter chain run *before* hwupload for HW encoders.
 
@@ -1017,18 +1025,26 @@ class VideoConverter:
                 if src_height is None or src_height > target_height:
                     parts.append(f"scale=-2:{target_height}:flags=lanczos")
 
-            if encode_options.get("strip_hdr"):
-                parts.extend(
-                    [
-                        "zscale=t=linear:npl=100",
-                        "format=gbrpf32le",
-                        "zscale=p=bt709",
-                        "tonemap=tonemap=hable:desat=0",
-                        "zscale=t=bt709:m=bt709:r=tv",
-                        "format=nv12",  # SDR output → 8-bit nv12 before HW upload
-                    ]
-                )
-                return ",".join(parts)
+        # PTS reset for DV sources — regenerate monotonic timestamps from the
+        # decoded frame counter before the HW upload.  DV HEVC streams produce
+        # frames with broken or frozen PTS; setpts guarantees the HW encoder
+        # always receives valid, increasing timestamps.  Placed after scale so
+        # N counts the frames that will actually be encoded.
+        if reset_pts:
+            parts.append("setpts=N/FRAME_RATE/TB")
+
+        if encode_options and encode_options.get("strip_hdr"):
+            parts.extend(
+                [
+                    "zscale=t=linear:npl=100",
+                    "format=gbrpf32le",
+                    "zscale=p=bt709",
+                    "tonemap=tonemap=hable:desat=0",
+                    "zscale=t=bt709:m=bt709:r=tv",
+                    "format=nv12",  # SDR output → 8-bit nv12 before HW upload
+                ]
+            )
+            return ",".join(parts)
 
         parts.append(f"format={upload_fmt}")
         return ",".join(parts)
@@ -1091,6 +1107,11 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
+        is_dv_source = bool(video and video.is_dolby_vision)
+        if is_dv_source:
+            cmd.extend(["-fflags", "+genpts+igndts"])
+            cmd.extend(["-err_detect", "ignore_err"])
+
         cmd.extend(
             [
                 "-analyzeduration",
@@ -1111,7 +1132,9 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to QSV surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
+                self._build_preupload_sw_filter(
+                    upload_fmt, encode_options, video, reset_pts=is_dv_source
+                )
                 + ",hwupload=extra_hw_frames=64",
                 "-c:v:0",
                 encoder,
@@ -1190,6 +1213,11 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
+        is_dv_source = bool(video and video.is_dolby_vision)
+        if is_dv_source:
+            cmd.extend(["-fflags", "+genpts+igndts"])
+            cmd.extend(["-err_detect", "ignore_err"])
+
         cmd.extend(
             [
                 "-analyzeduration",
@@ -1210,7 +1238,10 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to VAAPI surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload",
+                self._build_preupload_sw_filter(
+                    upload_fmt, encode_options, video, reset_pts=is_dv_source
+                )
+                + ",hwupload",
                 "-c:v:0",
                 encoder,
                 "-rc_mode",
@@ -1283,6 +1314,11 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
+        is_dv_source = bool(video and video.is_dolby_vision)
+        if is_dv_source:
+            cmd.extend(["-fflags", "+genpts+igndts"])
+            cmd.extend(["-err_detect", "ignore_err"])
+
         cmd.extend(
             [
                 "-analyzeduration",
@@ -1303,7 +1339,9 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to CUDA surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
+                self._build_preupload_sw_filter(
+                    upload_fmt, encode_options, video, reset_pts=is_dv_source
+                )
                 + ",hwupload_cuda",
                 "-c:v:0",
                 encoder,
