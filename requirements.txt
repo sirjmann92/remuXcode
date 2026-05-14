@@ -1,5 +1,5 @@
 fastapi
 pyyaml>=6.0.3
-requests>=2.33.1
+requests>=2.34.1
 uvicorn
 httptools
