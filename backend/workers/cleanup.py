@@ -127,6 +127,19 @@ class StreamCleanup:
             if self._needs_language_tagging(kept_audio, original_lang):
                 return True
 
+        # Check if commentary tracks need to be pushed to the back
+        if self.config.deprioritize_commentary:
+            if self.config.clean_audio:
+                kept_audio = [
+                    s
+                    for s in info.audio_streams
+                    if self._should_keep_audio(s, audio_keep_languages)
+                ]
+                if self._commentary_out_of_order(kept_audio, info.subtitle_streams):
+                    return True
+            elif self._commentary_out_of_order([], info.subtitle_streams):
+                return True
+
         return False
 
     def cleanup(
@@ -230,9 +243,13 @@ class StreamCleanup:
             else:
                 subtitle_remove.append(sub_stream)
 
-        # Sort audio so preferred language (English) is first
+        # Sort audio so preferred language is first, commentary last
         if self.config.clean_audio:
             audio_keep = self._sort_audio_for_playback(audio_keep, original_lang)
+
+        # Sort subtitles so commentary tracks come last
+        if self.config.deprioritize_commentary:
+            subtitle_keep = self._sort_subtitles_for_playback(subtitle_keep)
 
         # Build inferred language map for untagged streams based on sorted position.
         # Position 0..N-1 → preferred language(s); remaining → original language.
@@ -623,22 +640,72 @@ class StreamCleanup:
     ) -> list[AudioStream]:
         """Sort audio streams so the preferred language plays by default.
         Preferred languages (e.g. English) come first; original language follows.
+        Commentary tracks are pushed to the end when deprioritize_commentary is on.
         Order within each group is preserved.
         """
-        if not audio_streams or original_lang == "eng":
-            return audio_streams
-        preferred_langs = [lang for lang in self.config.keep_languages if lang != original_lang]
-        if not preferred_langs:
+        if not audio_streams:
             return audio_streams
 
-        def sort_key(stream: AudioStream) -> int:
+        deprioritize = self.config.deprioritize_commentary
+
+        # Fast-path when no reordering needed
+        if original_lang == "eng" and not deprioritize:
+            return audio_streams
+
+        preferred_langs = [lang for lang in self.config.keep_languages if lang != original_lang]
+
+        def sort_key(stream: AudioStream) -> tuple[int, int]:
+            commentary_rank = 1 if (deprioritize and stream.is_commentary) else 0
+            if not preferred_langs or original_lang == "eng":
+                return (commentary_rank, 0)
             lang = (stream.language or "").lower()
             for i, pl in enumerate(preferred_langs):
                 if lang == pl:
-                    return i
-            return len(preferred_langs)  # original language / others sort last
+                    return (commentary_rank, i)
+            return (commentary_rank, len(preferred_langs))
 
         return sorted(audio_streams, key=sort_key)
+
+    def _sort_subtitles_for_playback(
+        self, subtitle_streams: list[SubtitleStream]
+    ) -> list[SubtitleStream]:
+        """Sort subtitle streams so commentary tracks come last.
+        Order within each group (non-commentary, commentary) is preserved.
+        """
+        if not subtitle_streams:
+            return subtitle_streams
+        non_commentary = [s for s in subtitle_streams if not s.is_commentary]
+        commentary = [s for s in subtitle_streams if s.is_commentary]
+        return non_commentary + commentary
+
+    def _commentary_out_of_order(
+        self,
+        audio_streams: list[AudioStream],
+        subtitle_streams: list[SubtitleStream],
+    ) -> bool:
+        """Return True if any commentary track appears before a non-commentary one,
+        or if any commentary sub has is_default=True when non-commentary subs exist.
+        """
+        # Audio: commentary before non-commentary?
+        seen_non_commentary_audio = False
+        for stream in reversed(audio_streams):
+            if not stream.is_commentary:
+                seen_non_commentary_audio = True
+            elif seen_non_commentary_audio:
+                return True
+        # Subtitle: commentary before non-commentary, or default commentary exists?
+        non_commentary_subs = [s for s in subtitle_streams if not s.is_commentary]
+        commentary_subs = [s for s in subtitle_streams if s.is_commentary]
+        if commentary_subs and non_commentary_subs:
+            # Commentary sub with default=True when non-commentary subs exist
+            if any(s.is_default for s in commentary_subs):
+                return True
+            # Commentary sub appears before a non-commentary sub by file index
+            first_commentary_idx = min(s.index for s in commentary_subs)
+            first_non_commentary_idx = min(s.index for s in non_commentary_subs)
+            if first_commentary_idx < first_non_commentary_idx:
+                return True
+        return False
 
     def _build_ffmpeg_command(
         self,
@@ -676,9 +743,27 @@ class StreamCleanup:
                 cmd.extend([f"-metadata:s:a:{i}", f"language={lang}"])
             cmd.extend([f"-disposition:a:{i}", "default" if i == 0 else "0"])
 
-        # Map kept subtitle streams
+        # Map kept subtitle streams (already sorted: commentary last)
         for sub_stream in subtitle_keep:
             cmd.extend(["-map", f"0:{sub_stream.index}"])
+
+        # Explicitly set subtitle dispositions when deprioritizing commentary.
+        # This strips the `default` flag from commentary subs (which some releases
+        # incorrectly set) and tags them with the `comment` disposition flag.
+        # Non-commentary subs have their source disposition preserved (no override).
+        if self.config.deprioritize_commentary:
+            for i, sub_stream in enumerate(subtitle_keep):
+                if sub_stream.is_commentary:
+                    # `comment` disposition: marks as commentary, clears `default`
+                    cmd.extend([f"-disposition:s:{i}", "comment"])
+                elif sub_stream.is_sdh:
+                    # Preserve hearing_impaired flag, but clear default if a
+                    # non-SDH non-commentary sub exists before this one
+                    non_sdh_before = any(
+                        not s.is_sdh and not s.is_commentary for s in subtitle_keep[:i]
+                    )
+                    if non_sdh_before and sub_stream.is_default:
+                        cmd.extend([f"-disposition:s:{i}", "hearing_impaired"])
 
         # Map attachments (fonts, etc.)
         if info.attachment_streams:

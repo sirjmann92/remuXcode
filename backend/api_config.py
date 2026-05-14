@@ -89,6 +89,7 @@ async def get_config_summary() -> dict[str, Any]:
             "clean_subtitles": cfg.cleanup.clean_subtitles,
             "keep_languages": cfg.cleanup.keep_languages,
             "keep_commentary": cfg.cleanup.keep_commentary,
+            "deprioritize_commentary": cfg.cleanup.deprioritize_commentary,
             "anime_keep_original_audio": cfg.cleanup.anime_keep_original_audio,
             "keep_original_audio": cfg.cleanup.keep_original_audio,
             # Advanced
@@ -241,6 +242,7 @@ class CleanupUpdate(BaseModel):
     keep_languages: list[str] | None = None
     keep_undefined: bool | None = None
     keep_commentary: bool | None = None
+    deprioritize_commentary: bool | None = None
     keep_audio_description: bool | None = None
     keep_sdh: bool | None = None
     anime_keep_original_audio: bool | None = None

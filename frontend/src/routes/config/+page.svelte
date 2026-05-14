@@ -624,6 +624,7 @@ $effect(() => {
               { field: 'clean_audio', label: 'Clean Audio', hint: 'Remove audio tracks not in your language list' },
               { field: 'clean_subtitles', label: 'Clean Subtitles', hint: 'Remove subtitle tracks not in your language list' },
               { field: 'keep_commentary', label: 'Keep Commentary', hint: 'Preserve director/cast commentary tracks regardless of language' },
+              { field: 'deprioritize_commentary', label: 'Deprioritize Commentary', hint: 'Sort commentary audio/subtitle tracks after non-commentary ones and strip their default flag' },
               { field: 'anime_keep_original_audio', label: 'Anime Keep Original Audio', hint: 'Always keep the original-language audio in anime files (Japanese, Korean, etc.)' },
               { field: 'keep_original_audio', label: 'Keep Original Audio', hint: 'Always keep the original-language audio in live-action files' },
             ] as item}
