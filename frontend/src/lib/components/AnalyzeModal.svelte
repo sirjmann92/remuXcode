@@ -71,6 +71,15 @@ function formatFrameRate(rate: string): string {
 function fileName(path: string): string {
   return path.split('/').pop() ?? path;
 }
+
+function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
+  const parts: string[] = [];
+  if (v.is_dolby_vision) parts.push('Dolby Vision');
+  if (v.is_hdr10_plus) parts.push('HDR10+');
+  else if (v.is_hdr10) parts.push('HDR10');
+  if (v.is_hlg) parts.push('HLG');
+  return parts.join(' + ');
+}
 </script>
 
 <div class="modal modal-open" role="dialog" aria-modal="true">
@@ -180,9 +189,13 @@ function fileName(path: string): string {
               <div class="card-glass rounded-box p-3">
                 <div class="flex items-center justify-between mb-2">
                   <span class="font-medium text-sm">Stream #{v.index}</span>
-                  <div class="flex gap-1">
+                  <div class="flex gap-1 flex-wrap justify-end">
                     {#if v.is_hevc}<span class="badge badge-success badge-xs">HEVC</span>{/if}
                     {#if v.is_h264}<span class="badge badge-ghost badge-xs">H.264</span>{/if}
+                    {#if v.is_dolby_vision}<span class="badge badge-secondary badge-xs">DV</span>{/if}
+                    {#if v.is_hdr10_plus}<span class="badge badge-warning badge-xs">HDR10+</span>
+                    {:else if v.is_hdr10}<span class="badge badge-warning badge-xs">HDR10</span>{/if}
+                    {#if v.is_hlg}<span class="badge badge-info badge-xs">HLG</span>{/if}
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
@@ -192,6 +205,10 @@ function fileName(path: string): string {
                   <div>{v.resolution}</div>
                   <div class="text-base-content/50">Profile</div>
                   <div>{v.profile ?? '—'}</div>
+                  {#if hdrLabel(v)}
+                    <div class="text-base-content/50">HDR</div>
+                    <div>{hdrLabel(v)}</div>
+                  {/if}
                   <div class="text-base-content/50">Pixel Format</div>
                   <div>{v.pix_fmt} ({v.bit_depth}-bit)</div>
                   <div class="text-base-content/50">Frame Rate</div>
