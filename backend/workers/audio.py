@@ -790,16 +790,29 @@ class AudioConverter:
                 # Copy non-converted streams as-is
                 map_args.extend(["-map", f"0:{stream.index}"])
                 codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
-                # Preserve source title since -map_metadata:s -1 suppresses stream tags
+                # Preserve source language/title since -map_metadata:s -1 suppresses stream tags
+                if stream.language:
+                    codec_args.extend(
+                        [f"-metadata:s:a:{audio_output_index}", f"language={stream.language}"]
+                    )
                 if stream.title:
                     codec_args.extend(
                         [f"-metadata:s:a:{audio_output_index}", f"title={stream.title}"]
                     )
                 audio_output_index += 1
 
-        # Map subtitle and attachment streams
-        for ss in info.subtitle_streams:
+        # Map subtitle and attachment streams — restore language/title since
+        # -map_metadata:s -1 below clears per-stream tags from copied streams.
+        for sub_out_idx, ss in enumerate(info.subtitle_streams):
             map_args.extend(["-map", f"0:{ss.index}"])
+            if ss.language:
+                codec_args.extend(
+                    [f"-metadata:s:s:{sub_out_idx}", f"language={ss.language}"]
+                )
+            if ss.title:
+                codec_args.extend(
+                    [f"-metadata:s:s:{sub_out_idx}", f"title={ss.title}"]
+                )
         for att in info.attachment_streams:
             map_args.extend(["-map", f"0:{att.index}"])
 
@@ -816,8 +829,8 @@ class AudioConverter:
 
         # Suppress per-stream metadata from source so FFmpeg auto-generates correct
         # BPS / NUMBER_OF_BYTES / NUMBER_OF_FRAMES for re-encoded and copied streams.
-        # Titles are set explicitly above; language is a structural MKV element
-        # preserved automatically during stream copy.
+        # Titles and languages are set explicitly above for subtitle streams;
+        # audio stream titles are set above in each codec_args block.
         cmd.extend(["-map_metadata:s", "-1"])
 
         cmd.append(output_file)

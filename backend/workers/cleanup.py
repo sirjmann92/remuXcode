@@ -243,6 +243,18 @@ class StreamCleanup:
             else:
                 subtitle_remove.append(sub_stream)
 
+        # Safety net: never remove ALL subtitle streams — if all are untagged
+        # (language=null/und) and nothing matched, keep them all rather than
+        # silently stripping every subtitle from the file.
+        if info.subtitle_streams and not subtitle_keep:
+            logger.warning(
+                "No subtitle streams match keep_languages %s for %s — keeping all subtitles",
+                sub_keep_languages,
+                input_path.name,
+            )
+            subtitle_keep = list(info.subtitle_streams)
+            subtitle_remove = []
+
         # Sort audio so preferred language is first, commentary last
         if self.config.clean_audio:
             audio_keep = self._sort_audio_for_playback(audio_keep, original_lang)
