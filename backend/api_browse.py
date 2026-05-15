@@ -408,7 +408,13 @@ def proxy_poster(source: str, item_id: int) -> Response:
 
 
 @router.get("/analyze")
-def analyze_file(path: str = Query(..., description="Path to media file")) -> dict[str, Any]:
+def analyze_file(
+    path: str = Query(..., description="Path to media file"),
+    radarr_movie_id: int | None = Query(None, description="Radarr movie ID for HDR enrichment"),
+    sonarr_episode_file_id: int | None = Query(
+        None, description="Sonarr episode file ID for HDR enrichment"
+    ),
+) -> dict[str, Any]:
     """Analyze a single file — returns full stream details for MediaInfo-style display."""
     file_path = translate_path(path)
     if not Path(file_path).exists():
@@ -421,28 +427,32 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
     # Enrich HDR flags by OR-merging with Radarr/Sonarr MediaInfo.
     # ffprobe reliably detects DV (DOVI RPU in stream headers) but misses HDR10+
     # (SMPTE 2094-40 dynamic metadata) on DV+HDR10+ combo discs. Radarr/Sonarr's
-    # MediaInfo scan catches HDR10+ — look up the stored file ID and fetch it.
+    # MediaInfo scan catches HDR10+ — use the caller-supplied IDs first, then fall
+    # back to whatever IDs were previously stored in the media cache.
     _extra_dv = _extra_hdr10plus = _extra_hdr10 = _extra_hlg = False
-    if core.media_store and core.config:
-        _existing = core.media_store.get_by_path(file_path)
-        _radarr_mf_id = _existing.get("radarr_movie_file_id") if _existing else None
-        _sonarr_ef_id = _existing.get("sonarr_episode_file_id") if _existing else None
+    if core.config:
         _drt = ""
-        if _radarr_mf_id and core.config.radarr.url and core.config.radarr.api_key:
+        # Primary: use IDs passed by the frontend (always available from the movie/show page)
+        if radarr_movie_id and core.config.radarr.url and core.config.radarr.api_key:
             try:
                 _r = requests.get(
-                    f"{core.config.radarr.url}/api/v3/moviefile/{_radarr_mf_id}",
+                    f"{core.config.radarr.url}/api/v3/movie/{radarr_movie_id}",
                     headers={"X-Api-Key": core.config.radarr.api_key},
                     timeout=5,
                 )
                 if _r.ok:
-                    _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+                    _drt = (
+                        _r.json()
+                        .get("movieFile", {})
+                        .get("mediaInfo", {})
+                        .get("videoDynamicRangeType", "")
+                    )
             except Exception:
                 pass
-        elif _sonarr_ef_id and core.config.sonarr.url and core.config.sonarr.api_key:
+        elif sonarr_episode_file_id and core.config.sonarr.url and core.config.sonarr.api_key:
             try:
                 _r = requests.get(
-                    f"{core.config.sonarr.url}/api/v3/episodefile/{_sonarr_ef_id}",
+                    f"{core.config.sonarr.url}/api/v3/episodefile/{sonarr_episode_file_id}",
                     headers={"X-Api-Key": core.config.sonarr.api_key},
                     timeout=5,
                 )
@@ -450,6 +460,33 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
                     _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
             except Exception:
                 pass
+        # Fallback: IDs stored in media cache from a previous library scan
+        if not _drt and core.media_store:
+            _existing = core.media_store.get_by_path(file_path)
+            _radarr_mf_id = _existing.get("radarr_movie_file_id") if _existing else None
+            _sonarr_ef_id = _existing.get("sonarr_episode_file_id") if _existing else None
+            if _radarr_mf_id and core.config.radarr.url and core.config.radarr.api_key:
+                try:
+                    _r = requests.get(
+                        f"{core.config.radarr.url}/api/v3/moviefile/{_radarr_mf_id}",
+                        headers={"X-Api-Key": core.config.radarr.api_key},
+                        timeout=5,
+                    )
+                    if _r.ok:
+                        _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+                except Exception:
+                    pass
+            elif _sonarr_ef_id and core.config.sonarr.url and core.config.sonarr.api_key:
+                try:
+                    _r = requests.get(
+                        f"{core.config.sonarr.url}/api/v3/episodefile/{_sonarr_ef_id}",
+                        headers={"X-Api-Key": core.config.sonarr.api_key},
+                        timeout=5,
+                    )
+                    if _r.ok:
+                        _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+                except Exception:
+                    pass
         if _drt:
             _extra_dv, _extra_hdr10plus, _extra_hdr10, _extra_hlg = _parse_radarr_dynamic_range(
                 _drt

@@ -182,8 +182,15 @@ export async function getSeriesDetail(id: number): Promise<SeriesDetail> {
 }
 
 // Analyze
-export async function analyzeFile(path: string): Promise<AnalyzeResult> {
-  return request(`/api/analyze?path=${encodeURIComponent(path)}`);
+export async function analyzeFile(
+  path: string,
+  radarrMovieId?: number,
+  sonarrEpisodeFileId?: number,
+): Promise<AnalyzeResult> {
+  const params = new URLSearchParams({ path });
+  if (radarrMovieId) params.set('radarr_movie_id', String(radarrMovieId));
+  if (sonarrEpisodeFileId) params.set('sonarr_episode_file_id', String(sonarrEpisodeFileId));
+  return request(`/api/analyze?${params}`);
 }
 
 // Active jobs (pending/running) keyed by file path
