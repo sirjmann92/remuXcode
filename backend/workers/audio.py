@@ -801,7 +801,7 @@ class AudioConverter:
                     )
                 audio_output_index += 1
 
-        # Map subtitle and attachment streams — restore language/title since
+        # Map subtitle and attachment streams — restore language/title/filename/mimetype since
         # -map_metadata:s -1 below clears per-stream tags from copied streams.
         for sub_out_idx, ss in enumerate(info.subtitle_streams):
             map_args.extend(["-map", f"0:{ss.index}"])
@@ -809,8 +809,13 @@ class AudioConverter:
                 codec_args.extend([f"-metadata:s:s:{sub_out_idx}", f"language={ss.language}"])
             if ss.title:
                 codec_args.extend([f"-metadata:s:s:{sub_out_idx}", f"title={ss.title}"])
-        for att in info.attachment_streams:
+        for att_out_idx, att in enumerate(info.attachment_streams):
             map_args.extend(["-map", f"0:{att.index}"])
+            # Restore filename/mimetype since -map_metadata:s -1 clears them
+            if att.filename:
+                codec_args.extend([f"-metadata:s:t:{att_out_idx}", f"filename={att.filename}"])
+            if att.mimetype:
+                codec_args.extend([f"-metadata:s:t:{att_out_idx}", f"mimetype={att.mimetype}"])
 
         # Assemble final command
         cmd.extend(map_args)
