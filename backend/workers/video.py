@@ -25,8 +25,10 @@ from backend.workers._safe_move import safe_replace
 logger = logging.getLogger(__name__)
 
 # Fallback MIME types for attachment streams that carry no mimetype tag.
-# The MKV muxer rejects output when an attachment has an empty/absent mimetype;
-# we infer from the filename extension and fall back to application/octet-stream.
+# The MKV muxer rejects output when an attachment is missing its mimetype or
+# filename tag.  We infer mimetype from the filename extension and fall back to
+# application/octet-stream; for filename we reverse-map the mimetype to an
+# extension and synthesise "attachment_N.<ext>".
 _ATTACHMENT_MIME_FALLBACK: dict[str, str] = {
     ".ttf": "application/x-truetype-font",
     ".otf": "application/vnd.ms-opentype",
@@ -37,6 +39,19 @@ _ATTACHMENT_MIME_FALLBACK: dict[str, str] = {
     ".jpeg": "image/jpeg",
     ".gif": "image/gif",
     ".bmp": "image/bmp",
+}
+
+# Reverse map: MIME type → a reasonable file extension (first match wins)
+_ATTACHMENT_MIME_TO_EXT: dict[str, str] = {
+    "application/x-truetype-font": ".ttf",
+    "application/vnd.ms-opentype": ".otf",
+    "application/font-woff": ".woff",
+    "font/woff2": ".woff2",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/bmp": ".bmp",
+    "application/octet-stream": ".bin",
 }
 
 
@@ -1009,23 +1024,27 @@ class VideoConverter:
         cmd: list[str],
         attachments: list[AttachmentStream],
     ) -> list[str]:
-        """Insert -metadata:s:t:N mimetype=... for attachments missing a mimetype tag.
+        """Insert -metadata:s:t:N tags for attachments missing mimetype or filename.
 
         The MKV muxer refuses to write the output header when any attachment
-        stream has no mimetype and ffmpeg cannot deduce one from the codec id
-        (which is common for fonts or cover art with stripped tags).  This
-        method patches the completed ffmpeg command by inserting metadata
-        overrides immediately before the output filename (the last element).
+        stream is missing its mimetype or filename tag.  This method patches the
+        completed ffmpeg command by inserting metadata overrides immediately
+        before the output filename (the last element).
         """
         if not attachments:
             return cmd
 
         fixes: list[str] = []
         for i, att in enumerate(attachments):
-            if not att.mimetype:
+            mime = att.mimetype
+            if not mime:
                 ext = Path(att.filename or "").suffix.lower()
                 mime = _ATTACHMENT_MIME_FALLBACK.get(ext, "application/octet-stream")
                 fixes += [f"-metadata:s:t:{i}", f"mimetype={mime}"]
+
+            if not att.filename:
+                ext = _ATTACHMENT_MIME_TO_EXT.get(mime, ".bin")
+                fixes += [f"-metadata:s:t:{i}", f"filename=attachment_{i}{ext}"]
 
         if not fixes:
             return cmd
