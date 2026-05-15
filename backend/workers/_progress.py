@@ -144,8 +144,16 @@ def run_ffmpeg_with_progress(
     #      _PROGRESS_STALL_TIMEOUT seconds (ffmpeg alive but encoder frozen —
     #      e.g. DV RPU decoder stall mid-stream that keeps sending repeating
     #      progress=continue blocks without producing new output frames).
+    #
+    # _PROGRESS_STALL_TIMEOUT is intentionally long (10 min) because large MKV
+    # files with many subtitle tracks (e.g. full multi-language remuxes) require
+    # significant time for the MKV muxer to finalize the seek/cue tables after
+    # all video frames are encoded.  During that finalization phase out_time_us
+    # and the frame counter freeze at their final values while FFmpeg is still
+    # blocking on the output file — especially over NFS/CIFS mounts.  120 s was
+    # too aggressive and caused false kills on valid encodes.
     _STALL_TIMEOUT = 300.0
-    _PROGRESS_STALL_TIMEOUT = 120.0
+    _PROGRESS_STALL_TIMEOUT = 600.0
     last_fifo_activity = time.monotonic()
     last_progress_value = -1  # tracks highest out_time_us (or frame) seen
     last_progress_advance = time.monotonic()
