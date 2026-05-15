@@ -798,17 +798,21 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                             ),
                             "is_anime": is_anime,
                             "analyzed": True,
-                            # ffprobe overrides Radarr-derived HDR flags
-                            "is_dolby_vision": info.primary_video.is_dolby_vision
-                            if info.primary_video
-                            else False,
-                            "is_hdr10_plus": info.primary_video.is_hdr10_plus
-                            if info.primary_video
-                            else False,
-                            "is_hdr10": info.primary_video.is_hdr10
-                            if info.primary_video
-                            else False,
-                            "is_hlg": info.primary_video.is_hlg if info.primary_video else False,
+                            # Merge HDR flags: take the union of Radarr and ffprobe
+                            # detections.  Each source can miss formats the other
+                            # catches — e.g. Radarr (via MediaInfo) may report
+                            # HDR10+ while ffprobe detects DV, and both are correct
+                            # simultaneously for a DV+HDR10+ combo disc.
+                            "is_dolby_vision": item.get("is_dolby_vision", False)
+                            or (
+                                info.primary_video.is_dolby_vision if info.primary_video else False
+                            ),
+                            "is_hdr10_plus": item.get("is_hdr10_plus", False)
+                            or (info.primary_video.is_hdr10_plus if info.primary_video else False),
+                            "is_hdr10": item.get("is_hdr10", False)
+                            or (info.primary_video.is_hdr10 if info.primary_video else False),
+                            "is_hlg": item.get("is_hlg", False)
+                            or (info.primary_video.is_hlg if info.primary_video else False),
                         }
                     )
             except Exception as e:
@@ -829,15 +833,16 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     item["has_dts"] = a.get("has_dts", item["has_dts"])
                     item["has_truehd"] = a.get("has_truehd", item["has_truehd"])
                     item["analyzed"] = True
-                    # Override Radarr HDR flags with ffprobe-derived values from cache
-                    if "is_dolby_vision" in a:
-                        item["is_dolby_vision"] = a["is_dolby_vision"]
-                    if "is_hdr10_plus" in a:
-                        item["is_hdr10_plus"] = a["is_hdr10_plus"]
-                    if "is_hdr10" in a:
-                        item["is_hdr10"] = a["is_hdr10"]
-                    if "is_hlg" in a:
-                        item["is_hlg"] = a["is_hlg"]
+                    # Merge HDR flags from cache with Radarr baseline (OR logic — see
+                    # comment in the live-ffprobe block above for the rationale).
+                    item["is_dolby_vision"] = item.get("is_dolby_vision", False) or a.get(
+                        "is_dolby_vision", False
+                    )
+                    item["is_hdr10_plus"] = item.get("is_hdr10_plus", False) or a.get(
+                        "is_hdr10_plus", False
+                    )
+                    item["is_hdr10"] = item.get("is_hdr10", False) or a.get("is_hdr10", False)
+                    item["is_hlg"] = item.get("is_hlg", False) or a.get("is_hlg", False)
                     # Re-evaluate audio conversion with stream-level data from cache
                     cached_streams = a.get("audio_streams", [])
                     if cached_streams:
