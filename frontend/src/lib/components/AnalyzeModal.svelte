@@ -14,7 +14,8 @@ interface Props {
   onclose: () => void;
 }
 
-const { path, poster_url, media_type, radarr_movie_id, sonarr_episode_file_id, onclose }: Props = $props();
+const { path, poster_url, media_type, radarr_movie_id, sonarr_episode_file_id, onclose }: Props =
+  $props();
 
 let result: AnalyzeResult | null = $state(null);
 let loading = $state(true);

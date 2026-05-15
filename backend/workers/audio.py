@@ -806,13 +806,9 @@ class AudioConverter:
         for sub_out_idx, ss in enumerate(info.subtitle_streams):
             map_args.extend(["-map", f"0:{ss.index}"])
             if ss.language:
-                codec_args.extend(
-                    [f"-metadata:s:s:{sub_out_idx}", f"language={ss.language}"]
-                )
+                codec_args.extend([f"-metadata:s:s:{sub_out_idx}", f"language={ss.language}"])
             if ss.title:
-                codec_args.extend(
-                    [f"-metadata:s:s:{sub_out_idx}", f"title={ss.title}"]
-                )
+                codec_args.extend([f"-metadata:s:s:{sub_out_idx}", f"title={ss.title}"])
         for att in info.attachment_streams:
             map_args.extend(["-map", f"0:{att.index}"])
 
