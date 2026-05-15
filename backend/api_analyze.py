@@ -32,6 +32,10 @@ def build_analysis_dict(info: Any) -> dict[str, Any]:
         "is_hevc": v.is_hevc if v else False,
         "is_h264": v.is_h264 if v else False,
         "is_av1": v.is_av1 if v else False,
+        "is_dolby_vision": v.is_dolby_vision if v else False,
+        "is_hdr10_plus": v.is_hdr10_plus if v else False,
+        "is_hdr10": v.is_hdr10 if v else False,
+        "is_hlg": v.is_hlg if v else False,
         "audio_streams": [
             {
                 "codec": a.codec_name,

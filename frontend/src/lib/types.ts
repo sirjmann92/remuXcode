@@ -258,6 +258,10 @@ export interface BrowseMovie {
   is_anime?: boolean;
   analyzed?: boolean;
   video?: { codec: string | null; bit_depth: number | null };
+  is_dolby_vision?: boolean;
+  is_hdr10_plus?: boolean;
+  is_hdr10?: boolean;
+  is_hlg?: boolean;
 }
 
 export interface MoviesResponse {
@@ -368,6 +372,14 @@ export interface AnalyzeVideoStream {
   bitrate: number | null;
   is_hevc: boolean;
   is_h264: boolean;
+  is_dolby_vision: boolean;
+  is_hdr10_plus: boolean;
+  is_hdr10: boolean;
+  is_hlg: boolean;
+  color_primaries: string | null;
+  color_trc: string | null;
+  hdr_master_display: string | null;
+  hdr_max_cll: string | null;
 }
 
 export interface AnalyzeAudioStream {

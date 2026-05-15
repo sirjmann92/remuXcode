@@ -733,6 +733,11 @@ const sortOptions: { value: string; label: string }[] = [
           <div class="text-sm text-base-content/50">{detailMovie.year}{detailMovie.resolution ? ` · ${detailMovie.resolution}` : ''}</div>
           <div class="flex flex-wrap gap-1">
             {#if detailMovie.video_codec}<span class="badge badge-ghost badge-sm">{detailMovie.video_codec}</span>{/if}
+            {#if detailMovie.is_dolby_vision}<span class="badge badge-secondary badge-sm">DV</span>{/if}
+            {#if detailMovie.is_hdr10_plus}<span class="badge badge-warning badge-sm">HDR10+</span>
+            {:else if detailMovie.is_hdr10}<span class="badge badge-warning badge-sm">HDR10</span>{/if}
+            {#if detailMovie.is_hlg}<span class="badge badge-info badge-sm">HLG</span>{/if}
+            {#if detailMovie.video?.bit_depth === 10}<span class="badge badge-ghost badge-sm">10-bit</span>{/if}
             {#if detailMovie.audio_codec}<span class="badge badge-ghost badge-sm">{detailMovie.audio_codec}</span>{/if}
             <span class="badge badge-ghost badge-sm">{formatSize(detailMovie.size)}</span>
           </div>

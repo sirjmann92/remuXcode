@@ -138,6 +138,16 @@ class VideoStream:
         return self.is_h264 and self.is_10bit
 
     @property
+    def is_hdr10(self) -> bool:
+        """Check if stream uses HDR10 (PQ / SMPTE ST 2084 transfer function)."""
+        return self.color_trc == "smpte2084"
+
+    @property
+    def is_hlg(self) -> bool:
+        """Check if stream uses HLG (Hybrid Log-Gamma / ARIB STD-B67)."""
+        return self.color_trc == "arib-std-b67"
+
+    @property
     def is_legacy_codec(self) -> bool:
         """Check if stream uses a legacy codec (VC-1, MPEG-2, MPEG-4/Xvid/DivX)."""
         return self.codec_name.lower() in (

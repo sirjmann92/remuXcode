@@ -263,6 +263,22 @@ def _split_slash_field(value: Any) -> list[str]:
     return []
 
 
+def _parse_radarr_dynamic_range(drt: str) -> tuple[bool, bool, bool, bool]:
+    """Parse Radarr videoDynamicRangeType into (is_dv, is_hdr10plus, is_hdr10, is_hlg).
+
+    Radarr returns values like "HDR10", "HDR10Plus", "DolbyVision",
+    "DolbyVisionHDR10", "DolbyVisionHDR10Plus", "HLG", "SDR", or "".
+    HDR10+ is a superset of HDR10, so both flags are set when present.
+    This is a best-effort fallback; ffprobe analysis overrides these values.
+    """
+    d = drt.lower().replace(" ", "").replace("-", "")
+    is_dv = "dolbyvision" in d or "dovi" in d
+    is_hdr10plus = "hdr10plus" in d
+    is_hdr10 = "hdr10" in d  # covers both hdr10 and hdr10plus base layer
+    is_hlg = "hlg" in d
+    return is_dv, is_hdr10plus, is_hdr10, is_hlg
+
+
 def _subtitle_langs_to_remove(subtitle_streams: list[dict[str, Any]]) -> list[str]:
     """Return list of subtitle language codes that will be removed by cleanup."""
     cfg = core.config.cleanup if core.config else None
@@ -437,6 +453,14 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
             "bitrate": v.bitrate,
             "is_hevc": v.is_hevc,
             "is_h264": v.is_h264,
+            "is_dolby_vision": v.is_dolby_vision,
+            "is_hdr10_plus": v.is_hdr10_plus,
+            "is_hdr10": v.is_hdr10,
+            "is_hlg": v.is_hlg,
+            "color_primaries": v.color_primaries,
+            "color_trc": v.color_trc,
+            "hdr_master_display": v.hdr_master_display,
+            "hdr_max_cll": v.hdr_max_cll,
         }
         for v in info.video_streams
     ]
@@ -667,6 +691,9 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                 core.anime_detector.detect(host_path, use_api=False) == ContentType.ANIME
             )
 
+        _is_dv, _is_hdr10plus, _is_hdr10, _is_hlg = _parse_radarr_dynamic_range(
+            media_info.get("videoDynamicRangeType", "")
+        )
         item: dict[str, Any] = {
             "id": movie["id"],
             "tmdb_id": movie.get("tmdbId"),
@@ -687,6 +714,10 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
             "subtitles": _split_slash_field(media_info.get("subtitles", "")),
             "resolution": media_info.get("resolution", ""),
             "needs_cleanup": _needs_cleanup(media_info, is_anime=movie_is_anime),
+            "is_dolby_vision": _is_dv,
+            "is_hdr10_plus": _is_hdr10plus,
+            "is_hdr10": _is_hdr10,
+            "is_hlg": _is_hlg,
             "analyzed": False,
         }
 
@@ -767,6 +798,17 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                             ),
                             "is_anime": is_anime,
                             "analyzed": True,
+                            # ffprobe overrides Radarr-derived HDR flags
+                            "is_dolby_vision": info.primary_video.is_dolby_vision
+                            if info.primary_video
+                            else False,
+                            "is_hdr10_plus": info.primary_video.is_hdr10_plus
+                            if info.primary_video
+                            else False,
+                            "is_hdr10": info.primary_video.is_hdr10
+                            if info.primary_video
+                            else False,
+                            "is_hlg": info.primary_video.is_hlg if info.primary_video else False,
                         }
                     )
             except Exception as e:
@@ -787,6 +829,15 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     item["has_dts"] = a.get("has_dts", item["has_dts"])
                     item["has_truehd"] = a.get("has_truehd", item["has_truehd"])
                     item["analyzed"] = True
+                    # Override Radarr HDR flags with ffprobe-derived values from cache
+                    if "is_dolby_vision" in a:
+                        item["is_dolby_vision"] = a["is_dolby_vision"]
+                    if "is_hdr10_plus" in a:
+                        item["is_hdr10_plus"] = a["is_hdr10_plus"]
+                    if "is_hdr10" in a:
+                        item["is_hdr10"] = a["is_hdr10"]
+                    if "is_hlg" in a:
+                        item["is_hlg"] = a["is_hlg"]
                     # Re-evaluate audio conversion with stream-level data from cache
                     cached_streams = a.get("audio_streams", [])
                     if cached_streams:
