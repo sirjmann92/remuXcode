@@ -418,15 +418,56 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
     if not info:
         raise HTTPException(status_code=500, detail="Failed to analyze file")
 
-    # Store analysis in media.db for filter/badge use
+    # Enrich HDR flags by OR-merging with Radarr/Sonarr MediaInfo.
+    # ffprobe reliably detects DV (DOVI RPU in stream headers) but misses HDR10+
+    # (SMPTE 2094-40 dynamic metadata) on DV+HDR10+ combo discs. Radarr/Sonarr's
+    # MediaInfo scan catches HDR10+ — look up the stored file ID and fetch it.
+    _extra_dv = _extra_hdr10plus = _extra_hdr10 = _extra_hlg = False
+    if core.media_store and core.config:
+        _existing = core.media_store.get_by_path(file_path)
+        _radarr_mf_id = _existing.get("radarr_movie_file_id") if _existing else None
+        _sonarr_ef_id = _existing.get("sonarr_episode_file_id") if _existing else None
+        _drt = ""
+        if _radarr_mf_id and core.config.radarr.url and core.config.radarr.api_key:
+            try:
+                _r = requests.get(
+                    f"{core.config.radarr.url}/api/v3/moviefile/{_radarr_mf_id}",
+                    headers={"X-Api-Key": core.config.radarr.api_key},
+                    timeout=5,
+                )
+                if _r.ok:
+                    _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+            except Exception:
+                pass
+        elif _sonarr_ef_id and core.config.sonarr.url and core.config.sonarr.api_key:
+            try:
+                _r = requests.get(
+                    f"{core.config.sonarr.url}/api/v3/episodefile/{_sonarr_ef_id}",
+                    headers={"X-Api-Key": core.config.sonarr.api_key},
+                    timeout=5,
+                )
+                if _r.ok:
+                    _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+            except Exception:
+                pass
+        if _drt:
+            _extra_dv, _extra_hdr10plus, _extra_hdr10, _extra_hlg = _parse_radarr_dynamic_range(
+                _drt
+            )
+
+    # Store analysis in media.db for filter/badge use (with merged HDR flags)
     if core.media_store:
         try:
             from backend.api_analyze import build_analysis_dict
 
             stat = Path(file_path).stat()
-            core.media_store.upsert(
-                file_path, build_analysis_dict(info), stat.st_mtime, stat.st_size
-            )
+            analysis = build_analysis_dict(info)
+            if _extra_dv or _extra_hdr10plus or _extra_hdr10 or _extra_hlg:
+                analysis["is_dolby_vision"] = analysis.get("is_dolby_vision", False) or _extra_dv
+                analysis["is_hdr10_plus"] = analysis.get("is_hdr10_plus", False) or _extra_hdr10plus
+                analysis["is_hdr10"] = analysis.get("is_hdr10", False) or _extra_hdr10
+                analysis["is_hlg"] = analysis.get("is_hlg", False) or _extra_hlg
+            core.media_store.upsert(file_path, analysis, stat.st_mtime, stat.st_size)
             logger.info("Stored analysis for %s", Path(file_path).name)
         except Exception:
             logger.warning("Failed to store analysis in media.db", exc_info=True)
@@ -453,10 +494,10 @@ def analyze_file(path: str = Query(..., description="Path to media file")) -> di
             "bitrate": v.bitrate,
             "is_hevc": v.is_hevc,
             "is_h264": v.is_h264,
-            "is_dolby_vision": v.is_dolby_vision,
-            "is_hdr10_plus": v.is_hdr10_plus,
-            "is_hdr10": v.is_hdr10,
-            "is_hlg": v.is_hlg,
+            "is_dolby_vision": v.is_dolby_vision or _extra_dv,
+            "is_hdr10_plus": v.is_hdr10_plus or _extra_hdr10plus,
+            "is_hdr10": v.is_hdr10 or _extra_hdr10,
+            "is_hlg": v.is_hlg or _extra_hlg,
             "color_primaries": v.color_primaries,
             "color_trc": v.color_trc,
             "hdr_master_display": v.hdr_master_display,
