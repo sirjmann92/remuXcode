@@ -594,7 +594,6 @@ class VideoConverter:
         return self._patch_attachment_mimetypes(cmd, attachments or [])
 
     @staticmethod
-    @staticmethod
     def _build_color_args(video: VideoStream | None) -> list[str]:
         """Return ffmpeg color metadata flags matching the source stream.
 
@@ -1054,20 +1053,24 @@ class VideoConverter:
 
     @staticmethod
     def _clear_video_stream_tags() -> list[str]:
-        """Suppress source video stream metadata so FFmpeg auto-generates correct stats.
+        """Clear stale per-stream stats from the re-encoded video stream.
 
         Default ``-map_metadata 0`` copies BPS, NUMBER_OF_BYTES, SOURCE_ID, title,
         and other per-stream tags from the source MKV into the output video stream.
         After re-encoding these values are stale (e.g. the original 4K HEVC bitrate
         instead of the new AV1 bitrate).
 
-        Using ``-map_metadata:s:v:0 -1`` prevents any source stream metadata from
-        being copied to the output video track.  FFmpeg's MKV muxer then
-        auto-generates correct BPS / NUMBER_OF_BYTES / NUMBER_OF_FRAMES values
-        from the actual encoded output.  Global container metadata (title, IMDB,
-        TMDB, Encoded_By, etc.) is unaffected.
+        NOTE: ``-map_metadata:s:v:0 -1`` was previously used but FFmpeg 7.x treats
+        it as ``-map_metadata:s -1``, clearing ALL per-stream metadata including
+        attachment filename/mimetype — causing the MKV muxer to reject the output.
+        Instead, explicitly unset individual stale stats tags; FFmpeg's MKV muxer
+        then auto-generates correct values from the actual encoded output.
         """
-        return ["-map_metadata:s:v:0", "-1"]
+        stale = ("BPS", "NUMBER_OF_BYTES", "NUMBER_OF_FRAMES", "DURATION", "SOURCE_ID")
+        flags: list[str] = []
+        for tag in stale:
+            flags += ["-metadata:s:v:0", f"{tag}="]
+        return flags
 
     @staticmethod
     def _build_preupload_sw_filter(
