@@ -9,10 +9,12 @@ interface Props {
   path: string;
   poster_url?: string;
   media_type?: string;
+  radarr_movie_id?: number;
+  sonarr_episode_file_id?: number;
   onclose: () => void;
 }
 
-const { path, poster_url, media_type, onclose }: Props = $props();
+const { path, poster_url, media_type, radarr_movie_id, sonarr_episode_file_id, onclose }: Props = $props();
 
 let result: AnalyzeResult | null = $state(null);
 let loading = $state(true);
@@ -23,7 +25,7 @@ let showCustomEncode = $state(false);
 $effect(() => {
   loading = true;
   error = '';
-  analyzeFile(path)
+  analyzeFile(path, radarr_movie_id, sonarr_episode_file_id)
     .then((r) => {
       result = r;
     })
