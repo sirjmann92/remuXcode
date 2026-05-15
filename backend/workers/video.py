@@ -17,12 +17,27 @@ import uuid
 
 from backend.utils.anime_detect import AnimeDetector, ContentType
 from backend.utils.config import VideoConfig
-from backend.utils.ffprobe import FFProbe, VideoStream
+from backend.utils.ffprobe import AttachmentStream, FFProbe, VideoStream
 from backend.utils.hwaccel import HWAccelCaps, resolve_encoder
 from backend.workers._progress import run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace
 
 logger = logging.getLogger(__name__)
+
+# Fallback MIME types for attachment streams that carry no mimetype tag.
+# The MKV muxer rejects output when an attachment has an empty/absent mimetype;
+# we infer from the filename extension and fall back to application/octet-stream.
+_ATTACHMENT_MIME_FALLBACK: dict[str, str] = {
+    ".ttf": "application/x-truetype-font",
+    ".otf": "application/vnd.ms-opentype",
+    ".woff": "application/font-woff",
+    ".woff2": "font/woff2",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+}
 
 
 @dataclass
@@ -319,6 +334,7 @@ class VideoConverter:
                 video,
                 encode_options=encode_options,
                 title=title,
+                attachments=info.attachment_streams or None,
             )
             logger.debug("Running: %s", " ".join(cmd))
 
@@ -474,13 +490,14 @@ class VideoConverter:
         video: VideoStream | None = None,
         encode_options: dict | None = None,
         title: str | None = None,
+        attachments: list[AttachmentStream] | None = None,
     ) -> list[str]:
         """Build ffmpeg command with content-appropriate settings."""
         encoder = resolve_encoder(self.target_codec, self.hw_accel, self.hw_caps)
 
         # HW-accelerated encoders
         if encoder == "hevc_qsv":
-            return self._build_qsv_command(
+            cmd = self._build_qsv_command(
                 input_file,
                 output_file,
                 content_type,
@@ -489,8 +506,8 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
             )
-        if encoder == "av1_qsv":
-            return self._build_qsv_command(
+        elif encoder == "av1_qsv":
+            cmd = self._build_qsv_command(
                 input_file,
                 output_file,
                 content_type,
@@ -499,8 +516,8 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
             )
-        if encoder == "hevc_vaapi":
-            return self._build_vaapi_command(
+        elif encoder == "hevc_vaapi":
+            cmd = self._build_vaapi_command(
                 input_file,
                 output_file,
                 content_type,
@@ -509,8 +526,8 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
             )
-        if encoder == "av1_vaapi":
-            return self._build_vaapi_command(
+        elif encoder == "av1_vaapi":
+            cmd = self._build_vaapi_command(
                 input_file,
                 output_file,
                 content_type,
@@ -519,8 +536,8 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
             )
-        if encoder == "hevc_nvenc":
-            return self._build_nvenc_command(
+        elif encoder == "hevc_nvenc":
+            cmd = self._build_nvenc_command(
                 input_file,
                 output_file,
                 content_type,
@@ -529,35 +546,37 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
             )
-        if encoder == "av1_nvenc":
-            return self._build_nvenc_command(
+        elif encoder == "av1_nvenc":
+            cmd = self._build_nvenc_command(
                 input_file,
                 output_file,
                 content_type,
                 codec="av1",
+                video=video,
+                encode_options=encode_options,
+                title=title,
+            )
+        elif self.target_codec == "av1":
+            # Software encoders
+            cmd = self._build_av1_command(
+                input_file,
+                output_file,
+                content_type,
+                video=video,
+                encode_options=encode_options,
+                title=title,
+            )
+        else:
+            cmd = self._build_hevc_command(
+                input_file,
+                output_file,
+                content_type,
                 video=video,
                 encode_options=encode_options,
                 title=title,
             )
 
-        # Software encoders
-        if self.target_codec == "av1":
-            return self._build_av1_command(
-                input_file,
-                output_file,
-                content_type,
-                video=video,
-                encode_options=encode_options,
-                title=title,
-            )
-        return self._build_hevc_command(
-            input_file,
-            output_file,
-            content_type,
-            video=video,
-            encode_options=encode_options,
-            title=title,
-        )
+        return self._patch_attachment_mimetypes(cmd, attachments or [])
 
     @staticmethod
     @staticmethod
@@ -830,7 +849,7 @@ class VideoConverter:
 
         # Add animation-specific tuning for anime
         if content_type == ContentType.ANIME:
-            svtav1_params.append("enable-overlay=0")
+            # enable-overlay was removed in SVT-AV1 v2.x — omit to avoid parse error
             svtav1_params.append("film-grain=0")
 
         # Pass through HDR10 metadata if present (skip when stripping to SDR)
@@ -984,6 +1003,35 @@ class VideoConverter:
     def _append_copy_streams(cmd: list[str]) -> None:
         """Append flags to copy audio, subtitles, and attachments."""
         cmd.extend(["-c:a", "copy", "-c:s", "copy", "-c:t", "copy"])
+
+    @staticmethod
+    def _patch_attachment_mimetypes(
+        cmd: list[str],
+        attachments: list[AttachmentStream],
+    ) -> list[str]:
+        """Insert -metadata:s:t:N mimetype=... for attachments missing a mimetype tag.
+
+        The MKV muxer refuses to write the output header when any attachment
+        stream has no mimetype and ffmpeg cannot deduce one from the codec id
+        (which is common for fonts or cover art with stripped tags).  This
+        method patches the completed ffmpeg command by inserting metadata
+        overrides immediately before the output filename (the last element).
+        """
+        if not attachments:
+            return cmd
+
+        fixes: list[str] = []
+        for i, att in enumerate(attachments):
+            if not att.mimetype:
+                ext = Path(att.filename or "").suffix.lower()
+                mime = _ATTACHMENT_MIME_FALLBACK.get(ext, "application/octet-stream")
+                fixes += [f"-metadata:s:t:{i}", f"mimetype={mime}"]
+
+        if not fixes:
+            return cmd
+
+        # cmd[-1] is the output file path — insert before it
+        return cmd[:-1] + fixes + [cmd[-1]]
 
     @staticmethod
     def _clear_video_stream_tags() -> list[str]:
