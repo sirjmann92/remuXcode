@@ -608,16 +608,18 @@ class JobQueue:
                 or (result.get("audio") and not result["audio"].get("success"))
                 or (result.get("cleanup") and not result["cleanup"].get("success"))
             )
-            all_phases_failed = any_phase_failed and not any_success
-            if all_phases_failed:
+            if any_phase_failed:
                 job.status = JobStatus.FAILED
                 job.error = next(
-                    r["error"]
-                    for r in [result.get("video"), result.get("audio"), result.get("cleanup")]
-                    if r and not r.get("success") and r.get("error")
+                    (
+                        r["error"]
+                        for r in [result.get("video"), result.get("audio"), result.get("cleanup")]
+                        if r and not r.get("success") and r.get("error")
+                    ),
+                    "A phase failed without an error message",
                 )
                 job.log("app", "error", f"Job failed: {job.error}")
-                logger.error("Job %s failed: all phases failed", job_id)
+                logger.error("Job %s failed: one or more phases failed", job_id)
             else:
                 job.status = JobStatus.COMPLETED
                 job.log("app", "info", "Job completed successfully")

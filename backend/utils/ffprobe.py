@@ -463,6 +463,14 @@ class FFProbe:
             side_data_list
         )
 
+        # Fallback DV detection via codec tag (dvhe / dvh1) — some DV HEVC
+        # files (especially Profile 5/8) don't expose a DOVI side-data record
+        # via ffprobe even though the stream is Dolby Vision.
+        if not is_dolby_vision:
+            codec_tag = stream.get("codec_tag_string", "").lower()
+            if codec_tag in ("dvhe", "dvh1"):
+                is_dolby_vision = True
+
         return VideoStream(
             index=stream.get("index", 0),
             codec_name=stream.get("codec_name", ""),
