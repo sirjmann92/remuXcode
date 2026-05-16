@@ -6,12 +6,59 @@ import logging
 import os
 from pathlib import Path
 import select
+import signal
 import subprocess
 import tempfile
 import threading
 import time
 
 logger = logging.getLogger(__name__)
+
+# Progress-stat keywords that appear in FFmpeg's legacy stderr line:
+#   frame=N fps=N q=N.N size=NKiB time=H:M:S.ms bitrate=N speed=Nx
+# We use these to distinguish real error lines from progress noise.
+_PROGRESS_STAT_KEYWORDS = frozenset(["fps=", "speed=", "bitrate=", "out_time", "Svt["])
+
+
+def ffmpeg_error_summary(returncode: int, stderr_text: str) -> str:
+    """Return a concise error description suitable for a job failure message.
+
+    Prefers actual error/warning lines from stderr over raw progress stats.
+    When *returncode* is negative the process was killed by a Unix signal
+    (e.g. SIGABRT from an encoder assertion, SIGSEGV from a crash) — that
+    signal name is prepended so it's immediately visible in the UI.
+    """
+    # Decode signal number when the process was killed by a signal.
+    signal_prefix = ""
+    if returncode < 0:
+        try:
+            sig_name = signal.Signals(-returncode).name
+        except ValueError:
+            sig_name = f"signal {-returncode}"
+        signal_prefix = f"FFmpeg killed by {sig_name}\n"
+
+    # Scan for lines that look like real errors rather than progress stats.
+    meaningful: list[str] = []
+    for ln in stderr_text.splitlines():
+        ln_strip = ln.strip()
+        if not ln_strip:
+            continue
+        # Skip pure progress-stat lines.
+        if any(kw in ln_strip for kw in _PROGRESS_STAT_KEYWORDS):
+            continue
+        # Skip the standard "frame=N fps=N ..." stderr format line.
+        if ln_strip.startswith("frame=") and "fps=" in ln_strip:
+            continue
+        meaningful.append(ln_strip)
+
+    if meaningful:
+        # Last 30 meaningful lines give a good picture without being overwhelming.
+        summary = "\n".join(meaningful[-30:])
+    else:
+        # Nothing meaningful found — fall back to the raw tail.
+        summary = stderr_text[-2000:]
+
+    return f"{signal_prefix}{summary}"
 
 
 class CancelledError(Exception):
