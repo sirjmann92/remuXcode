@@ -298,10 +298,20 @@ def run_ffmpeg_with_progress(
                             proc.kill()
                     if can_report:
                         pct = 0.0
-                        if out_time_us > 0 and has_duration:
-                            pct = min(100.0, (out_time_us / 1_000_000.0) / duration_secs * 100.0)  # type: ignore[operator]
-                        elif current_frame > 0 and has_frames:
+                        # Prefer frame-based progress when available: for
+                        # software encoders with deep pipelines (SVT-AV1
+                        # look-ahead + GOP buffering), out_time_us can lag
+                        # current_frame by several minutes, making the
+                        # percentage appear frozen while the encode is healthy.
+                        # current_frame (frames ingested by the encoder)
+                        # advances in real time and is a more accurate proxy
+                        # for actual work done.  Fall back to out_time_us only
+                        # when total_frames is not available (e.g. audio-only
+                        # remux, or HW encoder that skips frame reporting).
+                        if current_frame > 0 and has_frames:
                             pct = min(100.0, current_frame / total_frames * 100.0)  # type: ignore[operator]
+                        elif out_time_us > 0 and has_duration:
+                            pct = min(100.0, (out_time_us / 1_000_000.0) / duration_secs * 100.0)  # type: ignore[operator]
                         if pct > 0:
                             progress_cb(pct)  # type: ignore[misc]
     except CancelledError:
