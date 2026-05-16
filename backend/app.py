@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from backend import __version__
-from backend.core import cleanup_temp_dirs, initialize_components, shutdown_components
+from backend.core import initialize_components, shutdown_components
 
 logger = logging.getLogger("remuxcode")
 
@@ -30,7 +30,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("=" * 60)
     logger.info("  remuXcode %s Starting", __version__)
     logger.info("=" * 60)
-    cleanup_temp_dirs()
     initialize_components()
     yield
     shutdown_components()

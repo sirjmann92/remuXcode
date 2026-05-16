@@ -249,6 +249,12 @@ class MediaStore:
     # Maintenance
     # ------------------------------------------------------------------
 
+    def get_all_file_paths(self) -> list[str]:
+        """Return every file_path currently in the analysis cache."""
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT file_path FROM media_analysis").fetchall()
+        return [r["file_path"] for r in rows]
+
     def purge_missing(self) -> int:
         """Delete rows whose files no longer exist on disk. Run on startup."""
         with self._get_connection() as conn:
