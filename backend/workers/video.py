@@ -1210,9 +1210,7 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to QSV surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(
-                    upload_fmt, encode_options, video
-                )
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
                 + ",hwupload=extra_hw_frames=64",
                 "-c:v:0",
                 encoder,
@@ -1317,10 +1315,7 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to VAAPI surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(
-                    upload_fmt, encode_options, video
-                )
-                + ",hwupload",
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload",
                 "-c:v:0",
                 encoder,
                 "-rc_mode",
@@ -1419,9 +1414,7 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to CUDA surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(
-                    upload_fmt, encode_options, video
-                )
+                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
                 + ",hwupload_cuda",
                 "-c:v:0",
                 encoder,
