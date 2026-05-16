@@ -650,21 +650,12 @@ class VideoConverter:
             parts.append(f"fps=fps={framerate}")
 
         # --- PTS reset for DV sources ---
-        # DV HEVC streams produce frames with broken or frozen PTS after demux.
-        # setpts=N/FRAME_RATE/TB regenerates monotonically-increasing timestamps
-        # from the output frame counter.  Must come AFTER the fps filter so any
-        # fps-induced duplicates/drops are included in N before PTS is assigned.
+        # For DV sources, regenerate monotonically-increasing PTS from the
+        # frame counter to smooth out any minor timestamp irregularities
+        # from DV RPU SEI data in the HEVC bitstream.  With valid container
+        # timestamps (no -igndts), FRAME_RATE is correctly detected from
+        # the source stream.
         if reset_pts:
-            # When no explicit framerate is configured, -fflags+igndts prevents
-            # the filtergraph from detecting the source fps from broken/missing
-            # timestamps.  FFmpeg then falls back to 25fps for FRAME_RATE in
-            # setpts and for -fps_mode cfr, causing ~4% frame duplication on
-            # 23.976fps content and a corrupted output duration.
-            # Pin an explicit fps filter to the ffprobe-detected source rate
-            # (from r_frame_rate, which is read from container headers and is
-            # unaffected by -igndts) so FRAME_RATE resolves correctly.
-            if not framerate and video and video.frame_rate and video.frame_rate != "0/1":
-                parts.append(f"fps=fps={video.frame_rate}")
             parts.append("setpts=N/FRAME_RATE/TB")
 
         # --- HDR → SDR tone-mapping ---
@@ -742,14 +733,14 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        # DV HEVC streams embed RPU SEI NAL units that corrupt timestamps and
-        # can cause the HEVC decoder to stall on malformed bitstream data.
-        # +genpts+igndts: regenerate all timestamps from frame rate at demux
-        # ignore_err: skip malformed NAL/RPU data the decoder can't handle
-        # setpts (in vf chain): recompute decoded frame PTS from frame index
+        # DV HEVC streams embed RPU SEI NAL units that may be malformed;
+        # ignore_err skips bad data without aborting the decode.
+        # -fflags+igndts is intentionally omitted: it destroys container
+        # timestamp info, causing FRAME_RATE in setpts to fall back to 25 fps
+        # and -fps_mode cfr to fill timing gaps with duplicate frames,
+        # eventually deadlocking the SVT-AV1 pipeline.
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts+igndts"])
             cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
@@ -895,14 +886,14 @@ class VideoConverter:
         if self.ffmpeg_threads > 0:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
-        # DV HEVC streams embed RPU SEI NAL units that corrupt timestamps and
-        # can cause the HEVC decoder to stall on malformed bitstream data.
-        # +genpts+igndts: regenerate all timestamps from frame rate at demux
-        # ignore_err: skip malformed NAL/RPU data the decoder can't handle
-        # setpts (in vf chain): recompute decoded frame PTS from frame index
+        # DV HEVC streams embed RPU SEI NAL units that may be malformed;
+        # ignore_err skips bad data without aborting the decode.
+        # -fflags+igndts is intentionally omitted: it destroys container
+        # timestamp info, causing FRAME_RATE in setpts to fall back to 25 fps
+        # and -fps_mode cfr to fill timing gaps with duplicate frames,
+        # eventually deadlocking the SVT-AV1 pipeline.
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts+igndts"])
             cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
@@ -1189,7 +1180,6 @@ class VideoConverter:
 
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts+igndts"])
             cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
@@ -1295,7 +1285,6 @@ class VideoConverter:
 
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts+igndts"])
             cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
@@ -1396,7 +1385,6 @@ class VideoConverter:
 
         is_dv_source = bool(video and video.is_dolby_vision)
         if is_dv_source:
-            cmd.extend(["-fflags", "+genpts+igndts"])
             cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
