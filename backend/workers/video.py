@@ -19,7 +19,7 @@ from backend.utils.anime_detect import AnimeDetector, ContentType
 from backend.utils.config import VideoConfig
 from backend.utils.ffprobe import AttachmentStream, FFProbe, VideoStream
 from backend.utils.hwaccel import HWAccelCaps, resolve_encoder
-from backend.workers._progress import run_ffmpeg_with_progress
+from backend.workers._progress import ffmpeg_error_summary, run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace
 
 logger = logging.getLogger(__name__)
@@ -385,7 +385,7 @@ class VideoConverter:
                     codec_from=video.codec_name,
                     codec_to=codec_to,
                     content_type=content_type.value,
-                    error=f"FFmpeg failed: {stderr_text[-2000:]}",
+                    error=ffmpeg_error_summary(returncode, stderr_text),
                 )
 
             # Move temp file to output location

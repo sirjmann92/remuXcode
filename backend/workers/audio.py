@@ -17,7 +17,7 @@ import uuid
 
 from backend.utils.config import AudioConfig
 from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo
-from backend.workers._progress import run_ffmpeg_with_progress
+from backend.workers._progress import ffmpeg_error_summary, run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace
 
 logger = logging.getLogger(__name__)
@@ -404,7 +404,7 @@ class AudioConverter:
                     streams_total=len(info.audio_streams),
                     original_size=info.size,
                     new_size=0,
-                    error=f"FFmpeg failed: {stderr_text[-2000:]}",
+                    error=ffmpeg_error_summary(returncode, stderr_text),
                 )
 
             # Move temp file to output location
