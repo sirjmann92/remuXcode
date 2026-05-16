@@ -655,6 +655,16 @@ class VideoConverter:
         # from the output frame counter.  Must come AFTER the fps filter so any
         # fps-induced duplicates/drops are included in N before PTS is assigned.
         if reset_pts:
+            # When no explicit framerate is configured, -fflags+igndts prevents
+            # the filtergraph from detecting the source fps from broken/missing
+            # timestamps.  FFmpeg then falls back to 25fps for FRAME_RATE in
+            # setpts and for -fps_mode cfr, causing ~4% frame duplication on
+            # 23.976fps content and a corrupted output duration.
+            # Pin an explicit fps filter to the ffprobe-detected source rate
+            # (from r_frame_rate, which is read from container headers and is
+            # unaffected by -igndts) so FRAME_RATE resolves correctly.
+            if not framerate and video and video.frame_rate and video.frame_rate != "0/1":
+                parts.append(f"fps=fps={video.frame_rate}")
             parts.append("setpts=N/FRAME_RATE/TB")
 
         # --- HDR → SDR tone-mapping ---
