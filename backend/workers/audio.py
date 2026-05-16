@@ -842,17 +842,21 @@ class AudioConverter:
         cmd.extend(["-c:v", "copy"])
         if info.subtitle_streams:
             cmd.extend(["-c:s", "copy"])
+
+        # Suppress per-stream metadata from source BEFORE applying explicit tags.
+        # This clears stale BPS / NUMBER_OF_BYTES / etc. from the input streams.
+        # codec_args (which follows) then re-applies the language / title values
+        # we want to preserve, ensuring they are not overridden by the clear.
+        # NOTE: -map_metadata:s -1 placed AFTER codec_args causes it to win over
+        # explicit -metadata:s:s:N flags for copied streams (subtitle/attachment),
+        # because FFmpeg processes the last metadata directive for each stream.
+        cmd.extend(["-map_metadata:s", "-1"])
+
         cmd.extend(codec_args)
         cmd.extend(["-map_chapters", "0"])
 
         # Tag the container so Sonarr detects a size change and re-reads MediaInfo
         cmd.extend(["-metadata:g", "ENCODED_BY=remuxcode"])
-
-        # Suppress per-stream metadata from source so FFmpeg auto-generates correct
-        # BPS / NUMBER_OF_BYTES / NUMBER_OF_FRAMES for re-encoded and copied streams.
-        # Titles and languages are set explicitly above for subtitle streams;
-        # audio stream titles are set above in each codec_args block.
-        cmd.extend(["-map_metadata:s", "-1"])
 
         cmd.append(output_file)
         return cmd
