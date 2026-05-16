@@ -788,7 +788,6 @@ class VideoConverter:
             framerate,
             encode_options=encode_options,
             video=video,
-            reset_pts=is_dv_source,
         )
         cmd.extend(vf_args)
 
@@ -807,6 +806,11 @@ class VideoConverter:
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:
             cmd.extend(["-r", framerate])
+        elif is_dv_source and video and video.frame_rate and video.frame_rate != "0/1":
+            # DV sources often lack a declared frame rate in stream headers;
+            # without an explicit -r, -fps_mode cfr's implicit fps filter falls
+            # back to 25 fps, causing duplicate frames and pipeline deadlock.
+            cmd.extend(["-r", video.frame_rate])
 
         # Clear stale video stream tags from source MKV
         cmd.extend(self._clear_video_stream_tags())
@@ -933,7 +937,6 @@ class VideoConverter:
             framerate,
             encode_options=encode_options,
             video=video,
-            reset_pts=is_dv_source,
         )
         cmd.extend(vf_args)
 
@@ -952,6 +955,11 @@ class VideoConverter:
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:
             cmd.extend(["-r", framerate])
+        elif is_dv_source and video and video.frame_rate and video.frame_rate != "0/1":
+            # DV sources often lack a declared frame rate in stream headers;
+            # without an explicit -r, -fps_mode cfr's implicit fps filter falls
+            # back to 25 fps, causing duplicate frames and pipeline deadlock.
+            cmd.extend(["-r", video.frame_rate])
 
         # Clear stale video stream tags from source MKV
         cmd.extend(self._clear_video_stream_tags())
@@ -1203,7 +1211,7 @@ class VideoConverter:
                 # Upload SW-decoded frames to QSV surface for HW encoding
                 "-filter:v:0",
                 self._build_preupload_sw_filter(
-                    upload_fmt, encode_options, video, reset_pts=is_dv_source
+                    upload_fmt, encode_options, video
                 )
                 + ",hwupload=extra_hw_frames=64",
                 "-c:v:0",
@@ -1226,6 +1234,8 @@ class VideoConverter:
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:
             cmd.extend(["-r", framerate])
+        elif is_dv_source and video and video.frame_rate and video.frame_rate != "0/1":
+            cmd.extend(["-r", video.frame_rate])
 
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
@@ -1308,7 +1318,7 @@ class VideoConverter:
                 # Upload SW-decoded frames to VAAPI surface for HW encoding
                 "-filter:v:0",
                 self._build_preupload_sw_filter(
-                    upload_fmt, encode_options, video, reset_pts=is_dv_source
+                    upload_fmt, encode_options, video
                 )
                 + ",hwupload",
                 "-c:v:0",
@@ -1329,6 +1339,8 @@ class VideoConverter:
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:
             cmd.extend(["-r", framerate])
+        elif is_dv_source and video and video.frame_rate and video.frame_rate != "0/1":
+            cmd.extend(["-r", video.frame_rate])
 
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
@@ -1408,7 +1420,7 @@ class VideoConverter:
                 # Upload SW-decoded frames to CUDA surface for HW encoding
                 "-filter:v:0",
                 self._build_preupload_sw_filter(
-                    upload_fmt, encode_options, video, reset_pts=is_dv_source
+                    upload_fmt, encode_options, video
                 )
                 + ",hwupload_cuda",
                 "-c:v:0",
@@ -1430,6 +1442,8 @@ class VideoConverter:
         cmd.extend(["-fps_mode", "cfr"])
         if framerate:
             cmd.extend(["-r", framerate])
+        elif is_dv_source and video and video.frame_rate and video.frame_rate != "0/1":
+            cmd.extend(["-r", video.frame_rate])
 
         cmd.extend(self._sdr_color_args() if strip_hdr else self._build_color_args(video))
         self._append_copy_streams(cmd)
