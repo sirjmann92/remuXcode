@@ -740,8 +740,7 @@ class VideoConverter:
         # and -fps_mode cfr to fill timing gaps with duplicate frames,
         # eventually deadlocking the SVT-AV1 pipeline.
         is_dv_source = bool(video and video.is_dolby_vision)
-        if is_dv_source:
-            cmd.extend(["-err_detect", "ignore_err"])
+        cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
@@ -897,8 +896,7 @@ class VideoConverter:
         # and -fps_mode cfr to fill timing gaps with duplicate frames,
         # eventually deadlocking the SVT-AV1 pipeline.
         is_dv_source = bool(video and video.is_dolby_vision)
-        if is_dv_source:
-            cmd.extend(["-err_detect", "ignore_err"])
+        cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
@@ -1187,8 +1185,7 @@ class VideoConverter:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
         is_dv_source = bool(video and video.is_dolby_vision)
-        if is_dv_source:
-            cmd.extend(["-err_detect", "ignore_err"])
+        cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
@@ -1292,8 +1289,7 @@ class VideoConverter:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
         is_dv_source = bool(video and video.is_dolby_vision)
-        if is_dv_source:
-            cmd.extend(["-err_detect", "ignore_err"])
+        cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
@@ -1391,8 +1387,7 @@ class VideoConverter:
             cmd.extend(["-threads", str(self.ffmpeg_threads)])
 
         is_dv_source = bool(video and video.is_dolby_vision)
-        if is_dv_source:
-            cmd.extend(["-err_detect", "ignore_err"])
+        cmd.extend(["-err_detect", "ignore_err"])
 
         cmd.extend(
             [
