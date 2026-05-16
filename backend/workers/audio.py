@@ -731,11 +731,17 @@ class AudioConverter:
                         )
                     if title:
                         codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
+                    if stream.language:
+                        codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"language={stream.language}"])
                     audio_output_index += 1
 
                     map_args.extend(["-map", f"0:{stream.index}"])
                     codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
-                    # Preserve source title since -map_metadata:s -1 suppresses stream tags
+                    # Preserve source language/title since -map_metadata:s -1 suppresses stream tags
+                    if stream.language:
+                        codec_args.extend(
+                            [f"-metadata:s:a:{audio_output_index}", f"language={stream.language}"]
+                        )
                     if stream.title:
                         codec_args.extend(
                             [f"-metadata:s:a:{audio_output_index}", f"title={stream.title}"]
@@ -746,7 +752,11 @@ class AudioConverter:
                     # Original first, converted second
                     map_args.extend(["-map", f"0:{stream.index}"])
                     codec_args.extend([f"-c:a:{audio_output_index}", "copy"])
-                    # Preserve source title since -map_metadata:s -1 suppresses stream tags
+                    # Preserve source language/title since -map_metadata:s -1 suppresses stream tags
+                    if stream.language:
+                        codec_args.extend(
+                            [f"-metadata:s:a:{audio_output_index}", f"language={stream.language}"]
+                        )
                     if stream.title:
                         codec_args.extend(
                             [f"-metadata:s:a:{audio_output_index}", f"title={stream.title}"]
@@ -767,6 +777,8 @@ class AudioConverter:
                         )
                     if title:
                         codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
+                    if stream.language:
+                        codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"language={stream.language}"])
                     audio_output_index += 1
 
                 else:
@@ -785,6 +797,8 @@ class AudioConverter:
                         )
                     if title:
                         codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"title={title}"])
+                    if stream.language:
+                        codec_args.extend([f"-metadata:s:a:{audio_output_index}", f"language={stream.language}"])
                     audio_output_index += 1
             else:
                 # Copy non-converted streams as-is
