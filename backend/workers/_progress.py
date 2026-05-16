@@ -140,10 +140,15 @@ def run_ffmpeg_with_progress(
     # Stall watchdog: kill ffmpeg if encoding progress stops advancing.
     # Two complementary checks:
     #   1. No FIFO data at all for _STALL_TIMEOUT seconds (complete silence).
-    #   2. FIFO data arriving but out_time_us/frame haven't advanced for
-    #      _PROGRESS_STALL_TIMEOUT seconds (ffmpeg alive but encoder frozen —
-    #      e.g. DV RPU decoder stall mid-stream that keeps sending repeating
-    #      progress=continue blocks without producing new output frames).
+    #   2. FIFO data arriving but both out_time_us AND frame haven't advanced
+    #      for _PROGRESS_STALL_TIMEOUT seconds.
+    #
+    # IMPORTANT: out_time_us (output mux time) and current_frame (input/filter
+    # side) are tracked independently.  Encoders with large internal pipelines
+    # (e.g. SVT-AV1 with look-ahead depth 40 + GOP 120) can have out_time_us
+    # lag current_frame by many minutes while the encode is perfectly healthy.
+    # Advancing EITHER metric resets the stall timer, so the watchdog only
+    # fires when the entire pipeline — both input and output — has truly frozen.
     #
     # _PROGRESS_STALL_TIMEOUT is intentionally long (10 min) because large MKV
     # files with many subtitle tracks (e.g. full multi-language remuxes) require
@@ -155,7 +160,8 @@ def run_ffmpeg_with_progress(
     _STALL_TIMEOUT = 300.0
     _PROGRESS_STALL_TIMEOUT = 600.0
     last_fifo_activity = time.monotonic()
-    last_progress_value = -1  # tracks highest out_time_us (or frame) seen
+    last_out_time_us = -1  # highest out_time_us seen
+    last_frame = -1  # highest current_frame seen
     last_progress_advance = time.monotonic()
     try:
         buf = ""
@@ -216,10 +222,20 @@ def run_ffmpeg_with_progress(
                             current_frame = val
                 elif line.startswith("progress="):
                     progress_blocks += 1
-                    # Watchdog 2: FIFO data arriving but progress not advancing
-                    progress_value = out_time_us if out_time_us > 0 else current_frame
-                    if progress_value > last_progress_value:
-                        last_progress_value = progress_value
+                    # Watchdog 2: FIFO data arriving but progress not advancing.
+                    # Advance the timer when EITHER out_time_us OR current_frame
+                    # increases.  This prevents false kills when SVT-AV1's large
+                    # pipeline (look-ahead + GOP buffering) causes out_time_us to
+                    # lag current_frame by many minutes while the encode is still
+                    # actively processing input frames.
+                    _advanced = False
+                    if out_time_us > 0 and out_time_us > last_out_time_us:
+                        last_out_time_us = out_time_us
+                        _advanced = True
+                    if current_frame > 0 and current_frame > last_frame:
+                        last_frame = current_frame
+                        _advanced = True
+                    if _advanced:
                         last_progress_advance = time.monotonic()
                     elif progress_blocks > 10:
                         # Only start checking after initial startup (10 blocks)
