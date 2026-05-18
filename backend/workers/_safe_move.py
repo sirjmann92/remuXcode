@@ -18,9 +18,11 @@ irreversibly destroyed.
 
 from __future__ import annotations
 
+import errno
 import logging
 from pathlib import Path
 import shutil
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,51 @@ _BACKUP_SUFFIX = ".remuxcode-backup"
 
 class SafeMoveError(Exception):
     """Raised when a safe move/replace operation fails."""
+
+
+def _move_with_retry(src: Path, dst: Path, max_attempts: int = 3) -> None:
+    """Move *src* to *dst*, handling cross-device boundaries and transient ENOENT.
+
+    On FUSE/mergerfs mounts ``os.rename`` can fail with ``EXDEV`` when the
+    create policy places the destination on a different underlying branch than
+    the source.  ``shutil.move`` silently falls back to ``copy2`` + ``unlink``
+    in that case, but if the source disk is briefly unavailable at that moment
+    (Unraid spindown, heavy I/O) ``open(src)`` inside ``copy2`` raises ``ENOENT``
+    and the exception propagates with no recovery.
+
+    This function replicates the same two-step strategy but retries the copy
+    on transient ``FileNotFoundError`` so a brief disk hiccup doesn't kill the
+    job.
+    """
+    # Fast path: atomic same-device rename
+    try:
+        src.rename(dst)
+        return
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+
+    # Cross-device fallback: copy then remove with retry
+    last_exc: Exception | None = None
+    for attempt in range(max_attempts):
+        try:
+            shutil.copy2(str(src), str(dst))
+            src.unlink()
+            return
+        except FileNotFoundError as exc:
+            last_exc = exc
+            if attempt < max_attempts - 1:
+                delay = 0.5 * (attempt + 1)
+                logger.warning(
+                    "copy2 attempt %d/%d failed (ENOENT) – retrying in %.1fs: %s",
+                    attempt + 1,
+                    max_attempts,
+                    delay,
+                    src.name,
+                )
+                time.sleep(delay)
+
+    raise last_exc  # type: ignore[misc]
 
 
 def safe_replace(
@@ -96,7 +143,7 @@ def safe_replace(
     # 3. Move the new file into place
     # ------------------------------------------------------------------
     try:
-        shutil.move(str(new_file), str(destination))
+        _move_with_retry(new_file, destination)
     except Exception as exc:
         logger.error("Move failed: %s → %s: %s", new_file, destination, exc)
         if has_backup:
