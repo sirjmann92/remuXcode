@@ -412,6 +412,22 @@ class StreamCleanup:
                     error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
+            if not temp_output.exists():
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return CleanupResult(
+                    success=False,
+                    input_file=input_file,
+                    output_file=output_file,
+                    audio_removed=0,
+                    audio_kept=len(info.audio_streams),
+                    subtitle_removed=0,
+                    subtitle_kept=len(info.subtitle_streams),
+                    original_size=info.size,
+                    new_size=0,
+                    original_language=original_lang,
+                    error=f"FFmpeg exited normally but output file is missing: {temp_output.name}",
+                )
+
             # Move temp file to output location
             if temp_output.exists():
                 # Check if original still exists (could be deleted during conversion)

@@ -388,6 +388,24 @@ class VideoConverter:
                     error=ffmpeg_error_summary(returncode, stderr_text),
                 )
 
+            # Sanity-check: FFmpeg exited 0 but didn't create the output file.
+            # Can happen on FUSE/mergerfs when a cross-device rename (EXDEV)
+            # causes shutil.move to fall back to copy2, and the source disk is
+            # transiently unavailable (spindown / heavy I/O at that moment).
+            if not temp_file.exists():
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return VideoConversionResult(
+                    success=False,
+                    input_file=input_file,
+                    output_file=output_file,
+                    original_size=info.size,
+                    new_size=0,
+                    codec_from=video.codec_name,
+                    codec_to=codec_to,
+                    content_type=content_type.value,
+                    error=f"FFmpeg exited normally but output file is missing: {temp_file.name}",
+                )
+
             # Move temp file to output location
             if temp_file.exists():
                 # Check if original still exists (could be deleted during conversion)

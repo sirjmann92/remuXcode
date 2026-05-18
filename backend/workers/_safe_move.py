@@ -62,10 +62,15 @@ def safe_replace(
     # ------------------------------------------------------------------
     # 1. Validate the new file
     # ------------------------------------------------------------------
-    if not new_file.exists():
-        raise FileNotFoundError(f"New file does not exist: {new_file}")
+    # Use a single stat() call rather than exists() + stat() to avoid a
+    # TOCTOU window on FUSE/mergerfs mounts where consecutive lookups can
+    # return different results under heavy I/O or after a cross-device
+    # rename fallback (shutil.move → copy2 path).
+    try:
+        new_size = new_file.stat().st_size
+    except FileNotFoundError:
+        raise FileNotFoundError(f"New file does not exist: {new_file}") from None
 
-    new_size = new_file.stat().st_size
     if new_size == 0:
         raise SafeMoveError(f"New file is 0 bytes – refusing to replace original: {new_file}")
 
