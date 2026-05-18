@@ -407,6 +407,19 @@ class AudioConverter:
                     error=ffmpeg_error_summary(returncode, stderr_text),
                 )
 
+            if not temp_output.exists():
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return AudioConversionResult(
+                    success=False,
+                    input_file=input_file,
+                    output_file=output_file,
+                    streams_converted=0,
+                    streams_total=len(info.audio_streams),
+                    original_size=info.size,
+                    new_size=0,
+                    error=f"FFmpeg exited normally but output file is missing: {temp_output.name}",
+                )
+
             # Move temp file to output location
             if temp_output.exists():
                 # Check if original still exists (could be deleted during conversion)
