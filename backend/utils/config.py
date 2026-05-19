@@ -60,8 +60,8 @@ class AudioConfig:
     """Audio conversion settings."""
 
     enabled: bool = True
-    anime_only: bool = False  # When True, only convert audio in anime content
-    live_action_only: bool = False  # When True, only convert audio in live-action content
+    process_anime: bool = True  # When False, skip anime content
+    process_live_action: bool = True  # When False, skip live-action content
     convert_dts: bool = True
     convert_dts_x: bool = False  # DTS:X is object-based — skip by default
     convert_truehd: bool = False  # TrueHD is lossless Dolby — default is to leave it alone
@@ -81,8 +81,8 @@ class CleanupConfig:
     """Stream cleanup settings."""
 
     enabled: bool = True
-    anime_only: bool = False  # When True, only clean streams in anime content
-    live_action_only: bool = False  # When True, only clean streams in live-action content
+    process_anime: bool = True  # When False, skip anime content
+    process_live_action: bool = True  # When False, skip live-action content
     clean_audio: bool = True
     clean_subtitles: bool = True
     keep_languages: list[str] = field(default_factory=lambda: ["eng"])
@@ -107,10 +107,10 @@ class VideoConfig:
     convert_8bit_x264: bool = False
     convert_legacy_codecs: bool = True  # VC-1, MPEG-2, MPEG-4/Xvid/DivX
 
-    # Only convert anime content (skip live action)
-    anime_only: bool = True
-    # Only convert live action content (skip anime)
-    live_action_only: bool = False
+    # Whether to process anime content
+    process_anime: bool = True
+    # Whether to process live action content
+    process_live_action: bool = True
 
     # HDR handling: by default DV and HDR10+ files are skipped to prevent
     # metadata loss.  Enable these to allow encoding (dynamic/RPU metadata
@@ -311,8 +311,8 @@ class Config:
         """Parse audio configuration section."""
         return AudioConfig(
             enabled=self._get("audio.enabled", True),
-            anime_only=self._get("audio.anime_only", False),
-            live_action_only=self._get("audio.live_action_only", False),
+            process_anime=self._get("audio.process_anime", True),
+            process_live_action=self._get("audio.process_live_action", True),
             convert_dts=self._get("audio.convert_dts", True),
             convert_dts_x=self._get("audio.convert_dts_x", False),
             convert_truehd=self._get("audio.convert_truehd", False),
@@ -331,8 +331,8 @@ class Config:
         """Parse stream cleanup configuration."""
         return CleanupConfig(
             enabled=self._get("cleanup.enabled", True),
-            anime_only=self._get("cleanup.anime_only", False),
-            live_action_only=self._get("cleanup.live_action_only", False),
+            process_anime=self._get("cleanup.process_anime", True),
+            process_live_action=self._get("cleanup.process_live_action", True),
             clean_audio=self._get("cleanup.clean_audio", True),
             clean_subtitles=self._get("cleanup.clean_subtitles", True),
             keep_languages=self._get("cleanup.keep_languages", ["eng"]),
@@ -353,8 +353,8 @@ class Config:
             convert_10bit_x264=self._get("video.convert_10bit_x264", True),
             convert_8bit_x264=self._get("video.convert_8bit_x264", False),
             convert_legacy_codecs=self._get("video.convert_legacy_codecs", True),
-            anime_only=self._get("video.anime_only", True),
-            live_action_only=self._get("video.live_action_only", False),
+            process_anime=self._get("video.process_anime", True),
+            process_live_action=self._get("video.process_live_action", True),
             dv_to_hdr10=self._get("video.dv_to_hdr10", False),
             hdr10plus_to_hdr10=self._get("video.hdr10plus_to_hdr10", False),
             anime_auto_detect=self._get("video.anime_auto_detect", True),
@@ -427,8 +427,8 @@ class Config:
         self._raw_config.setdefault("audio", {})
         for key in (
             "enabled",
-            "anime_only",
-            "live_action_only",
+            "process_anime",
+            "process_live_action",
             "convert_dts",
             "convert_dts_x",
             "convert_truehd",
@@ -450,7 +450,8 @@ class Config:
             "convert_10bit_x264",
             "convert_8bit_x264",
             "convert_legacy_codecs",
-            "anime_only",
+            "process_anime",
+            "process_live_action",
             "anime_auto_detect",
             "anime_crf",
             "anime_preset",
@@ -486,8 +487,8 @@ class Config:
         self._raw_config.setdefault("cleanup", {})
         for key in (
             "enabled",
-            "anime_only",
-            "live_action_only",
+            "process_anime",
+            "process_live_action",
             "clean_audio",
             "clean_subtitles",
             "keep_languages",

@@ -266,15 +266,15 @@ $effect(() => {
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.enabled} onchange={() => toggleBool('audio', 'enabled')} />
             </label>
             <div class="{config.audio.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
-            <!-- Anime Only -->
-            <label class="flex items-center justify-between cursor-pointer" title="Only convert audio in anime content, skip live action">
-              <span>Anime Only<span class="block text-xs text-base-content/30 font-normal">Only convert audio in anime content, skip live action</span></span>
-              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.anime_only} onchange={() => toggleBool('audio', 'anime_only')} />
+            <!-- Process Anime -->
+            <label class="flex items-center justify-between cursor-pointer" title="Apply audio conversion to anime content">
+              <span>Process Anime<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to anime content</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.process_anime} onchange={() => toggleBool('audio', 'process_anime')} />
             </label>
-            <!-- Live Action Only -->
-            <label class="flex items-center justify-between cursor-pointer" title="Only convert audio in live action content, skip anime">
-              <span>Live Action Only<span class="block text-xs text-base-content/30 font-normal">Only convert audio in live action content, skip anime</span></span>
-              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.live_action_only} onchange={() => toggleBool('audio', 'live_action_only')} />
+            <!-- Process Live Action -->
+            <label class="flex items-center justify-between cursor-pointer" title="Apply audio conversion to live action content">
+              <span>Process Live Action<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to live action content</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.process_live_action} onchange={() => toggleBool('audio', 'process_live_action')} />
             </label>
             <!-- Convert DTS -->
             <label class="flex items-center justify-between cursor-pointer" title="Re-encode DTS/DTS-HD audio to EAC3 or AC3">
@@ -368,8 +368,8 @@ $effect(() => {
               { field: 'convert_10bit_x264', label: 'Convert 10-bit x264', hint: 'Re-encode 10-bit H.264 files (common in anime releases)' },
               { field: 'convert_8bit_x264', label: 'Convert 8-bit x264', hint: 'Re-encode standard 8-bit H.264 files' },
               { field: 'convert_legacy_codecs', label: 'Convert Legacy Codecs', hint: 'Re-encode VC-1, MPEG-2, MPEG-4/Xvid/DivX to the target codec' },
-              { field: 'anime_only', label: 'Anime Only', hint: 'Only convert video for anime content, skip live action' },
-              { field: 'live_action_only', label: 'Live Action Only', hint: 'Only convert video for live action content, skip anime' },
+              { field: 'process_anime', label: 'Process Anime', hint: 'Apply video conversion to anime content' },
+              { field: 'process_live_action', label: 'Process Live Action', hint: 'Apply video conversion to live action content' },
               { field: 'dv_to_hdr10', label: 'Convert Dolby Vision → HDR10', hint: 'Strip DV RPU layer and encode; static HDR10 base is preserved. Off = skip DV files.', shortHint: 'Re-encode to static HDR10. Off = skip DV files.' },
               { field: 'hdr10plus_to_hdr10', label: 'Convert HDR10+ → HDR10', hint: 'Strip dynamic SMPTE 2094-40 metadata and encode; static HDR10 base is preserved. Off = skip HDR10+ files.', shortHint: 'Re-encode to static HDR10. Off = skip HDR10+ files.' },
             ] as item}
@@ -600,15 +600,15 @@ $effect(() => {
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.enabled} onchange={() => toggleBool('cleanup', 'enabled')} />
             </label>
             <div class="{config.cleanup.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
-            <!-- Anime Only -->
-            <label class="flex items-center justify-between cursor-pointer" title="Only clean streams in anime content, skip live action">
-              <span>Anime Only<span class="block text-xs text-base-content/30 font-normal">Only clean streams in anime content, skip live action</span></span>
-              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.anime_only} onchange={() => toggleBool('cleanup', 'anime_only')} />
+            <!-- Process Anime -->
+            <label class="flex items-center justify-between cursor-pointer" title="Apply stream cleanup to anime content">
+              <span>Process Anime<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to anime content</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.process_anime} onchange={() => toggleBool('cleanup', 'process_anime')} />
             </label>
-            <!-- Live Action Only -->
-            <label class="flex items-center justify-between cursor-pointer" title="Only clean streams in live action content, skip anime">
-              <span>Live Action Only<span class="block text-xs text-base-content/30 font-normal">Only clean streams in live action content, skip anime</span></span>
-              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.live_action_only} onchange={() => toggleBool('cleanup', 'live_action_only')} />
+            <!-- Process Live Action -->
+            <label class="flex items-center justify-between cursor-pointer" title="Apply stream cleanup to live action content">
+              <span>Process Live Action<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to live action content</span></span>
+              <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.process_live_action} onchange={() => toggleBool('cleanup', 'process_live_action')} />
             </label>
             <div class="flex items-center justify-between">
               <span>Languages<span class="block text-xs text-base-content/30 font-normal">Audio and subtitle languages to keep</span></span>

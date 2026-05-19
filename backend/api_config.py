@@ -29,8 +29,8 @@ async def get_config_summary() -> dict[str, Any]:
             "convert_10bit_x264": cfg.video.convert_10bit_x264,
             "convert_8bit_x264": cfg.video.convert_8bit_x264,
             "convert_legacy_codecs": cfg.video.convert_legacy_codecs,
-            "anime_only": cfg.video.anime_only,
-            "live_action_only": cfg.video.live_action_only,
+            "process_anime": cfg.video.process_anime,
+            "process_live_action": cfg.video.process_live_action,
             "dv_to_hdr10": cfg.video.dv_to_hdr10,
             "hdr10plus_to_hdr10": cfg.video.hdr10plus_to_hdr10,
             "anime_crf": cfg.video.anime_crf,
@@ -66,8 +66,8 @@ async def get_config_summary() -> dict[str, Any]:
         },
         "audio": {
             "enabled": cfg.audio.enabled,
-            "anime_only": cfg.audio.anime_only,
-            "live_action_only": cfg.audio.live_action_only,
+            "process_anime": cfg.audio.process_anime,
+            "process_live_action": cfg.audio.process_live_action,
             "convert_dts": cfg.audio.convert_dts,
             "convert_dts_x": cfg.audio.convert_dts_x,
             "convert_truehd": cfg.audio.convert_truehd,
@@ -83,8 +83,8 @@ async def get_config_summary() -> dict[str, Any]:
         },
         "cleanup": {
             "enabled": cfg.cleanup.enabled,
-            "anime_only": cfg.cleanup.anime_only,
-            "live_action_only": cfg.cleanup.live_action_only,
+            "process_anime": cfg.cleanup.process_anime,
+            "process_live_action": cfg.cleanup.process_live_action,
             "clean_audio": cfg.cleanup.clean_audio,
             "clean_subtitles": cfg.cleanup.clean_subtitles,
             "keep_languages": cfg.cleanup.keep_languages,
@@ -173,8 +173,8 @@ class AudioUpdate(BaseModel):
     """Partial audio config update."""
 
     enabled: bool | None = None
-    anime_only: bool | None = None
-    live_action_only: bool | None = None
+    process_anime: bool | None = None
+    process_live_action: bool | None = None
     convert_dts: bool | None = None
     convert_dts_x: bool | None = None
     convert_truehd: bool | None = None
@@ -196,8 +196,8 @@ class VideoUpdate(BaseModel):
     convert_10bit_x264: bool | None = None
     convert_8bit_x264: bool | None = None
     convert_legacy_codecs: bool | None = None
-    anime_only: bool | None = None
-    live_action_only: bool | None = None
+    process_anime: bool | None = None
+    process_live_action: bool | None = None
     dv_to_hdr10: bool | None = None
     hdr10plus_to_hdr10: bool | None = None
     anime_auto_detect: bool | None = None
@@ -235,8 +235,8 @@ class CleanupUpdate(BaseModel):
     """Partial cleanup config update."""
 
     enabled: bool | None = None
-    anime_only: bool | None = None
-    live_action_only: bool | None = None
+    process_anime: bool | None = None
+    process_live_action: bool | None = None
     clean_audio: bool | None = None
     clean_subtitles: bool | None = None
     keep_languages: list[str] | None = None

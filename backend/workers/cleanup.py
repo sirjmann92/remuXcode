@@ -79,11 +79,11 @@ class StreamCleanup:
         if not self.config.enabled:
             return False
 
-        # Skip non-anime content when anime_only is enabled
-        if self.config.anime_only and not is_anime:
+        # Skip anime when process_anime is disabled
+        if not self.config.process_anime and is_anime:
             return False
-        # Skip anime content when live_action_only is enabled
-        if self.config.live_action_only and is_anime:
+        # Skip live action when process_live_action is disabled
+        if not self.config.process_live_action and not is_anime:
             return False
 
         info = self.ffprobe.get_file_info(file_path)

@@ -227,9 +227,9 @@ def _needs_video_conversion(info: Any, is_anime: bool) -> bool:
     video = info.primary_video
     if video is None:
         return False
-    if cfg.anime_only and not is_anime:
+    if not cfg.process_anime and is_anime:
         return False
-    if cfg.live_action_only and is_anime:
+    if not cfg.process_live_action and not is_anime:
         return False
     # Skip Dolby Vision unless dv_to_hdr10 is enabled
     if video.is_dolby_vision and not cfg.dv_to_hdr10:
@@ -824,8 +824,8 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
             is_legacy_m = any(
                 x in vc_m for x in ("vc1", "vc-1", "wmv", "mpeg2", "mpeg4", "xvid", "divx")
             )
-            if (not cfg_video_m.anime_only or movie_is_anime) and (
-                not cfg_video_m.live_action_only or not movie_is_anime
+            if (cfg_video_m.process_anime or not movie_is_anime) and (
+                cfg_video_m.process_live_action or movie_is_anime
             ):
                 if (
                     (cfg_video_m.convert_10bit_x264 and is_h264_m and vbd_m >= 10)
@@ -1199,8 +1199,8 @@ def _build_series_results(
                             for x in ("vc1", "vc-1", "wmv", "mpeg2", "mpeg4", "xvid", "divx")
                         )
                         is_anime_ep = item.get("is_anime", False)
-                        if (not cfg_video.anime_only or is_anime_ep) and (
-                            not cfg_video.live_action_only or not is_anime_ep
+                        if (cfg_video.process_anime or not is_anime_ep) and (
+                            cfg_video.process_live_action or is_anime_ep
                         ):
                             if (
                                 (cfg_video.convert_10bit_x264 and is_h264_ep and vbd >= 10)
@@ -1473,8 +1473,8 @@ def get_series_detail(
             is_legacy_item = any(
                 x in vc for x in ("vc1", "vc-1", "wmv", "mpeg2", "mpeg4", "xvid", "divx")
             )
-            if (not cfg_video_ep.anime_only or series_is_anime) and (
-                not cfg_video_ep.live_action_only or not series_is_anime
+            if (cfg_video_ep.process_anime or not series_is_anime) and (
+                cfg_video_ep.process_live_action or series_is_anime
             ):
                 if (
                     (cfg_video_ep.convert_10bit_x264 and is_h264_item and vbd >= 10)
