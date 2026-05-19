@@ -398,7 +398,7 @@ $effect(() => {
               {/key}
             </div>
             <div class="flex items-center justify-between">
-              <span>Live Action {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for live action (lower = better)</span></span>
+              <span>Standard {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for standard content (lower = better)</span></span>
               {#key liveQualityField}
               <input
                 type="number"
@@ -460,7 +460,7 @@ $effect(() => {
                 <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">{effectiveMethod !== 'none' ? 'HEVC (x265)' : 'HEVC Encoding'}</h3>
                 {#each [
                   { field: 'anime_crf', label: 'Anime CRF', type: 'number', hint: 'Quality for anime (0–51, lower = better)', min: 0, max: 51 },
-                  { field: 'live_action_crf', label: 'Live Action CRF', type: 'number', hint: 'Quality for live action (0–51)', min: 0, max: 51 },
+                  { field: 'live_action_crf', label: 'Standard CRF', type: 'number', hint: 'Quality for standard content (0–51)', min: 0, max: 51 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
                     <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
@@ -478,9 +478,9 @@ $effect(() => {
                   { field: 'anime_preset', label: 'Anime Preset', type: 'select', options: ['ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow','placebo'], hint: 'Encoding speed vs quality for anime' },
                   { field: 'anime_tune', label: 'Anime Tune', type: 'select', options: ['','animation','grain','psnr','ssim','fastdecode','zerolatency'], hint: 'x265 tuning profile (empty = none)' },
                   { field: 'anime_framerate', label: 'Anime Framerate', type: 'text', hint: 'e.g. 24000/1001 for 23.976fps (empty = auto)' },
-                  { field: 'live_action_preset', label: 'Live Action Preset', type: 'select', options: ['ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow','placebo'], hint: 'Encoding speed vs quality for live action' },
-                  { field: 'live_action_tune', label: 'Live Action Tune', type: 'select', options: ['','grain','psnr','ssim','fastdecode','zerolatency'], hint: 'x265 tuning profile (empty = none)' },
-                  { field: 'live_action_framerate', label: 'Live Action Framerate', type: 'text', hint: 'Framerate override (empty = auto-detect)' },
+                  { field: 'live_action_preset', label: 'Standard Preset', type: 'select', options: ['ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow','placebo'], hint: 'Encoding speed vs quality for standard content' },
+                  { field: 'live_action_tune', label: 'Standard Tune', type: 'select', options: ['','grain','psnr','ssim','fastdecode','zerolatency'], hint: 'x265 tuning profile (empty = none)' },
+                  { field: 'live_action_framerate', label: 'Standard Framerate', type: 'text', hint: 'Framerate override (empty = auto-detect)' },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
                     <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
@@ -541,8 +541,8 @@ $effect(() => {
                 {#each [
                   { field: 'av1_anime_crf', label: 'Anime CRF', hint: 'Quality for anime (0–63, lower = better)', min: 0, max: 63 },
                   { field: 'av1_anime_preset', label: 'Anime Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
-                  { field: 'av1_live_action_crf', label: 'Live Action CRF', hint: 'Quality for live action (0–63)', min: 0, max: 63 },
-                  { field: 'av1_live_action_preset', label: 'Live Action Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                  { field: 'av1_live_action_crf', label: 'Standard CRF', hint: 'Quality for standard content (0–63)', min: 0, max: 63 },
+                  { field: 'av1_live_action_preset', label: 'Standard Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
                     <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
@@ -558,7 +558,7 @@ $effect(() => {
                 {/each}
                 {#each [
                   { field: 'av1_anime_framerate', label: 'Anime Framerate', hint: 'e.g. 24000/1001 (empty = auto)' },
-                  { field: 'av1_live_action_framerate', label: 'Live Action Framerate', hint: 'Framerate override (empty = auto)' },
+                  { field: 'av1_live_action_framerate', label: 'Standard Framerate', hint: 'Framerate override (empty = auto)' },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
                     <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
@@ -625,8 +625,8 @@ $effect(() => {
               { field: 'clean_subtitles', label: 'Clean Subtitles', hint: 'Remove subtitle tracks not in your language list' },
               { field: 'keep_commentary', label: 'Keep Commentary', hint: 'Preserve director/cast commentary tracks regardless of language' },
               { field: 'deprioritize_commentary', label: 'Deprioritize Commentary', hint: 'Sort commentary audio/subtitle tracks after non-commentary ones and strip their default flag' },
-              { field: 'anime_keep_original_audio', label: 'Anime Keep Original Audio', hint: 'Always keep the original-language audio in anime files (Japanese, Korean, etc.)' },
-              { field: 'keep_original_audio', label: 'Keep Original Audio', hint: 'Always keep the original-language audio in live-action files' },
+              { field: 'anime_keep_original_audio', label: 'Keep Original Anime Audio', hint: 'Always keep the original-language audio in anime files (Japanese, Korean, etc.)' },
+              { field: 'keep_original_audio', label: 'Keep Original Audio', hint: 'Always keep the original-language audio in non-anime content' },
             ] as item}
               <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
                 <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
