@@ -20,9 +20,10 @@ video:
   # Recommended: these codecs have poor modern device support
   convert_legacy_codecs: ${CONVERT_LEGACY_CODECS:-true}
 
-  # Only convert anime content (skip live action videos)
-  # Set to false to convert ALL 10-bit H.264 regardless of content type
-  anime_only: ${ANIME_ONLY:-true}
+  # Process anime content (set to false to skip all anime)
+  process_anime: ${PROCESS_ANIME:-true}
+  # Process live action content (set to false to skip all live action)
+  process_live_action: ${PROCESS_LIVE_ACTION:-true}
 
   # Auto-detect anime vs live action content (for encoding settings)
   anime_auto_detect: true
@@ -65,10 +66,10 @@ video:
 audio:
   enabled: ${AUDIO_CONVERSION_ENABLED:-true}
 
-  # Only process anime content (skip live action)
-  anime_only: false
-  # Only process live action content (skip anime)
-  live_action_only: false
+  # Process anime content
+  process_anime: true
+  # Process live action content
+  process_live_action: true
 
   # What to convert
   convert_dts: true      # Convert DTS/DTS-HD to AC3/AAC
@@ -96,10 +97,10 @@ audio:
 cleanup:
   enabled: ${STREAM_CLEANUP_ENABLED:-true}
 
-  # Only clean streams in anime content (skip live action)
-  anime_only: false
-  # Only clean streams in live action content (skip anime)
-  live_action_only: false
+  # Process anime content
+  process_anime: true
+  # Process live action content
+  process_live_action: true
 
   # Clean audio streams based on language
   clean_audio: ${AUDIO_CLEANUP_ENABLED:-true}

@@ -133,7 +133,8 @@ class VideoConverter:
         - Video is 10-bit H.264 and config.convert_10bit_x264 is True
         - Video is 8-bit H.264 and config.convert_8bit_x264 is True
         - Video is not already the target codec (HEVC or AV1)
-        - If anime_only is True, only converts anime content
+        - If process_anime is False, skips anime content
+        - If process_live_action is False, skips live action content
         """
         if not self.config.enabled:
             return False
@@ -172,18 +173,15 @@ class VideoConverter:
             )
             return False
 
-        # Check if anime-only mode and skip non-anime
-        if self.config.anime_only:
+        # Content-type filter: only call the detector if at least one type is disabled
+        if not self.config.process_anime or not self.config.process_live_action:
             content_type = self.anime_detector.detect(file_path, use_api=False)
-            if content_type != ContentType.ANIME:
-                logger.debug("Skipping non-anime file (anime_only=True): %s", file_path)
+            _is_anime = content_type == ContentType.ANIME
+            if _is_anime and not self.config.process_anime:
+                logger.debug("Skipping anime content (process_anime=False): %s", file_path)
                 return False
-
-        # Check if live-action-only mode and skip anime
-        if self.config.live_action_only:
-            content_type = self.anime_detector.detect(file_path, use_api=False)
-            if content_type == ContentType.ANIME:
-                logger.debug("Skipping anime file (live_action_only=True): %s", file_path)
+            if not _is_anime and not self.config.process_live_action:
+                logger.debug("Skipping live action content (process_live_action=False): %s", file_path)
                 return False
 
         # Check conversion criteria

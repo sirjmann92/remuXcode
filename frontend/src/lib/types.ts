@@ -122,8 +122,8 @@ export interface ConfigSummary {
     convert_10bit_x264: boolean;
     convert_8bit_x264: boolean;
     convert_legacy_codecs: boolean;
-    anime_only: boolean;
-    live_action_only: boolean;
+    process_anime: boolean;
+    process_live_action: boolean;
     dv_to_hdr10: boolean;
     hdr10plus_to_hdr10: boolean;
     anime_crf: number;
@@ -159,8 +159,8 @@ export interface ConfigSummary {
   };
   audio: {
     enabled: boolean;
-    anime_only: boolean;
-    live_action_only: boolean;
+    process_anime: boolean;
+    process_live_action: boolean;
     convert_dts: boolean;
     convert_dts_x: boolean;
     convert_truehd: boolean;
@@ -176,8 +176,8 @@ export interface ConfigSummary {
   };
   cleanup: {
     enabled: boolean;
-    anime_only: boolean;
-    live_action_only: boolean;
+    process_anime: boolean;
+    process_live_action: boolean;
     clean_audio: boolean;
     clean_subtitles: boolean;
     keep_languages: string[];
