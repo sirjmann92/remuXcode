@@ -271,9 +271,9 @@ $effect(() => {
               <span>Process Anime<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to anime content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.process_anime} onchange={() => toggleBool('audio', 'process_anime')} />
             </label>
-            <!-- Process Live Action -->
-            <label class="flex items-center justify-between cursor-pointer" title="Apply audio conversion to live action content">
-              <span>Process Live Action<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to live action content</span></span>
+            <!-- Process Standard -->
+            <label class="flex items-center justify-between cursor-pointer" title="Apply audio conversion to standard (non-anime) content">
+              <span>Process Standard<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to standard (non-anime) content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.process_live_action} onchange={() => toggleBool('audio', 'process_live_action')} />
             </label>
             <!-- Convert DTS -->
@@ -369,7 +369,7 @@ $effect(() => {
               { field: 'convert_8bit_x264', label: 'Convert 8-bit x264', hint: 'Re-encode standard 8-bit H.264 files' },
               { field: 'convert_legacy_codecs', label: 'Convert Legacy Codecs', hint: 'Re-encode VC-1, MPEG-2, MPEG-4/Xvid/DivX to the target codec' },
               { field: 'process_anime', label: 'Process Anime', hint: 'Apply video conversion to anime content' },
-              { field: 'process_live_action', label: 'Process Live Action', hint: 'Apply video conversion to live action content' },
+              { field: 'process_live_action', label: 'Process Standard', hint: 'Apply video conversion to standard (non-anime) content' },
               { field: 'dv_to_hdr10', label: 'Convert Dolby Vision → HDR10', hint: 'Strip DV RPU layer and encode; static HDR10 base is preserved. Off = skip DV files.', shortHint: 'Re-encode to static HDR10. Off = skip DV files.' },
               { field: 'hdr10plus_to_hdr10', label: 'Convert HDR10+ → HDR10', hint: 'Strip dynamic SMPTE 2094-40 metadata and encode; static HDR10 base is preserved. Off = skip HDR10+ files.', shortHint: 'Re-encode to static HDR10. Off = skip HDR10+ files.' },
             ] as item}
@@ -605,9 +605,9 @@ $effect(() => {
               <span>Process Anime<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to anime content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.process_anime} onchange={() => toggleBool('cleanup', 'process_anime')} />
             </label>
-            <!-- Process Live Action -->
-            <label class="flex items-center justify-between cursor-pointer" title="Apply stream cleanup to live action content">
-              <span>Process Live Action<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to live action content</span></span>
+            <!-- Process Standard -->
+            <label class="flex items-center justify-between cursor-pointer" title="Apply stream cleanup to standard (non-anime) content">
+              <span>Process Standard<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to standard (non-anime) content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.process_live_action} onchange={() => toggleBool('cleanup', 'process_live_action')} />
             </label>
             <div class="flex items-center justify-between">
