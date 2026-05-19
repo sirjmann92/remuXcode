@@ -181,7 +181,9 @@ class VideoConverter:
                 logger.debug("Skipping anime content (process_anime=False): %s", file_path)
                 return False
             if not _is_anime and not self.config.process_live_action:
-                logger.debug("Skipping live action content (process_live_action=False): %s", file_path)
+                logger.debug(
+                    "Skipping live action content (process_live_action=False): %s", file_path
+                )
                 return False
 
         # Check conversion criteria
