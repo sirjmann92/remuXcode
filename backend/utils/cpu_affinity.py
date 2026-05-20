@@ -113,9 +113,7 @@ def _detect_by_freq_gap() -> tuple[list[int], bool]:
         return sorted(freq_by_cpu.keys()), False
 
     # CPUs with frequency strictly above the split threshold are P-cores
-    p_core_ids = sorted(
-        cpu for cpu, freq in freq_by_cpu.items() if freq > split_threshold
-    )
+    p_core_ids = sorted(cpu for cpu, freq in freq_by_cpu.items() if freq > split_threshold)
     return p_core_ids, True
 
 
