@@ -101,6 +101,7 @@ class VideoConverter:
         ffmpeg_threads: int = 0,
         hw_accel: str = "none",
         hw_caps: HWAccelCaps | None = None,
+        affinity_fn: Callable[[], None] | None = None,
     ):
         """Initialize video converter.
 
@@ -112,6 +113,7 @@ class VideoConverter:
             ffmpeg_threads: Thread limit for ffmpeg (0 = unlimited)
             hw_accel: Hardware acceleration mode (none, auto, qsv, vaapi, nvenc)
             hw_caps: Pre-detected HW capabilities (auto-detected if None)
+            affinity_fn: Optional preexec_fn to pin ffmpeg to P-cores
         """
         self.config = config
         self.ffprobe = ffprobe or FFProbe()
@@ -120,6 +122,7 @@ class VideoConverter:
         self.hw_caps = hw_caps
         self.anime_detector = anime_detector or AnimeDetector()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
+        self.affinity_fn = affinity_fn
 
     @property
     def target_codec(self) -> str:
@@ -371,6 +374,7 @@ class VideoConverter:
                 cancel_event=cancel_event,
                 total_frames=_total_frames,
                 log_cb=log_cb,
+                affinity_fn=self.affinity_fn,
             )
 
             if returncode != 0:
@@ -883,10 +887,16 @@ class VideoConverter:
             f"keyint={keyint}",  # 5-second keyframe interval
         ]
 
-        # Add animation-specific tuning for anime
-        if content_type == ContentType.ANIME:
-            # enable-overlay was removed in SVT-AV1 v2.x — omit to avoid parse error
-            svtav1_params.append("film-grain=0")
+        # Film grain synthesis: 0=disabled, 1–50 adds synthetic grain at decode time.
+        # Anime gets 0 (clean cel-shaded content needs no grain).
+        # Live action can benefit from subtle values (e.g. 4) to mask compression
+        # artifacts on cinematic or noisy sources without visible over-application.
+        grain = (
+            self.config.av1_anime_film_grain
+            if content_type == ContentType.ANIME
+            else self.config.av1_live_action_film_grain
+        )
+        svtav1_params.append(f"film-grain={grain}")
 
         # Pass through HDR10 metadata if present (skip when stripping to SDR)
         strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))

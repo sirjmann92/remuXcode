@@ -139,9 +139,11 @@ export interface ConfigSummary {
     av1_anime_crf: number;
     av1_anime_preset: number;
     av1_anime_framerate: string;
+    av1_anime_film_grain: number;
     av1_live_action_crf: number;
     av1_live_action_preset: number;
     av1_live_action_framerate: string;
+    av1_live_action_film_grain: number;
     vbv_maxrate: number;
     vbv_bufsize: number;
     level: string;
@@ -204,6 +206,7 @@ export interface ConfigSummary {
   workers: number;
   ffmpeg_threads: number;
   effective_ffmpeg_threads: number;
+  ffmpeg_pin_to_p_cores: boolean;
   job_history_days: number;
   api_key: string;
 }
@@ -221,6 +224,8 @@ export interface HWAccelCaps {
 export interface SystemInfo {
   cpu_count: number;
   hw_accel: HWAccelCaps;
+  p_core_count: number;
+  is_hybrid_cpu: boolean;
 }
 
 export interface HealthStatus {

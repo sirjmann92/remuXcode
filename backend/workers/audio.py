@@ -90,6 +90,7 @@ class AudioConverter:
         ffprobe: FFProbe | None = None,
         get_volume_root: Callable[[str], str] | None = None,
         ffmpeg_threads: int = 0,
+        affinity_fn: Callable[[], None] | None = None,
     ):
         """Initialize audio converter.
 
@@ -98,11 +99,13 @@ class AudioConverter:
             ffprobe: FFProbe instance (created if not provided)
             get_volume_root: Function to get volume root for temp files (uses /tmp if not provided)
             ffmpeg_threads: Thread limit for ffmpeg (0 = unlimited)
+            affinity_fn: Optional preexec_fn to pin ffmpeg to P-cores
         """
         self.config = config
         self.ffprobe = ffprobe or FFProbe()
         self.get_volume_root = get_volume_root or (lambda _: tempfile.gettempdir())
         self.ffmpeg_threads = ffmpeg_threads
+        self.affinity_fn = affinity_fn
 
     @staticmethod
     def _has_compatible_companion(stream: AudioStream, companions: dict[str, int]) -> bool:
@@ -393,6 +396,7 @@ class AudioConverter:
                 cancel_event=cancel_event,
                 total_frames=total_frames,
                 log_cb=log_cb,
+                affinity_fn=self.affinity_fn,
             )
 
             if returncode != 0:

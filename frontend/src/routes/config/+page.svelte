@@ -6,6 +6,8 @@ import type { ConfigSummary, HWAccelCaps } from '$lib/types';
 let config: ConfigSummary | null = $state(null);
 let cpuCount = $state(0);
 let hwAccel: HWAccelCaps | null = $state(null);
+let pCoreCount = $state(0);
+let isHybridCpu = $state(false);
 let loading = $state(true);
 let error = $state('');
 let saving = $state(false);
@@ -74,6 +76,8 @@ async function fetchConfig() {
     config = cfg;
     cpuCount = sys.cpu_count;
     hwAccel = sys.hw_accel;
+    pCoreCount = sys.p_core_count;
+    isHybridCpu = sys.is_hybrid_cpu;
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load config';
   } finally {
@@ -541,8 +545,10 @@ $effect(() => {
                 {#each [
                   { field: 'av1_anime_crf', label: 'Anime CRF', hint: 'Quality for anime (0–63, lower = better)', min: 0, max: 63 },
                   { field: 'av1_anime_preset', label: 'Anime Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                  { field: 'av1_anime_film_grain', label: 'Anime Film Grain', hint: 'Synthetic grain level 0–50; keep 0 for clean cel-shaded content', min: 0, max: 50 },
                   { field: 'av1_live_action_crf', label: 'Standard CRF', hint: 'Quality for standard content (0–63)', min: 0, max: 63 },
                   { field: 'av1_live_action_preset', label: 'Standard Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
+                  { field: 'av1_live_action_film_grain', label: 'Standard Film Grain', hint: 'Synthetic grain 0–50; 4–8 helps cinematic/noisy sources, 0 for clean digital', min: 0, max: 50 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
                     <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
@@ -681,9 +687,9 @@ $effect(() => {
                 onchange={(e) => { const v = clampInt(e as Event & { currentTarget: HTMLInputElement }, 1, 16); config!.workers = v; saveTop('workers', v); }}
               />
             </div>
-            <div title="Limit CPU threads ffmpeg uses for encoding. 0 = auto (~80% of available CPUs). Lower values leave more CPU for other tasks.">
+            <div title="Limit CPU threads ffmpeg uses for encoding. 0 = auto. Lower values leave more CPU for other tasks.">
               <div class="flex items-center justify-between">
-                <span class="text-xs">FFmpeg Threads<span class="block text-xs text-base-content/30 font-normal">{config.ffmpeg_threads === 0 ? `Auto (${config.effective_ffmpeg_threads} of ${cpuCount} CPUs)` : `${config.ffmpeg_threads} of ${cpuCount} CPUs`}</span></span>
+                <span class="text-xs">FFmpeg Threads<span class="block text-xs text-base-content/30 font-normal">{config.ffmpeg_threads === 0 ? `Auto (${config.effective_ffmpeg_threads} of ${isHybridCpu ? pCoreCount + ' P-cores' : cpuCount + ' CPUs'})` : `${config.ffmpeg_threads} of ${cpuCount} CPUs`}</span></span>
                 <input
                   type="number"
                   class="input input-xs input-bordered w-16 text-center font-mono"
@@ -709,6 +715,23 @@ $effect(() => {
                 </div>
               {/if}
             </div>
+            <label class="flex items-center justify-between cursor-pointer" title="Pin ffmpeg to high-performance (P) cores on hybrid CPUs. No-op on AMD / homogeneous Intel CPUs.">
+              <span class="text-xs">Pin to P-cores
+                <span class="block text-xs text-base-content/30 font-normal">
+                  {#if isHybridCpu}
+                    Restrict encode to {pCoreCount} P-core threads; E-cores stay free
+                  {:else}
+                    {pCoreCount > 0 ? `${pCoreCount} threads detected — no E-cores (no-op)` : 'No frequency data — no-op on this CPU'}
+                  {/if}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={config.ffmpeg_pin_to_p_cores}
+                onchange={(e) => { config!.ffmpeg_pin_to_p_cores = e.currentTarget.checked; saveTop('ffmpeg_pin_to_p_cores', e.currentTarget.checked); }}
+              />
+            </label>
             <div class="flex items-center justify-between" title="Completed and failed jobs are removed after this many days">
               <span class="text-xs">Job History<span class="block text-xs text-base-content/30 font-normal">Days to retain completed job records (1–365)</span></span>
               <input
