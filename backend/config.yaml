@@ -43,14 +43,16 @@ video:
 
   # AV1 encoding settings - Anime
   # AV1 uses higher CRF values (shifted scale compared to x265)
-  av1_anime_crf: 22  # Archival quality (transparent on virtually all content)
+  av1_anime_crf: 18  # Tighter than live action: flat colors + sharp edges make artifacts obvious
   av1_anime_preset: 4  # SVT-AV1 preset 0-13 (lower = slower/better); 4 is archival sweet spot
   av1_anime_framerate: "24000/1001"
+  av1_anime_film_grain: 0  # No synthetic grain for anime (clean cel-shaded content)
 
   # AV1 encoding settings - Live Action
-  av1_live_action_crf: 22  # Archival quality
+  av1_live_action_crf: 20  # Archival quality
   av1_live_action_preset: 4  # Match anime preset for consistency
   av1_live_action_framerate: ""  # Auto-detect
+  av1_live_action_film_grain: 0  # Grain synthesis (0=off, 1-50); helps cinematic/noisy sources
 
   # Common HEVC settings
   pix_fmt: yuv420p10le  # 10-bit output
@@ -191,6 +193,17 @@ processing:
   # Recommended: 1 for most systems (prevents CPU overload)
   # Can override with REMUXCODE_WORKERS environment variable
   max_concurrent_jobs: 1
+
+  # FFmpeg CPU thread limit per encode job (0 = auto-compute)
+  # Auto mode uses ~80% of available CPUs, or P-cores ÷ workers on hybrid CPUs.
+  # Can override with FFMPEG_THREADS environment variable
+  ffmpeg_threads: 0
+
+  # Pin ffmpeg processes to P-cores on hybrid Intel CPUs (12th gen+, Meteor Lake, etc.)
+  # Keeps E-cores free for the OS and background services.
+  # Safe no-op on AMD, older Intel, and VMs (detected automatically via sysfs).
+  # Disabled by default — enable explicitly if you have a hybrid CPU.
+  ffmpeg_pin_to_p_cores: false
 
   # Job timeout (seconds) - 0 for no timeout, default 7200 (2 hours)
   job_timeout: 7200

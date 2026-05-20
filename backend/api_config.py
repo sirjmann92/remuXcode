@@ -46,9 +46,11 @@ async def get_config_summary() -> dict[str, Any]:
             "av1_anime_crf": cfg.video.av1_anime_crf,
             "av1_anime_preset": cfg.video.av1_anime_preset,
             "av1_anime_framerate": cfg.video.av1_anime_framerate,
+            "av1_anime_film_grain": cfg.video.av1_anime_film_grain,
             "av1_live_action_crf": cfg.video.av1_live_action_crf,
             "av1_live_action_preset": cfg.video.av1_live_action_preset,
             "av1_live_action_framerate": cfg.video.av1_live_action_framerate,
+            "av1_live_action_film_grain": cfg.video.av1_live_action_film_grain,
             "vbv_maxrate": cfg.video.vbv_maxrate,
             "vbv_bufsize": cfg.video.vbv_bufsize,
             "level": cfg.video.level,
@@ -111,6 +113,7 @@ async def get_config_summary() -> dict[str, Any]:
         "workers": cfg.workers,
         "ffmpeg_threads": cfg.ffmpeg_threads,
         "effective_ffmpeg_threads": cfg.effective_ffmpeg_threads,
+        "ffmpeg_pin_to_p_cores": cfg.ffmpeg_pin_to_p_cores,
         "job_history_days": cfg.job_history_days,
         "api_key": get_api_key(),
     }
@@ -120,12 +123,16 @@ async def get_config_summary() -> dict[str, Any]:
 async def get_system_info() -> dict[str, Any]:
     """Return host system info for UI controls (CPU count, HW accel capabilities)."""
     from backend.utils.config import get_available_cpus
+    from backend.utils.cpu_affinity import get_cpu_info
     from backend.utils.hwaccel import detect_hw_capabilities
 
     caps = detect_hw_capabilities()
+    p_cores, is_hybrid = get_cpu_info()
     return {
         "cpu_count": get_available_cpus(),
         "hw_accel": caps.to_dict(),
+        "p_core_count": len(p_cores),
+        "is_hybrid_cpu": is_hybrid,
     }
 
 
@@ -212,9 +219,11 @@ class VideoUpdate(BaseModel):
     av1_anime_crf: int | None = Field(None, ge=0, le=63)
     av1_anime_preset: int | None = Field(None, ge=0, le=13)
     av1_anime_framerate: str | None = None
+    av1_anime_film_grain: int | None = Field(None, ge=0, le=50)
     av1_live_action_crf: int | None = Field(None, ge=0, le=63)
     av1_live_action_preset: int | None = Field(None, ge=0, le=13)
     av1_live_action_framerate: str | None = None
+    av1_live_action_film_grain: int | None = Field(None, ge=0, le=50)
     vbv_maxrate: int | None = Field(None, ge=0, le=100000)
     vbv_bufsize: int | None = Field(None, ge=0, le=200000)
     level: str | None = None
@@ -291,6 +300,7 @@ class ConfigUpdate(BaseModel):
     radarr: RadarrUpdate | None = None
     workers: int | None = Field(None, ge=1, le=16)
     ffmpeg_threads: int | None = Field(None, ge=0, le=128)
+    ffmpeg_pin_to_p_cores: bool | None = None
     job_history_days: int | None = Field(None, ge=1, le=365)
 
 
@@ -335,6 +345,23 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
         if core.video_converter:
             core.video_converter.ffmpeg_threads = effective
         if core.stream_cleanup:
+            core.stream_cleanup.ffmpeg_threads = effective
+
+    if body.ffmpeg_pin_to_p_cores is not None:
+        cfg.ffmpeg_pin_to_p_cores = body.ffmpeg_pin_to_p_cores
+        from backend.utils.cpu_affinity import get_cpu_info, make_affinity_fn
+
+        p_cores, _ = get_cpu_info()
+        new_affinity = make_affinity_fn(p_cores) if cfg.ffmpeg_pin_to_p_cores else None
+        effective = cfg.effective_ffmpeg_threads
+        if core.audio_converter:
+            core.audio_converter.affinity_fn = new_affinity
+            core.audio_converter.ffmpeg_threads = effective
+        if core.video_converter:
+            core.video_converter.affinity_fn = new_affinity
+            core.video_converter.ffmpeg_threads = effective
+        if core.stream_cleanup:
+            core.stream_cleanup.affinity_fn = new_affinity
             core.stream_cleanup.ffmpeg_threads = effective
 
     if body.job_history_days is not None:

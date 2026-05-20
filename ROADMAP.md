@@ -48,6 +48,10 @@
 
 - **Full API authentication** — all endpoints currently rely on same-origin trust; external callers (curl, scripts) and the UI should use a consistent auth mechanism. Plan: frontend fetches the API key once from a localhost-only bootstrap endpoint on first load, stores it as an `HttpOnly` session cookie, and FastAPI accepts either the cookie or the `X-Api-Key` header. Closes the Sonarr/Radarr key leak via `GET /api/config` and prevents unauthenticated write access to config, job queue, and file processing endpoints from other LAN devices.
 
+### Infrastructure / Dependencies
+
+- **mkvtoolnix** — add `mkvtoolnix` to the Docker image (~70 MB) to enable: writing `BPS`/`DURATION`/`NUMBER_OF_FRAMES` track statistics tags (fixes MediaInfo showing no bitrate for AV1 output), post-encode metadata editing via `mkvpropedit`, chapter manipulation, attachment support, and `mkvinfo`-based stream verification. Currently deferred due to image size cost.
+
 ### Quality of Life
 
 - **Retry from UI** — re-queue failed jobs from the Jobs page with one click

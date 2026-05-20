@@ -73,6 +73,7 @@ def run_ffmpeg_with_progress(
     cancel_event: threading.Event | None = None,
     total_frames: float | None = None,
     log_cb: Callable[[str, str, str], None] | None = None,
+    affinity_fn: Callable[[], None] | None = None,
 ) -> tuple[int, str]:
     """Run an ffmpeg command, reporting progress via callback.
 
@@ -135,6 +136,7 @@ def run_ffmpeg_with_progress(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
+        preexec_fn=affinity_fn,
     )
 
     def _read_stderr() -> None:
@@ -269,6 +271,17 @@ def run_ffmpeg_with_progress(
                             current_frame = val
                 elif line.startswith("progress="):
                     progress_blocks += 1
+                    if line == "progress=end":
+                        # All frames have been encoded.  ffmpeg is now in its
+                        # container-finalization phase (writing MKV seek/cue
+                        # tables, flushing output buffers, etc.) and will stop
+                        # writing to the progress FIFO.  Staying in this loop
+                        # would cause Watchdog 1 to fire after _STALL_TIMEOUT
+                        # seconds of FIFO silence and falsely kill an otherwise
+                        # completed encode.  Break here and let proc.wait()
+                        # with the full job timeout act as the backstop.
+                        logger.debug("progress=end received — encode complete, waiting for mux finalization")
+                        break
                     # Watchdog 2: FIFO data arriving but progress not advancing.
                     # Advance the timer when EITHER out_time_us OR current_frame
                     # increases.  This prevents false kills when SVT-AV1's large

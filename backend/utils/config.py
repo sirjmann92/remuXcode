@@ -135,14 +135,16 @@ class VideoConfig:
     live_action_framerate: str = ""  # Empty = auto-detect from source
 
     # AV1 settings - Anime (SVT-AV1 encoder)
-    av1_anime_crf: int = 22  # Archival quality (transparent on virtually all content)
+    av1_anime_crf: int = 18  # Tighter than live action: flat colors + hard edges make artifacts obvious
     av1_anime_preset: int = 4  # 0-13, lower = slower/better; 4 is archival sweet spot
     av1_anime_framerate: str = "24000/1001"
+    av1_anime_film_grain: int = 0  # No synthetic grain for anime (clean cel-shaded content)
 
     # AV1 settings - Live action
-    av1_live_action_crf: int = 22  # Archival quality
+    av1_live_action_crf: int = 20  # Archival quality
     av1_live_action_preset: int = 4  # Match anime preset for consistency
     av1_live_action_framerate: str = ""
+    av1_live_action_film_grain: int = 0  # Grain synthesis; helps cinematic/noisy sources (0=off)
 
     # QSV encoder settings (Intel Quick Sync — ICQ mode)
     qsv_anime_quality: int = 18
@@ -217,12 +219,28 @@ class Config:
         self.ffmpeg_threads = int(
             os.getenv("FFMPEG_THREADS", self._get("processing.ffmpeg_threads", 0))
         )
+        # Pin ffmpeg processes to P-cores on hybrid CPUs (Intel 12th gen+, etc.).
+        # No-op on homogeneous CPUs; safe inside Docker cpuset constraints.
+        self.ffmpeg_pin_to_p_cores: bool = bool(
+            self._get("processing.ffmpeg_pin_to_p_cores", False)
+        )
 
     @property
     def effective_ffmpeg_threads(self) -> int:
-        """Resolve ffmpeg_threads: 0 → ~80% of available CPUs, else the explicit value."""
+        """Resolve ffmpeg_threads: 0 → computed count, else the explicit value.
+
+        When P-core pinning is enabled on a hybrid CPU, the auto count is
+        scaled to P-cores ÷ workers so each concurrent job gets a fair share
+        of the high-performance cores.
+        """
         if self.ffmpeg_threads > 0:
             return self.ffmpeg_threads
+        if self.ffmpeg_pin_to_p_cores:
+            from backend.utils.cpu_affinity import get_cpu_info
+
+            p_cores, is_hybrid = get_cpu_info()
+            if is_hybrid and p_cores:
+                return max(1, len(p_cores) // self.workers)
         return max(1, int(get_available_cpus() * 0.8))
 
     def _find_config_path(self, provided_path: str | None) -> Path | None:
@@ -367,12 +385,14 @@ class Config:
             live_action_preset=self._get("video.live_action_preset", "medium"),
             live_action_tune=self._get("video.live_action_tune"),
             live_action_framerate=self._get("video.live_action_framerate", ""),
-            av1_anime_crf=self._get("video.av1_anime_crf", 22),
+            av1_anime_crf=self._get("video.av1_anime_crf", 18),
             av1_anime_preset=self._get("video.av1_anime_preset", 4),
             av1_anime_framerate=self._get("video.av1_anime_framerate", "24000/1001"),
-            av1_live_action_crf=self._get("video.av1_live_action_crf", 22),
+            av1_anime_film_grain=self._get("video.av1_anime_film_grain", 0),
+            av1_live_action_crf=self._get("video.av1_live_action_crf", 20),
             av1_live_action_preset=self._get("video.av1_live_action_preset", 4),
             av1_live_action_framerate=self._get("video.av1_live_action_framerate", ""),
+            av1_live_action_film_grain=self._get("video.av1_live_action_film_grain", 0),
             qsv_anime_quality=self._get("video.qsv_anime_quality", 18),
             qsv_live_action_quality=self._get("video.qsv_live_action_quality", 21),
             qsv_preset=self._get("video.qsv_preset", "medium"),
@@ -464,9 +484,11 @@ class Config:
             "av1_anime_crf",
             "av1_anime_preset",
             "av1_anime_framerate",
+            "av1_anime_film_grain",
             "av1_live_action_crf",
             "av1_live_action_preset",
             "av1_live_action_framerate",
+            "av1_live_action_film_grain",
             "qsv_anime_quality",
             "qsv_live_action_quality",
             "qsv_preset",
@@ -513,6 +535,7 @@ class Config:
         self._raw_config.setdefault("processing", {})
         self._raw_config["processing"]["max_concurrent_jobs"] = self.workers
         self._raw_config["processing"]["ffmpeg_threads"] = self.ffmpeg_threads
+        self._raw_config["processing"]["ffmpeg_pin_to_p_cores"] = self.ffmpeg_pin_to_p_cores
 
         self._raw_config.setdefault("general", {})
         self._raw_config["general"]["job_history_days"] = self.job_history_days

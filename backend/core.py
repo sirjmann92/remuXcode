@@ -1357,6 +1357,11 @@ def initialize_components() -> None:
 
     config = get_config(CONFIG_PATH)
 
+    from backend.utils.cpu_affinity import get_cpu_info, make_affinity_fn
+
+    _p_core_ids, _is_hybrid = get_cpu_info()
+    _affinity_fn = make_affinity_fn(_p_core_ids) if config.ffmpeg_pin_to_p_cores else None
+
     ffprobe = FFProbe()
     anime_detector = AnimeDetector(
         sonarr_url=config.sonarr.url,
@@ -1376,6 +1381,7 @@ def initialize_components() -> None:
         ffprobe=ffprobe,
         get_volume_root=get_volume_root,
         ffmpeg_threads=config.effective_ffmpeg_threads,
+        affinity_fn=_affinity_fn,
     )
     video_converter = VideoConverter(
         config=config.video,
@@ -1384,6 +1390,7 @@ def initialize_components() -> None:
         get_volume_root=get_volume_root,
         ffmpeg_threads=config.effective_ffmpeg_threads,
         hw_accel=config.video.hw_accel,
+        affinity_fn=_affinity_fn,
     )
     stream_cleanup = StreamCleanup(
         config=config.cleanup,
@@ -1391,9 +1398,10 @@ def initialize_components() -> None:
         language_detector=language_detector,
         get_volume_root=get_volume_root,
         ffmpeg_threads=config.effective_ffmpeg_threads,
+        affinity_fn=_affinity_fn,
     )
 
-    db_path = os.getenv("REMUXCODE_DB_PATH", str(Path(__file__).parent / "jobs.db"))
+    db_path = os.getenv("REMUXCODE_DB_PATH", str(Path(CONFIG_PATH).parent / "jobs.db"))
     job_store = JobStore(db_path=db_path)
 
     # Media analysis cache (persistent ffprobe results) — same directory as jobs.db
