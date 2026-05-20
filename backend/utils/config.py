@@ -135,7 +135,9 @@ class VideoConfig:
     live_action_framerate: str = ""  # Empty = auto-detect from source
 
     # AV1 settings - Anime (SVT-AV1 encoder)
-    av1_anime_crf: int = 18  # Tighter than live action: flat colors + hard edges make artifacts obvious
+    av1_anime_crf: int = (
+        18  # Tighter than live action: flat colors + hard edges make artifacts obvious
+    )
     av1_anime_preset: int = 4  # 0-13, lower = slower/better; 4 is archival sweet spot
     av1_anime_framerate: str = "24000/1001"
     av1_anime_film_grain: int = 0  # No synthetic grain for anime (clean cel-shaded content)
