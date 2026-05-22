@@ -17,6 +17,7 @@ import uuid
 
 from backend.utils.config import AudioConfig
 from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo
+from backend.utils.language import LANGUAGE_NAMES
 from backend.workers._progress import ffmpeg_error_summary, run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace
 
@@ -24,38 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 # ISO 639-2 language code to full name mapping
-LANGUAGE_NAMES = {
-    "eng": "English",
-    "spa": "Spanish",
-    "fre": "French",
-    "fra": "French",
-    "ger": "German",
-    "deu": "German",
-    "ita": "Italian",
-    "por": "Portuguese",
-    "jpn": "Japanese",
-    "chi": "Chinese",
-    "zho": "Chinese",
-    "kor": "Korean",
-    "rus": "Russian",
-    "ara": "Arabic",
-    "hin": "Hindi",
-    "tha": "Thai",
-    "vie": "Vietnamese",
-    "pol": "Polish",
-    "dut": "Dutch",
-    "nld": "Dutch",
-    "swe": "Swedish",
-    "nor": "Norwegian",
-    "dan": "Danish",
-    "fin": "Finnish",
-    "ces": "Czech",
-    "hun": "Hungarian",
-    "tur": "Turkish",
-    "gre": "Greek",
-    "ell": "Greek",
-    "heb": "Hebrew",
-}
 
 
 @dataclass

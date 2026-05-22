@@ -41,11 +41,17 @@ Click a series to open the detail view, which shows all seasons and their episod
 
 ### Series Header Actions
 
-The header row for a selected series includes:
+The series header always shows these buttons on the left:
 
 - **Open in Sonarr** — opens this series in Sonarr in a new tab (only shown when Sonarr is configured)
-- **Queue All** — queues every episode across all seasons that needs conversion
-- **Clear** — deselects all checked episodes (shown when episodes are selected)
+- **Select All** — selects every episode that needs work across all seasons
+- **Rescan** — re-reads this show's episodes from disk and refreshes the episode list
+- **Custom Encode All** — opens the custom encode options for all episodes in the series (downscale / HDR tone-map)
+
+The far-right slot changes based on selection state:
+
+- **No selection** → **Queue All Episodes** — queues every episode across all seasons that needs at least one conversion
+- **Selection active** → **Clear (N)** + **Queue N Selected** — clears or queues only the checked episodes
 
 ### Season Level
 
@@ -55,6 +61,8 @@ Each season row shows:
 - Episode count
 - A **Queued** or **In Progress** badge if any episode in the season has an active job
 - A **Needs Work** count
+- A gear icon to open **Custom Encode** options for the season
+- A **Queue Season** button — queues all episodes in this season that need work. When episodes from this season are checked, the button reads **Queue N Selected** and queues only the checked episodes instead.
 
 Click a season row to expand it and show individual episodes.
 
@@ -84,15 +92,19 @@ Click **Queue** on any episode row to add that episode to the job queue. A type 
 
 ### Queue an Entire Season
 
-A **Queue All** button appears at the season level when the season has episodes that need work. It queues only the episodes in that season that have at least one conversion needed — it will not queue episodes that are already up to standard.
+Each season header has a **Queue Season** button. It queues only the episodes in that season that have at least one conversion needed — already-converted episodes are skipped.
+
+If you have checked episodes from that season, the button changes to **Queue N Selected** and queues only those specific episodes.
 
 ### Queue an Entire Series
 
-A **Queue All** button appears at the series header level. It queues every episode across all seasons that needs at least one conversion.
+**Queue All Episodes** in the series header queues every episode across all seasons that needs at least one conversion.
 
 ### Multi-Select
 
-Check the checkbox next to one or more episode rows to enter multi-select mode. Then click **Queue Selected** to queue all checked episodes at once.
+Check the checkbox next to any episode row to build a selection. The series header's far-right slot shows **Clear (N)** and **Queue N Selected** whenever any episodes are checked. You can keep selecting (including **Select All**) before queuing — no mode switch happens and no buttons disappear.
+
+At the season level, **Queue Season** changes to **Queue N Selected** when checked episodes from that season exist, letting you queue a season subset without scrolling back up to the series header.
 
 ---
 
@@ -109,15 +121,13 @@ Click **Analyze** on any episode to open the stream detail modal. The modal has 
 
 ---
 
-## Refresh Library
+## Rescan
 
-The **Refresh Library** button on the series detail page triggers Sonarr to perform a full metadata refresh and rescan for that series. Use this when:
+The **Rescan** button in the series header re-reads all episode files for this show from disk and refreshes the episode list immediately. Use it when:
 
-- Episode files were renamed or moved outside of Sonarr
-- Artwork or metadata is stale
-- You want Sonarr to pick up newly converted filenames
-
-A confirmation dialog appears before the refresh is sent. remuXcode polls Sonarr until the refresh and rename commands complete before re-fetching the episode list.
+- You have added, removed, or renamed files outside of remuXcode
+- Badge counts look stale after a conversion completes
+- You want to confirm the current state of files on disk without a full Sonarr library refresh
 
 ---
 

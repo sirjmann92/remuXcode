@@ -64,6 +64,7 @@ let showRefreshConfirm = $state(false);
 let refreshingLibrary = $state(false);
 let refreshMsg = $state('');
 let reloading = $state(false);
+let rescanning = $state(false);
 let scanProgress: ScanProgress | null = $state(null);
 let scanPollTimer: ReturnType<typeof setInterval> | null = null;
 let prevActiveKeys: Set<string> = new Set();
@@ -302,6 +303,18 @@ async function reloadSeries() {
   }
 }
 
+async function rescanShow() {
+  if (!selectedSeries) return;
+  rescanning = true;
+  try {
+    selectedSeries = await getSeriesDetail(selectedSeries.id);
+  } catch {
+    // keep existing data on failure
+  } finally {
+    rescanning = false;
+  }
+}
+
 async function openDetail(series: BrowseSeries) {
   detailLoading = true;
   expandedSeasons = {};
@@ -342,6 +355,33 @@ async function queueSeason(season: Season) {
     for (const ep of season.episodes) {
       if (episodeNeedsWork(ep)) {
         await convertFile(ep.path, 'full', selectedSeries?.poster, 'episode');
+      }
+    }
+  } catch {
+    // ignore
+  } finally {
+    queueing[key] = false;
+  }
+}
+
+async function queueSeasonOrSelected(season: Season) {
+  const seasonPaths = new Set(season.episodes.map((e) => e.path));
+  const selectedInSeason = [...selectedEps].filter((p) => seasonPaths.has(p));
+  const key = `season-${season.season_number}`;
+  queueing[key] = true;
+  try {
+    if (selectedInSeason.length > 0) {
+      for (const path of selectedInSeason) {
+        await convertFile(path, 'full', selectedSeries?.poster, 'episode');
+      }
+      const next = new Set(selectedEps);
+      for (const p of selectedInSeason) next.delete(p);
+      selectedEps = next;
+    } else {
+      for (const ep of season.episodes) {
+        if (episodeNeedsWork(ep)) {
+          await convertFile(ep.path, 'full', selectedSeries?.poster, 'episode');
+        }
       }
     }
   } catch {
@@ -601,14 +641,43 @@ const sortOptions: { value: string; label: string }[] = [
                 class="btn btn-ghost btn-sm gap-1"
                 title="Open in Sonarr"
               >
-                Open in Sonarr
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                 </svg>
+                Open in Sonarr
               </a>
             {/if}
+            <button class="btn btn-ghost btn-sm" onclick={selectAllEps}>
+              Select All
+            </button>
+            <button
+              class="btn btn-ghost btn-sm gap-1"
+              onclick={rescanShow}
+              disabled={rescanning}
+              title="Re-read this show from disk"
+            >
+              {#if rescanning}
+                <span class="loading loading-spinner loading-xs"></span>
+              {:else}
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+              {/if}
+              Rescan
+            </button>
+            <button
+              class="btn btn-ghost btn-sm"
+              title="Custom encode all episodes (downscale / HDR)"
+              onclick={() => {
+                if (!selectedSeries) return;
+                customEncodePaths = selectedSeries.seasons.flatMap(s => s.episodes.map(e => e.path));
+                customEncodeLabel = selectedSeries.title;
+              }}
+            >
+              Custom Encode All
+            </button>
             {#if selectedEps.size > 0}
-              <button class="btn btn-ghost btn-sm" onclick={clearEpSelection}>
+              <button class="btn btn-ghost btn-sm ml-auto" onclick={clearEpSelection}>
                 Clear ({selectedEps.size})
               </button>
               <button
@@ -623,22 +692,8 @@ const sortOptions: { value: string; label: string }[] = [
                 {/if}
               </button>
             {:else}
-              <button class="btn btn-ghost btn-sm" onclick={selectAllEps}>
-                Select All
-              </button>
               <button
-                class="btn btn-ghost btn-sm"
-                title="Custom encode all episodes (downscale / HDR)"
-                onclick={() => {
-                  if (!selectedSeries) return;
-                  customEncodePaths = selectedSeries.seasons.flatMap(s => s.episodes.map(e => e.path));
-                  customEncodeLabel = selectedSeries.title;
-                }}
-              >
-                Custom Encode All
-              </button>
-              <button
-                class="btn btn-primary btn-sm"
+                class="btn btn-primary btn-sm ml-auto"
                 onclick={queueAllSeries}
                 disabled={queueing['all']}
               >
@@ -656,6 +711,7 @@ const sortOptions: { value: string; label: string }[] = [
 
     <!-- Seasons -->
     {#each filteredSeasons as season (season.season_number)}
+      {@const seasonSelected = season.episodes.filter((e) => selectedEps.has(e.path)).length}
       <div class="card-glass rounded-box overflow-hidden">
         <!-- Season header (clickable) -->
         <div
@@ -707,11 +763,13 @@ const sortOptions: { value: string; label: string }[] = [
             </button>
             <button
               class="btn btn-primary btn-xs"
-              onclick={(e) => { e.stopPropagation(); queueSeason(season); }}
+              onclick={(e) => { e.stopPropagation(); queueSeasonOrSelected(season); }}
               disabled={queueing[`season-${season.season_number}`]}
             >
               {#if queueing[`season-${season.season_number}`]}
                 <span class="loading loading-spinner loading-xs"></span>
+              {:else if seasonSelected > 0}
+                Queue {seasonSelected} Selected
               {:else}
                 Queue Season
               {/if}
