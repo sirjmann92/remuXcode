@@ -12,7 +12,7 @@
     "lint:fix": "biome check . --write --config-path=../biome.json"
   },
   "dependencies": {
-    "daisyui": "^5.0.0"
+    "daisyui": "^5.5.20"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
