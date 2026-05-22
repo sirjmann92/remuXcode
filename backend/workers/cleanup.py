@@ -309,6 +309,28 @@ class StreamCleanup:
         )
 
         if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging:
+            # In a chained pipeline the input is a chain-temp file that must be
+            # moved to the designated output path even when there is nothing to
+            # clean.  If we return early without doing the move, core.py will
+            # delete the chain-temp dir and the encoded file is lost while the
+            # original remains untouched.
+            if output_file is not None and Path(output_file) != input_path:
+                try:
+                    safe_replace(input_path, Path(output_file))
+                except Exception as exc:
+                    return CleanupResult(
+                        success=False,
+                        input_file=input_file,
+                        output_file=output_file,
+                        audio_removed=0,
+                        audio_kept=len(info.audio_streams),
+                        subtitle_removed=0,
+                        subtitle_kept=len(info.subtitle_streams),
+                        original_size=info.size,
+                        new_size=0,
+                        original_language=original_lang,
+                        error=f"Failed to move chain file to output: {exc}",
+                    )
             logger.info("No streams to remove from: %s", input_path.name)
             return CleanupResult(
                 success=True,
