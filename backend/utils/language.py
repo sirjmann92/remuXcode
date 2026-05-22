@@ -107,6 +107,44 @@ LANGUAGE_CODE_MAP = {
 }
 
 
+# Canonical English display names for ISO 639-2 language codes.
+# Used by audio and cleanup workers to normalise track titles regardless
+# of what the source release group wrote (e.g. "英语", "Anglais", "英文").
+LANGUAGE_NAMES: dict[str, str] = {
+    "eng": "English",
+    "spa": "Spanish",
+    "fre": "French",
+    "fra": "French",
+    "ger": "German",
+    "deu": "German",
+    "ita": "Italian",
+    "por": "Portuguese",
+    "jpn": "Japanese",
+    "chi": "Chinese",
+    "zho": "Chinese",
+    "kor": "Korean",
+    "rus": "Russian",
+    "ara": "Arabic",
+    "hin": "Hindi",
+    "tha": "Thai",
+    "vie": "Vietnamese",
+    "pol": "Polish",
+    "dut": "Dutch",
+    "nld": "Dutch",
+    "swe": "Swedish",
+    "nor": "Norwegian",
+    "dan": "Danish",
+    "fin": "Finnish",
+    "cze": "Czech",
+    "ces": "Czech",
+    "hun": "Hungarian",
+    "tur": "Turkish",
+    "gre": "Greek",
+    "ell": "Greek",
+    "heb": "Hebrew",
+}
+
+
 def normalize_language_code(lang: str) -> str:
     """Normalize language name or code to ISO 639-2 code.
 

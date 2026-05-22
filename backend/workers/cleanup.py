@@ -17,7 +17,7 @@ import uuid
 
 from backend.utils.config import CleanupConfig
 from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo, SubtitleStream
-from backend.utils.language import LanguageDetector
+from backend.utils.language import LANGUAGE_NAMES, LanguageDetector
 from backend.workers._progress import run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace
 
@@ -141,6 +141,23 @@ class StreamCleanup:
                 if self._commentary_out_of_order(kept_audio, info.subtitle_streams):
                     return True
             elif self._commentary_out_of_order([], info.subtitle_streams):
+                return True
+
+        # Check if any track titles need normalising (e.g. foreign-language labels
+        # like "英语" instead of "English").  We check both audio and subtitle
+        # streams that would be kept so files that only have this problem are
+        # still picked up for a cleanup pass.
+        kept_audio_for_title = [
+            s for s in info.audio_streams if self._should_keep_audio(s, audio_keep_languages)
+        ]
+        for a_stream in kept_audio_for_title:
+            if self._needs_title_normalisation(a_stream):
+                return True
+        kept_subs_for_title = [
+            s for s in info.subtitle_streams if self._should_keep_subtitle(s, sub_keep_languages)
+        ]
+        for sub_stream in kept_subs_for_title:
+            if self._needs_title_normalisation(sub_stream):
                 return True
 
         return False
@@ -739,6 +756,70 @@ class StreamCleanup:
                 return True
         return False
 
+    def _needs_title_normalisation(self, stream: AudioStream | SubtitleStream) -> bool:
+        """Return True if the stream's title doesn't match its canonical English name.
+
+        Triggers a cleanup pass for files whose only problem is a wrongly-labelled
+        track title (e.g. "英语" or "Anglais" on an English-tagged stream).
+        Commentary tracks are excluded — their titles are intentionally freeform.
+        Streams with unknown language codes are skipped (nothing to normalise to).
+        """
+        if isinstance(stream, AudioStream) and stream.is_commentary:
+            return False
+        if isinstance(stream, SubtitleStream) and stream.is_commentary:
+            return False
+        lang_code = (stream.language or "").lower().strip()
+        expected_base = LANGUAGE_NAMES.get(lang_code)
+        if not expected_base:
+            return False  # Unknown lang — can't normalise, don't flag
+        current_title = (stream.title or "").strip()
+        if not current_title:
+            return False  # No title set — nothing wrong yet
+        # Build the expected title with qualifiers (for subtitle streams)
+        if isinstance(stream, SubtitleStream):
+            qualifiers: list[str] = []
+            if stream.is_forced:
+                qualifiers.append("Forced")
+            if stream.is_sdh:
+                qualifiers.append("SDH")
+            expected = f"{expected_base} ({', '.join(qualifiers)})" if qualifiers else expected_base
+        else:
+            expected = expected_base
+        return current_title != expected
+
+    def _canonical_audio_title(self, stream: AudioStream) -> str:
+        """Return a canonical English title for an audio stream.
+
+        Commentary tracks keep their original title.  All other tracks get a
+        clean name derived from their ISO 639-2 language code (e.g. "English",
+        "Japanese") so that foreign-language track titles from release groups
+        (e.g. "英语", "Anglais") are replaced with a consistent label.
+        """
+        if stream.is_commentary:
+            return stream.title or ""
+        lang_code = (stream.language or "").lower().strip()
+        return LANGUAGE_NAMES.get(lang_code, "")
+
+    def _canonical_subtitle_title(self, stream: SubtitleStream) -> str:
+        """Return a canonical English title for a subtitle stream.
+
+        Appends recognised qualifiers so the track label is self-describing:
+          English (Forced) · English (SDH) · English (Commentary)
+        Commentary tracks use their original title if set.
+        """
+        if stream.is_commentary:
+            return stream.title or ""
+        lang_code = (stream.language or "").lower().strip()
+        base = LANGUAGE_NAMES.get(lang_code, "")
+        if not base:
+            return ""
+        qualifiers: list[str] = []
+        if stream.is_forced:
+            qualifiers.append("Forced")
+        if stream.is_sdh:
+            qualifiers.append("SDH")
+        return f"{base} ({', '.join(qualifiers)})" if qualifiers else base
+
     def _build_ffmpeg_command(
         self,
         input_file: str,
@@ -773,11 +854,26 @@ class StreamCleanup:
                 lang = inferred_langs.get(a_stream.index, "")
             if lang:
                 cmd.extend([f"-metadata:s:a:{i}", f"language={lang}"])
+            # Normalise track title to canonical English name regardless of
+            # what the release group wrote (e.g. "英语", "Anglais", "英文").
+            # Commentary titles are preserved as-is.
+            title = self._canonical_audio_title(a_stream)
+            if title:
+                cmd.extend([f"-metadata:s:a:{i}", f"title={title}"])
             cmd.extend([f"-disposition:a:{i}", "default" if i == 0 else "0"])
 
         # Map kept subtitle streams (already sorted: commentary last)
         for sub_stream in subtitle_keep:
             cmd.extend(["-map", f"0:{sub_stream.index}"])
+
+        # Normalise subtitle track titles and set language tags.
+        for i, sub_stream in enumerate(subtitle_keep):
+            lang = (sub_stream.language or "").strip()
+            if lang:
+                cmd.extend([f"-metadata:s:s:{i}", f"language={lang}"])
+            title = self._canonical_subtitle_title(sub_stream)
+            if title:
+                cmd.extend([f"-metadata:s:s:{i}", f"title={title}"])
 
         # Explicitly set subtitle dispositions when deprioritizing commentary.
         # This strips the `default` flag from commentary subs (which some releases

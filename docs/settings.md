@@ -214,6 +214,14 @@ Additional patterns can be added by editing `config/config.yaml` directly under 
 
 ---
 
+## System
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| **Pin FFmpeg to P-Cores** | On Intel hybrid CPUs (12th gen Alder Lake and later), restrict FFmpeg processes to Performance cores only, bypassing the Efficiency cores. Improves encode throughput on hybrid CPUs by keeping the workload on the fastest cores. Detected automatically at startup; falls back silently if the system is not a hybrid CPU or no P-cores are found. | `false` |
+
+---
+
 ## Saving Settings
 
 Changes are saved immediately when you click **Save** in each section. There is no page-wide save — each section saves independently. A brief confirmation toast appears after a successful save.
