@@ -107,8 +107,10 @@ async def list_jobs(
     filtered.sort(
         key=lambda j: (
             status_order.get(j.status.value, 9),
-            # Pending: use queue position; everything else: newest first
-            pending_order.get(j.id, 0) if j.status.value == "pending" else -(j.created_at or 0),
+            # Pending: use queue position; finished: sort by when they ended; running: by when they started
+            pending_order.get(j.id, 0)
+            if j.status.value == "pending"
+            else -(j.completed_at or j.started_at or j.created_at or 0),
         )
     )
 
