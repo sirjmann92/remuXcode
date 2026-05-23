@@ -308,42 +308,94 @@ class StreamCleanup:
             audio_keep, original_lang
         )
 
+        # Check if any kept track has a wrong title that mkvpropedit can fix in-place
+        needs_title_fix = (self.config.clean_audio or self.config.clean_subtitles) and any(
+            self._needs_title_normalisation(s) for s in (info.audio_streams + info.subtitle_streams)
+        )
+
         if audio_to_remove == 0 and subs_to_remove == 0 and not needs_reorder and not needs_tagging:
             # In a chained pipeline the input is a chain-temp file that must be
             # moved to the designated output path even when there is nothing to
             # clean.  If we return early without doing the move, core.py will
             # delete the chain-temp dir and the encoded file is lost while the
             # original remains untouched.
-            if output_file is not None and Path(output_file) != input_path:
-                try:
-                    safe_replace(input_path, Path(output_file))
-                except Exception as exc:
+            if needs_title_fix and input_path.suffix.lower() == ".mkv":
+                # Use mkvpropedit for an instant in-place title fix (milliseconds,
+                # no stream copy, no file-size change) instead of a full ffmpeg pass.
+                target = (
+                    Path(output_file)
+                    if (output_file and Path(output_file) != input_path)
+                    else input_path
+                )
+                # If the target is a different path (chained), copy first then fix titles
+                if target != input_path:
+                    try:
+                        safe_replace(input_path, target)
+                    except Exception as exc:
+                        return CleanupResult(
+                            success=False,
+                            input_file=input_file,
+                            output_file=output_file,
+                            audio_removed=0,
+                            audio_kept=len(info.audio_streams),
+                            subtitle_removed=0,
+                            subtitle_kept=len(info.subtitle_streams),
+                            original_size=info.size,
+                            new_size=0,
+                            original_language=original_lang,
+                            error=f"Failed to move chain file to output: {exc}",
+                        )
+                mkvp_ok = self._run_mkvpropedit_titles(str(target), info)
+                if mkvp_ok:
+                    logger.info("Fixed track titles via mkvpropedit: %s", target.name)
                     return CleanupResult(
-                        success=False,
+                        success=True,
                         input_file=input_file,
-                        output_file=output_file,
+                        output_file=str(target),
                         audio_removed=0,
                         audio_kept=len(info.audio_streams),
                         subtitle_removed=0,
                         subtitle_kept=len(info.subtitle_streams),
                         original_size=info.size,
-                        new_size=0,
+                        new_size=info.size,
                         original_language=original_lang,
-                        error=f"Failed to move chain file to output: {exc}",
                     )
-            logger.info("No streams to remove from: %s", input_path.name)
-            return CleanupResult(
-                success=True,
-                input_file=input_file,
-                output_file=output_file or input_file,
-                audio_removed=0,
-                audio_kept=len(info.audio_streams),
-                subtitle_removed=0,
-                subtitle_kept=len(info.subtitle_streams),
-                original_size=info.size,
-                new_size=info.size,
-                original_language=original_lang,
-            )
+                # mkvpropedit failed — fall through to the full ffmpeg path below
+                logger.warning(
+                    "mkvpropedit failed for %s — falling back to ffmpeg", input_path.name
+                )
+            elif not needs_title_fix:
+                if output_file is not None and Path(output_file) != input_path:
+                    try:
+                        safe_replace(input_path, Path(output_file))
+                    except Exception as exc:
+                        return CleanupResult(
+                            success=False,
+                            input_file=input_file,
+                            output_file=output_file,
+                            audio_removed=0,
+                            audio_kept=len(info.audio_streams),
+                            subtitle_removed=0,
+                            subtitle_kept=len(info.subtitle_streams),
+                            original_size=info.size,
+                            new_size=0,
+                            original_language=original_lang,
+                            error=f"Failed to move chain file to output: {exc}",
+                        )
+                logger.info("No streams to remove from: %s", input_path.name)
+                return CleanupResult(
+                    success=True,
+                    input_file=input_file,
+                    output_file=output_file or input_file,
+                    audio_removed=0,
+                    audio_kept=len(info.audio_streams),
+                    subtitle_removed=0,
+                    subtitle_kept=len(info.subtitle_streams),
+                    original_size=info.size,
+                    new_size=info.size,
+                    original_language=original_lang,
+                )
+            # else: non-MKV with title issues → fall through to ffmpeg
 
         reorder_note = ", reordering audio (English first)" if needs_reorder else ""
         tag_note = ", tagging untagged audio streams" if needs_tagging else ""
@@ -841,6 +893,43 @@ class StreamCleanup:
         if stream.is_sdh:
             qualifiers.append("SDH")
         return f"{base} ({', '.join(qualifiers)})" if qualifiers else base
+
+    def _run_mkvpropedit_titles(self, file_path: str, info: MediaInfo) -> bool:
+        """Fix wrong track titles in-place using mkvpropedit.
+
+        Uses 1-based type-specific track numbering (track:a1, track:s1, …) which
+        matches the original file order.  Returns True on success.
+        """
+        import subprocess
+
+        cmd = ["mkvpropedit", file_path]
+        for i, stream in enumerate(info.audio_streams, 1):
+            if self._needs_title_normalisation(stream):
+                title = self._canonical_audio_title(stream)
+                if title:
+                    cmd += ["--edit", f"track:a{i}", "--set", f"name={title}"]
+        for i, stream in enumerate(info.subtitle_streams, 1):
+            if self._needs_title_normalisation(stream):
+                title = self._canonical_subtitle_title(stream)
+                if title:
+                    cmd += ["--edit", f"track:s{i}", "--set", f"name={title}"]
+
+        if len(cmd) == 2:
+            return True  # Nothing to edit
+
+        try:
+            proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
+            if proc.returncode != 0:
+                logger.warning(
+                    "mkvpropedit title fix failed for %s: %s",
+                    Path(file_path).name,
+                    proc.stderr.strip(),
+                )
+                return False
+            return True
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            logger.warning("mkvpropedit error: %s", exc)
+            return False
 
     def _build_ffmpeg_command(
         self,
