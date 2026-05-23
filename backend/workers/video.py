@@ -466,6 +466,28 @@ class VideoConverter:
 
             new_size = output_path.stat().st_size
 
+            # Write accurate BPS/DURATION/NUMBER_OF_FRAMES track statistics tags
+            # so MediaInfo and media servers report the correct AV1 bitrate.
+            if output_path.suffix.lower() == ".mkv":
+                try:
+                    proc_stats = subprocess.run(
+                        ["mkvpropedit", "--add-track-statistics-tags", str(output_path)],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                    )
+                    if proc_stats.returncode == 0:
+                        logger.debug("Updated track statistics tags: %s", output_path.name)
+                    else:
+                        logger.warning(
+                            "mkvpropedit track-statistics failed for %s: %s",
+                            output_path.name,
+                            proc_stats.stderr.strip(),
+                        )
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+                    logger.warning("mkvpropedit track-statistics error: %s", exc)
+
             logger.info(
                 "Converted: %s (%.1fMB \u2192 %.1fMB)",
                 input_file,
