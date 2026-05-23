@@ -335,7 +335,7 @@ class StreamCleanup:
                         return CleanupResult(
                             success=False,
                             input_file=input_file,
-                            output_file=output_file,
+                            output_file=output_file or input_file,
                             audio_removed=0,
                             audio_kept=len(info.audio_streams),
                             subtitle_removed=0,
@@ -908,9 +908,9 @@ class StreamCleanup:
                 title = self._canonical_audio_title(stream)
                 if title:
                     cmd += ["--edit", f"track:a{i}", "--set", f"name={title}"]
-        for i, stream in enumerate(info.subtitle_streams, 1):
-            if self._needs_title_normalisation(stream):
-                title = self._canonical_subtitle_title(stream)
+        for i, sub_stream in enumerate(info.subtitle_streams, 1):
+            if self._needs_title_normalisation(sub_stream):
+                title = self._canonical_subtitle_title(sub_stream)
                 if title:
                     cmd += ["--edit", f"track:s{i}", "--set", f"name={title}"]
 
