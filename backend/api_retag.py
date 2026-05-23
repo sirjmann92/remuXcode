@@ -22,9 +22,14 @@ async def retag_file(data: dict[str, Any]) -> dict[str, Any]:
         {
             "path": "/media/Shows/Show/S01/E01.mkv",
             "overrides": [
-                {"track_type": "audio",    "track_index": 0, "language": "eng", "title": "English"},
-                {"track_type": "subtitle", "track_index": 0, "language": "eng", "title": "English (SDH)"}
-            ]
+                {"track_type": "audio", "track_index": 0, "language": "eng", "title": "English"},
+                {
+                    "track_type": "subtitle",
+                    "track_index": 0,
+                    "language": "eng",
+                    "title": "English (SDH)",
+                },
+            ],
         }
 
     ``track_index`` is 0-based within each track type.
