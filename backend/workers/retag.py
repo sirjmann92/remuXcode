@@ -7,11 +7,11 @@ we fall back to an ffmpeg -c copy remux to a temp file followed by safe_replace.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import logging
+from pathlib import Path
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from backend.workers._safe_move import safe_replace
@@ -31,6 +31,7 @@ class TrackChange:
     new_title: str | None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable dict of this change."""
         return {
             "track_type": self.track_type,
             "track_index": self.track_index,
@@ -51,6 +52,7 @@ class RetagResult:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable dict of this result."""
         return {
             "success": self.success,
             "file": self.file,
@@ -114,7 +116,7 @@ class Retagger:
                 edits += ["--set", f"name={ov.title}"]
 
             if edits:
-                cmd += ["--edit", selector] + edits
+                cmd += ["--edit", selector, *edits]
                 changes.append(
                     TrackChange(
                         track_type=ov.track_type,
@@ -133,14 +135,13 @@ class Retagger:
         try:
             proc = subprocess.run(
                 cmd,
+                check=False,
                 capture_output=True,
                 text=True,
                 timeout=60,
             )
         except subprocess.TimeoutExpired:
-            return RetagResult(
-                success=False, file=file_path, error="mkvpropedit timed out"
-            )
+            return RetagResult(success=False, file=file_path, error="mkvpropedit timed out")
         except FileNotFoundError:
             return RetagResult(
                 success=False,
@@ -183,15 +184,21 @@ class Retagger:
 
         try:
             cmd = [
-                "ffmpeg", "-y",
-                "-i", file_path,
-                "-c", "copy",
+                "ffmpeg",
+                "-y",
+                "-i",
+                file_path,
+                "-c",
+                "copy",
             ]
 
             for ov in overrides:
                 type_letter = "a" if ov.track_type == "audio" else "s"
                 if ov.language is not None:
-                    cmd += [f"-metadata:s:{type_letter}:{ov.track_index}", f"language={ov.language}"]
+                    cmd += [
+                        f"-metadata:s:{type_letter}:{ov.track_index}",
+                        f"language={ov.language}",
+                    ]
                 if ov.title is not None:
                     cmd += [f"-metadata:s:{type_letter}:{ov.track_index}", f"title={ov.title}"]
                 changes.append(
@@ -209,6 +216,7 @@ class Retagger:
 
             proc = subprocess.run(
                 cmd,
+                check=False,
                 capture_output=True,
                 text=True,
                 timeout=600,
@@ -221,9 +229,7 @@ class Retagger:
                 return RetagResult(success=False, file=file_path, error=err)
 
             safe_replace(tmp_path, path)
-            logger.info(
-                "Retagged %d track(s) via ffmpeg: %s", len(changes), path.name
-            )
+            logger.info("Retagged %d track(s) via ffmpeg: %s", len(changes), path.name)
             return RetagResult(success=True, file=file_path, changes=changes)
 
         except Exception as exc:
