@@ -758,6 +758,11 @@ class VideoConverter:
             "scenecut=40",
         ]
 
+        # Limit x265 thread pool so concurrent workers don't over-subscribe CPUs.
+        # When ffmpeg_threads is 0 (auto), let x265 self-tune.
+        if self.ffmpeg_threads > 0:
+            x265_params.append(f"pools={self.ffmpeg_threads}")
+
         # Pass through HDR10 mastering display metadata if present (skip when stripping to SDR)
         strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
         if not strip_hdr:
@@ -908,6 +913,12 @@ class VideoConverter:
             "tune=0",  # 0=VQ (visual quality), 1=PSNR
             f"keyint={keyint}",  # 5-second keyframe interval
         ]
+
+        # Limit SVT-AV1 logical processors so concurrent workers don't over-subscribe CPUs.
+        # SVT-AV1 ignores ffmpeg's global -threads flag; lp must be set explicitly.
+        # When ffmpeg_threads is 0 (auto), let SVT-AV1 self-tune.
+        if self.ffmpeg_threads > 0:
+            svtav1_params.append(f"lp={self.ffmpeg_threads}")
 
         # Film grain synthesis: 0=disabled, 1–50 adds synthetic grain at decode time.
         # Anime gets 0 (clean cel-shaded content needs no grain).
