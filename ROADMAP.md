@@ -6,7 +6,7 @@
 
 - **Audio** — DTS/DTS-HD → AC3 (5.1), EAC3 (7.1+), AAC (stereo); separate DTS:X toggle; TrueHD passthrough; configurable bitrate caps; keep-original option with track ordering control; anime-only and live-action-only modes
 - **Video** — 10-bit H.264 → HEVC or AV1; 8-bit H.264 (optional); legacy codecs (VC-1, MPEG-2, MPEG-4/XviD/DivX); anime-optimized presets (CRF, tune, framerate); anime-only and live-action-only modes; hardware acceleration (Intel QSV/VAAPI, NVIDIA NVENC) with automatic software fallback
-- **Cleanup** — mux-only pass that removes audio/subtitle tracks outside keep-languages list; preserves forced subtitles, SDH, commentary, audio description; rewrites foreign-language track titles to canonical English names (e.g. 「英语」 → "English") during the cleanup pass; anime dual-audio mode; live-action-only mode
+- **Cleanup** — mux-only pass that removes audio/subtitle tracks outside keep-languages list; preserves forced subtitles, SDH, commentary, audio description; rewrites foreign-language track titles to canonical English names (e.g. 「英語」 → "English") in-place via `mkvpropedit` for MKV files (ffmpeg fallback for other containers); anime dual-audio mode; live-action-only mode
 
 ### Automation & Integration
 
@@ -19,8 +19,8 @@
 ### Web UI
 
 - **Dashboard** — live job stats (processed, active, queued, storage saved), in-progress jobs with per-phase progress and size delta, pending queue with drag-and-drop reordering, recent activity
-- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, per-file analyze modal, individual and multi-select batch queue, job status indicators on posters, library refresh
-- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, per-episode analyze modal, per-episode and per-season Custom Encode (downscale / HDR), individual and multi-select batch queue, **Queue Season** button that context-switches to **Queue N Selected** when season episodes are checked, **Queue All Episodes** and **Queue N Selected** at series level, per-show **Rescan** button, library refresh
+- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, per-file analyze modal with **Fix Metadata** for in-place track language/title correction, individual and multi-select batch queue, job status indicators on posters, library refresh
+- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, per-episode analyze modal with **Fix Metadata** for in-place track language/title correction, per-episode and per-season Custom Encode (downscale / HDR), individual and multi-select batch queue, **Queue Season** button that context-switches to **Queue N Selected** when season episodes are checked, **Queue All Episodes** and **Queue N Selected** at series level, per-show **Rescan** button, library refresh
 - **Jobs** — full job history with status/worker/media/source/date-range filters and search, per-phase results (size delta per phase), full-text error display with clipboard copy button, drag-and-drop pending queue reordering, Stop Current / Clear Pending / Delete Completed controls, individual job cancel and delete, load-more pagination
 - **Settings** — all settings configurable from the UI: audio, video, cleanup, language detection, Sonarr/Radarr connections, workers, job retention, hardware acceleration
 
@@ -32,6 +32,7 @@
 - Real-time FFmpeg progress via Unix FIFO; frame-count fallback for hardware encoders that report `out_time_us=N/A`
 - File size tracking: before/after displayed per conversion phase in the Jobs UI
 - Automatic job retry on startup for jobs interrupted mid-encode
+- **mkvtoolnix** (`mkvpropedit`) — in-place MKV metadata editing without remuxing: track statistics tags (`BPS`/`DURATION`/`NUMBER_OF_FRAMES`) written after every video encode so MediaInfo and media servers report correct bitrate; in-place track language/title correction via the Retag worker; in-place title normalisation during the Cleanup pass
 
 ---
 
@@ -50,7 +51,7 @@
 
 ### Infrastructure / Dependencies
 
-- **mkvtoolnix** — add `mkvtoolnix` to the Docker image (~70 MB) to enable: writing `BPS`/`DURATION`/`NUMBER_OF_FRAMES` track statistics tags (fixes MediaInfo showing no bitrate for AV1 output), post-encode metadata editing via `mkvpropedit`, chapter manipulation, attachment support, and `mkvinfo`-based stream verification. Currently deferred due to image size cost.
+- **mkvtoolnix** — remaining capabilities not yet wired up: chapter manipulation, attachment management, and `mkvinfo`-based stream verification.
 
 ### Quality of Life
 

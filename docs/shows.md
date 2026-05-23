@@ -119,6 +119,17 @@ Click **Analyze** on any episode to open the stream detail modal. The modal has 
 | **Audio** | Each track: codec, channels, language, bitrate, whether it would be converted |
 | **Subtitles** | Each track: format, language, forced flag, SDH flag, whether it would be removed by cleanup |
 
+### Fix Metadata
+
+The **Audio** and **Subtitles** tabs let you edit track language and title directly in the modal. A language dropdown and title text field appear on each track card.
+
+When any value differs from the original, a **Fix Metadata (N)** button appears at the bottom of the modal showing the number of pending changes. Clicking it queues a **Retag** job that corrects the track metadata without transcoding:
+
+- **MKV files** — `mkvpropedit` rewrites only the relevant track header bytes in-place. No temp file, no size change, no quality loss.
+- **Other containers** — ffmpeg remuxes with `-c copy` to apply the metadata, then atomically replaces the original.
+
+The modal closes automatically once the job is queued.
+
 ---
 
 ## Rescan
