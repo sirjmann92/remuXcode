@@ -1,5 +1,5 @@
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-export type JobType = 'audio' | 'video' | 'cleanup' | 'full';
+export type JobType = 'audio' | 'video' | 'cleanup' | 'full' | 'retag';
 
 export type JobPhase = 'audio' | 'video' | 'cleanup';
 
@@ -71,6 +71,7 @@ export interface JobResult {
   audio: ConversionResult | null;
   video: VideoResult | null;
   cleanup: CleanupResult | null;
+  retag: RetagResult | null;
 }
 
 export interface ConversionResult {
@@ -112,6 +113,27 @@ export interface CleanupResult {
   original_size?: number;
   new_size?: number;
   original_language: string | null;
+  error: string | null;
+}
+
+export interface RetagOverride {
+  track_type: 'audio' | 'subtitle';
+  track_index: number;
+  language?: string;
+  title?: string;
+}
+
+export interface RetagResult {
+  success: boolean;
+  file: string;
+  changes: Array<{
+    track_type: string;
+    track_index: number;
+    old_language: string | null;
+    new_language: string | null;
+    old_title: string | null;
+    new_title: string | null;
+  }>;
   error: string | null;
 }
 

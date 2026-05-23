@@ -47,7 +47,7 @@ RUN set -eux; \
     if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
         INTEL_PKGS="intel-media-va-driver-non-free libvpl2 libmfx-gen1.2"; \
     fi; \
-    apt-get install -y --no-install-recommends gosu ffmpeg $INTEL_PKGS; \
+    apt-get install -y --no-install-recommends gosu ffmpeg mkvtoolnix $INTEL_PKGS; \
     # ── Trim Mesa/LLVM/z3 OpenGL chain (dlopen'd, never in ldd output) ─
     LIBDIR="/usr/lib/$(dpkg --print-architecture | sed 's/amd64/x86_64-linux-gnu/;s/arm64/aarch64-linux-gnu/')"; \
     rm -f "$LIBDIR"/libLLVM*.so* \

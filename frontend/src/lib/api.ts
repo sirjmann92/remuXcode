@@ -8,6 +8,7 @@ import type {
   JobLogsResponse,
   JobsResponse,
   MoviesResponse,
+  RetagOverride,
   ScanProgress,
   SeriesDetail,
   SeriesResponse,
@@ -125,6 +126,17 @@ export async function convertFile(
   return request('/api/convert', {
     method: 'POST',
     body: JSON.stringify({ path, type, poster_url, media_type, encode_options }),
+  });
+}
+
+// Retag
+export async function retagFile(
+  path: string,
+  overrides: RetagOverride[],
+): Promise<{ message: string; job_id: string }> {
+  return request('/api/retag', {
+    method: 'POST',
+    body: JSON.stringify({ path, overrides }),
   });
 }
 

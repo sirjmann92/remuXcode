@@ -110,6 +110,7 @@ def create_app() -> FastAPI:
     from backend.api_config import router as config_router
     from backend.api_convert import router as convert_router
     from backend.api_jobs import router as jobs_router
+    from backend.api_retag import router as retag_router
     from backend.api_webhook import router as webhook_router
 
     app.include_router(analyze_router, prefix="/api")
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(config_router, prefix="/api")
     app.include_router(convert_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
+    app.include_router(retag_router, prefix="/api")
     app.include_router(webhook_router, prefix="/api")
 
     @app.get("/health")

@@ -75,6 +75,7 @@ class JobType(Enum):
     VIDEO = "video"
     CLEANUP = "cleanup"
     FULL = "full"
+    RETAG = "retag"
 
 
 class JobStatus(Enum):
@@ -559,6 +560,37 @@ class JobQueue:
             job.status_detail = detail
 
         try:
+            if job.job_type == JobType.RETAG:
+                from backend.workers.retag import Retagger, TrackOverride
+
+                raw_overrides = (job.encode_options or {}).get("overrides", [])
+                overrides = [
+                    TrackOverride(
+                        track_type=o["track_type"],
+                        track_index=o["track_index"],
+                        language=o.get("language"),
+                        title=o.get("title"),
+                    )
+                    for o in raw_overrides
+                ]
+                job.log("app", "info", f"Retagging {len(overrides)} track(s)")
+                retag_result = Retagger().retag(job.file_path, overrides)
+                job.result = {"retag": retag_result.to_dict()}
+                if not retag_result.success:
+                    job.status = JobStatus.FAILED
+                    job.error = retag_result.error or "Retag failed"
+                    job.log("app", "error", f"Retag failed: {job.error}")
+                else:
+                    job.status = JobStatus.COMPLETED
+                    job.log("app", "info", "Retag completed successfully")
+                    try:
+                        from backend.api_analyze import analyze_and_store
+
+                        analyze_and_store(job.file_path)
+                    except Exception as analyze_err:
+                        logger.warning("Post-retag analysis failed: %s", analyze_err)
+                return
+
             result = process_file(
                 job.file_path,
                 job.job_type,

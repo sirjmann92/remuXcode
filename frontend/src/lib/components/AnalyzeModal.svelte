@@ -1,8 +1,8 @@
 <script lang="ts">
-import { analyzeFile } from '$lib/api';
+import { analyzeFile, retagFile } from '$lib/api';
 import { channelLabel, videoCodecLabel } from '$lib/format';
-import { langLabel } from '$lib/languages';
-import type { AnalyzeResult } from '$lib/types';
+import { langLabel, langNames } from '$lib/languages';
+import type { AnalyzeResult, RetagOverride } from '$lib/types';
 import ConvertOptionsModal from './ConvertOptionsModal.svelte';
 
 interface Props {
@@ -23,12 +23,29 @@ let error = $state('');
 let activeTab: 'video' | 'audio' | 'subtitles' | 'general' = $state('general');
 let showCustomEncode = $state(false);
 
+// Retag state
+let audioEdits = $state<Array<{ language: string; title: string }>>([]);
+let subEdits = $state<Array<{ language: string; title: string }>>([]);
+let retagLoading = $state(false);
+let retagError = $state('');
+let retagSuccess = $state(false);
+
+const langOptions = Object.entries(langNames).sort(([, a], [, b]) => a.localeCompare(b));
+
 $effect(() => {
   loading = true;
   error = '';
   analyzeFile(path, radarr_movie_id, sonarr_episode_file_id)
     .then((r) => {
       result = r;
+      audioEdits = r.audio_streams.map((a) => ({
+        language: a.language ?? '',
+        title: a.title ?? '',
+      }));
+      subEdits = r.subtitle_streams.map((s) => ({
+        language: s.language ?? '',
+        title: s.title ?? '',
+      }));
     })
     .catch((e) => {
       error = e.message || 'Analysis failed';
@@ -37,6 +54,58 @@ $effect(() => {
       loading = false;
     });
 });
+
+const pendingOverrides = $derived.by((): RetagOverride[] => {
+  if (!result) return [];
+  const overrides: RetagOverride[] = [];
+  result.audio_streams.forEach((a, i) => {
+    const edit = audioEdits[i];
+    if (!edit) return;
+    const ov: RetagOverride = { track_type: 'audio', track_index: i };
+    let changed = false;
+    if (edit.language !== (a.language ?? '')) {
+      ov.language = edit.language || undefined;
+      changed = true;
+    }
+    if (edit.title !== (a.title ?? '')) {
+      ov.title = edit.title;
+      changed = true;
+    }
+    if (changed) overrides.push(ov);
+  });
+  result.subtitle_streams.forEach((s, i) => {
+    const edit = subEdits[i];
+    if (!edit) return;
+    const ov: RetagOverride = { track_type: 'subtitle', track_index: i };
+    let changed = false;
+    if (edit.language !== (s.language ?? '')) {
+      ov.language = edit.language || undefined;
+      changed = true;
+    }
+    if (edit.title !== (s.title ?? '')) {
+      ov.title = edit.title;
+      changed = true;
+    }
+    if (changed) overrides.push(ov);
+  });
+  return overrides;
+});
+
+async function handleRetag() {
+  if (!pendingOverrides.length) return;
+  retagLoading = true;
+  retagError = '';
+  retagSuccess = false;
+  try {
+    await retagFile(path, pendingOverrides);
+    retagSuccess = true;
+    setTimeout(() => onclose(), 1500);
+  } catch (e: unknown) {
+    retagError = e instanceof Error ? e.message : 'Retag failed';
+  } finally {
+    retagLoading = false;
+  }
+}
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -230,7 +299,7 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
           <p class="text-sm text-base-content/40 py-4 text-center">No audio streams</p>
         {:else}
           <div class="space-y-3">
-            {#each result.audio_streams as a}
+            {#each result.audio_streams as a, i}
               <div class="card-glass rounded-box p-3">
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
@@ -258,6 +327,26 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
                     <div>{a.title}</div>
                   {/if}
                 </div>
+                {#if audioEdits[i]}
+                  <div class="flex items-center gap-2 mt-2 pt-2 border-t border-base-content/10">
+                    <span class="text-xs text-base-content/40 shrink-0">Fix:</span>
+                    <select
+                      class="select select-xs flex-1 min-w-0"
+                      bind:value={audioEdits[i].language}
+                    >
+                      <option value="">Unknown</option>
+                      {#each langOptions as [code, name]}
+                        <option value={code}>{name}</option>
+                      {/each}
+                    </select>
+                    <input
+                      type="text"
+                      class="input input-xs flex-1 min-w-0"
+                      placeholder="Title"
+                      bind:value={audioEdits[i].title}
+                    />
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>
@@ -280,12 +369,34 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
                 </tr>
               </thead>
               <tbody>
-                {#each result.subtitle_streams as s}
+                {#each result.subtitle_streams as s, i}
                   <tr>
                     <td>{s.index}</td>
-                    <td>{langLabel(s.language)}</td>
+                    <td>
+                      {#if subEdits[i]}
+                        <select class="select select-xs w-28" bind:value={subEdits[i].language}>
+                          <option value="">Unknown</option>
+                          {#each langOptions as [code, name]}
+                            <option value={code}>{name}</option>
+                          {/each}
+                        </select>
+                      {:else}
+                        {langLabel(s.language)}
+                      {/if}
+                    </td>
                     <td class="font-mono text-xs">{s.codec}</td>
-                    <td class="max-w-48 truncate" title={s.title ?? ''}>{s.title ?? '—'}</td>
+                    <td>
+                      {#if subEdits[i]}
+                        <input
+                          type="text"
+                          class="input input-xs w-36"
+                          placeholder="Title"
+                          bind:value={subEdits[i].title}
+                        />
+                      {:else}
+                        <span class="max-w-48 truncate" title={s.title ?? ''}>{s.title ?? '—'}</span>
+                      {/if}
+                    </td>
                     <td>
                       <div class="flex gap-1">
                         {#if s.is_default}<span class="badge badge-ghost badge-xs">Default</span>{/if}
@@ -304,6 +415,24 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
     {/if}
 
     <div class="modal-action">
+      {#if retagSuccess}
+        <span class="text-success text-sm self-center">✓ Metadata updated!</span>
+      {:else if retagError}
+        <span class="text-error text-xs self-center max-w-48 truncate" title={retagError}>{retagError}</span>
+      {/if}
+      {#if pendingOverrides.length > 0}
+        <button
+          class="btn btn-warning btn-sm"
+          onclick={handleRetag}
+          disabled={retagLoading || retagSuccess}
+        >
+          {#if retagLoading}
+            <span class="loading loading-spinner loading-xs"></span>
+          {:else}
+            Fix Metadata ({pendingOverrides.length})
+          {/if}
+        </button>
+      {/if}
       <button class="btn btn-ghost btn-sm" onclick={() => (showCustomEncode = true)}>
         Custom Encode
       </button>
