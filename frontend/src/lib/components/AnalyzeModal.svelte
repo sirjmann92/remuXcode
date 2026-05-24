@@ -179,19 +179,33 @@ async function handleRemoveCoverArt(streamIndex: number) {
   removeCoverArtError = '';
   try {
     await removeCoverArt(path, streamIndex);
-    // Re-fetch analysis to reflect the change
-    const [r, jobs] = await Promise.all([
-      analyzeFile(path, radarr_movie_id, sonarr_episode_file_id),
-      getActiveJobs().catch(() => ({}) as Record<string, unknown>),
-    ]);
-    result = r;
-    activeJobPaths = new Set(Object.keys(jobs));
-    audioEdits = r.audio_streams.map((a) => ({ language: a.language ?? '', title: a.title ?? '' }));
-    subEdits = r.subtitle_streams.map((s) => ({
-      language: s.language ?? '',
-      title: s.title ?? '',
-    }));
-    oncoverartchanged?.(path, r.video_streams.filter((v) => v.is_attached_pic).length);
+    // Fire badge update immediately — don't block on re-analysis
+    const optimisticCount = Math.max(
+      0,
+      (result?.video_streams.filter((v) => v.is_attached_pic).length ?? 1) - 1,
+    );
+    oncoverartchanged?.(path, optimisticCount);
+    // Re-fetch analysis to refresh the modal (best-effort; failure is non-fatal)
+    try {
+      const [r, jobs] = await Promise.all([
+        analyzeFile(path, radarr_movie_id, sonarr_episode_file_id),
+        getActiveJobs().catch(() => ({}) as Record<string, unknown>),
+      ]);
+      result = r;
+      activeJobPaths = new Set(Object.keys(jobs));
+      audioEdits = r.audio_streams.map((a) => ({
+        language: a.language ?? '',
+        title: a.title ?? '',
+      }));
+      subEdits = r.subtitle_streams.map((s) => ({
+        language: s.language ?? '',
+        title: s.title ?? '',
+      }));
+      // Refine with accurate count from re-analysis
+      oncoverartchanged?.(path, r.video_streams.filter((v) => v.is_attached_pic).length);
+    } catch {
+      // Re-analyze failed — badge already updated with optimistic count above
+    }
   } catch (e) {
     removeCoverArtError = e instanceof Error ? e.message : 'Failed to remove cover art';
   } finally {

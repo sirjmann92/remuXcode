@@ -13,9 +13,9 @@ import type {
   SeriesResponse,
 } from './types';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 60_000): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(path, {
       ...init,
@@ -208,11 +208,16 @@ export async function removeCoverArt(
   path: string,
   index: number,
 ): Promise<{ message: string; removed: number }> {
-  return request('/api/cover-art/remove', {
-    method: 'POST',
-    body: JSON.stringify({ path, index }),
-    headers: { 'Content-Type': 'application/json' },
-  });
+  // Large MKV files on NAS can take several minutes to remux — use a long timeout.
+  return request(
+    '/api/cover-art/remove',
+    {
+      method: 'POST',
+      body: JSON.stringify({ path, index }),
+      headers: { 'Content-Type': 'application/json' },
+    },
+    600_000,
+  );
 }
 
 // Active jobs (pending/running) keyed by file path
