@@ -1164,7 +1164,18 @@ const sortOptions: { value: string; label: string }[] = [
 {/if}
 
 {#if analyzePath}
-  <AnalyzeModal path={analyzePath} media_type="episode" onclose={() => (analyzePath = null)} />
+  <AnalyzeModal
+    path={analyzePath}
+    media_type="episode"
+    onclose={() => (analyzePath = null)}
+    oncoverartchanged={(p, count) => {
+      if (!selectedSeries) return;
+      for (const season of selectedSeries.seasons) {
+        const ep = season.episodes.find((e) => e.path === p);
+        if (ep) { ep.cover_art_count = count; break; }
+      }
+    }}
+  />
 {/if}
 
 {#if customEncodePaths}

@@ -12,10 +12,18 @@ interface Props {
   radarr_movie_id?: number;
   sonarr_episode_file_id?: number;
   onclose: () => void;
+  oncoverartchanged?: (path: string, newCount: number) => void;
 }
 
-const { path, poster_url, media_type, radarr_movie_id, sonarr_episode_file_id, onclose }: Props =
-  $props();
+const {
+  path,
+  poster_url,
+  media_type,
+  radarr_movie_id,
+  sonarr_episode_file_id,
+  onclose,
+  oncoverartchanged,
+}: Props = $props();
 
 let result: AnalyzeResult | null = $state(null);
 let loading = $state(true);
@@ -183,6 +191,7 @@ async function handleRemoveCoverArt(streamIndex: number) {
       language: s.language ?? '',
       title: s.title ?? '',
     }));
+    oncoverartchanged?.(path, r.video_streams.filter((v) => v.is_attached_pic).length);
   } catch (e) {
     removeCoverArtError = e instanceof Error ? e.message : 'Failed to remove cover art';
   } finally {
