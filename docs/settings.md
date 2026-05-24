@@ -219,6 +219,7 @@ Additional patterns can be added by editing `config/config.yaml` directly under 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Pin FFmpeg to P-Cores** | On Intel hybrid CPUs (12th gen Alder Lake and later), restrict FFmpeg processes to Performance cores only, bypassing the Efficiency cores. Improves encode throughput on hybrid CPUs by keeping the workload on the fastest cores. Detected automatically at startup; falls back silently if the system is not a hybrid CPU or no P-cores are found. | `false` |
+| **Strip Cover Art** | Remove embedded poster images (attached picture streams) from output files during conversion. Prevents rare ffmpeg failures caused by malformed cover art metadata. When disabled, cover art passes through unchanged. You can also remove cover art from individual files in the Analyze modal. | `true` |
 
 ---
 

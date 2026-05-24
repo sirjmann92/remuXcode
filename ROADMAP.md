@@ -19,10 +19,10 @@
 ### Web UI
 
 - **Dashboard** — live job stats (processed, active, queued, storage saved), in-progress jobs with per-phase progress and size delta, pending queue with drag-and-drop reordering, recent activity
-- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, per-file analyze modal with **Fix Metadata** for in-place track language/title correction, individual and multi-select batch queue, job status indicators on posters, library refresh
-- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, per-episode analyze modal with **Fix Metadata** for in-place track language/title correction, per-episode and per-season Custom Encode (downscale / HDR), individual and multi-select batch queue, **Queue Season** button that context-switches to **Queue N Selected** when season episodes are checked, **Queue All Episodes** and **Queue N Selected** at series level, per-show **Rescan** button, library refresh
+- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, per-file analyze modal with **Fix Metadata** for in-place track language/title correction and **Cover Art** display (thumbnail preview + in-place removal), individual and multi-select batch queue, job status indicators on posters, library refresh
+- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, per-episode analyze modal with **Fix Metadata** for in-place track language/title correction and **Cover Art** display (thumbnail preview + in-place removal), per-episode and per-season Custom Encode (downscale / HDR), individual and multi-select batch queue, **Queue Season** button that context-switches to **Queue N Selected** when season episodes are checked, **Queue All Episodes** and **Queue N Selected** at series level, per-show **Rescan** button, library refresh
 - **Jobs** — full job history with status/worker/media/source/date-range filters and search, per-phase results (size delta per phase), full-text error display with clipboard copy button, drag-and-drop pending queue reordering, Stop Current / Clear Pending / Delete Completed controls, individual job cancel and delete, load-more pagination
-- **Settings** — all settings configurable from the UI: audio, video, cleanup, language detection, Sonarr/Radarr connections, workers, job retention, hardware acceleration
+- **Settings** — all settings configurable from the UI: audio, video, cleanup, language detection, Sonarr/Radarr connections, workers, job retention, hardware acceleration, cover art stripping
 
 ### Infrastructure
 

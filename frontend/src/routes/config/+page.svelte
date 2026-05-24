@@ -732,6 +732,17 @@ $effect(() => {
                 onchange={(e) => { config!.ffmpeg_pin_to_p_cores = e.currentTarget.checked; saveTop('ffmpeg_pin_to_p_cores', e.currentTarget.checked); }}
               />
             </label>
+            <label class="flex items-center justify-between cursor-pointer" title="Remove embedded poster images from outputs. Prevents rare ffmpeg failures on malformed cover art.">
+              <span class="text-xs">Strip Cover Art
+                <span class="block text-xs text-base-content/30 font-normal">Remove embedded poster images from outputs</span>
+              </span>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={config.strip_cover_art}
+                onchange={(e) => { config!.strip_cover_art = e.currentTarget.checked; saveTop('strip_cover_art', e.currentTarget.checked); }}
+              />
+            </label>
             <div class="flex items-center justify-between" title="Completed and failed jobs are removed after this many days">
               <span class="text-xs">Job History<span class="block text-xs text-base-content/30 font-normal">Days to retain completed job records (1–365)</span></span>
               <input

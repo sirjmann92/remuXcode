@@ -114,6 +114,7 @@ async def get_config_summary() -> dict[str, Any]:
         "ffmpeg_threads": cfg.ffmpeg_threads,
         "effective_ffmpeg_threads": cfg.effective_ffmpeg_threads,
         "ffmpeg_pin_to_p_cores": cfg.ffmpeg_pin_to_p_cores,
+        "strip_cover_art": cfg.strip_cover_art,
         "job_history_days": cfg.job_history_days,
         "api_key": get_api_key(),
     }
@@ -301,6 +302,7 @@ class ConfigUpdate(BaseModel):
     workers: int | None = Field(None, ge=1, le=16)
     ffmpeg_threads: int | None = Field(None, ge=0, le=128)
     ffmpeg_pin_to_p_cores: bool | None = None
+    strip_cover_art: bool | None = None
     job_history_days: int | None = Field(None, ge=1, le=365)
 
 
@@ -366,6 +368,11 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
 
     if body.job_history_days is not None:
         cfg.job_history_days = body.job_history_days
+
+    if body.strip_cover_art is not None:
+        cfg.strip_cover_art = body.strip_cover_art
+        if core.ffprobe:
+            core.ffprobe.strip_cover_art = body.strip_cover_art
 
     if body.cleanup:
         for field, val in body.cleanup.model_dump(exclude_none=True).items():

@@ -229,6 +229,7 @@ export interface ConfigSummary {
   ffmpeg_threads: number;
   effective_ffmpeg_threads: number;
   ffmpeg_pin_to_p_cores: boolean;
+  strip_cover_art: boolean;
   job_history_days: number;
   api_key: string;
 }
@@ -407,6 +408,7 @@ export interface AnalyzeVideoStream {
   color_trc: string | null;
   hdr_master_display: string | null;
   hdr_max_cll: string | null;
+  is_attached_pic: boolean;
 }
 
 export interface AnalyzeAudioStream {

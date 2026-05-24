@@ -205,6 +205,14 @@ export async function analyzeFile(
   return request(`/api/analyze?${params}`);
 }
 
+export async function removeCoverArt(path: string): Promise<{ message: string; removed: number }> {
+  return request('/api/cover-art/remove', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 // Active jobs (pending/running) keyed by file path
 export async function getActiveJobs(): Promise<ActiveJobsMap> {
   const res = await request<{ active: ActiveJobsMap }>('/api/jobs/active');

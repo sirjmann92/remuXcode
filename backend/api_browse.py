@@ -2,6 +2,8 @@
 
 import logging
 from pathlib import Path
+import secrets
+import subprocess
 import threading
 import time
 from typing import Any
@@ -13,6 +15,7 @@ import requests
 from backend import core
 from backend.core import translate_path
 from backend.utils.anime_detect import ContentType
+from backend.utils.ffprobe import FFProbe
 
 logger = logging.getLogger("remuxcode")
 
@@ -420,7 +423,9 @@ def analyze_file(
     if not Path(file_path).exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    info = core.ffprobe.get_file_info(file_path) if core.ffprobe else None
+    # Always probe with strip_cover_art=False so the modal shows all streams
+    # (including attached pictures) regardless of the global conversion setting.
+    info = FFProbe(strip_cover_art=False).get_file_info(file_path)
     if not info:
         raise HTTPException(status_code=500, detail="Failed to analyze file")
 
@@ -539,6 +544,7 @@ def analyze_file(
             "color_trc": v.color_trc,
             "hdr_master_display": v.hdr_master_display,
             "hdr_max_cll": v.hdr_max_cll,
+            "is_attached_pic": v.is_attached_pic,
         }
         for v in info.video_streams
     ]
@@ -613,6 +619,114 @@ def analyze_file(
         "subtitle_streams": subtitle_streams,
         "format_tags": info.format_tags,
     }
+
+
+@router.get("/cover-art")
+def serve_cover_art(
+    path: str = Query(..., description="Path to media file"),
+    index: int = Query(..., description="Stream index of the attached picture", ge=0),
+) -> Response:
+    """Extract and serve an embedded cover art image from a media file."""
+    file_path = translate_path(path)
+    if not Path(file_path).exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "quiet",
+                "-i",
+                file_path,
+                "-map",
+                f"0:{index}",
+                "-frames:v",
+                "1",
+                "-f",
+                "image2",
+                "pipe:1",
+            ],
+            check=False,
+            capture_output=True,
+            timeout=15,
+        )
+        if result.returncode != 0 or not result.stdout:
+            raise HTTPException(status_code=404, detail="Failed to extract cover art")
+        return Response(
+            content=result.stdout,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except subprocess.TimeoutExpired as e:
+        raise HTTPException(status_code=504, detail="Cover art extraction timed out") from e
+
+
+@router.post("/cover-art/remove")
+def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
+    """Remove all embedded cover art streams from a media file (in-place)."""
+    path = data.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing path")
+
+    file_path = translate_path(path)
+    if not Path(file_path).exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Guard: reject if the file is already queued or running
+    if core.job_queue:
+        active_paths = {j["file_path"] for j in core.job_queue.get_pending_jobs()}
+        if file_path in active_paths:
+            raise HTTPException(
+                status_code=409,
+                detail="A job is already queued or running for this file",
+            )
+
+    # Probe to identify attached_pic stream indices
+    info = FFProbe(strip_cover_art=False).get_file_info(file_path)
+    if not info:
+        raise HTTPException(status_code=500, detail="Failed to probe file")
+
+    all_streams = (
+        list(info.video_streams)
+        + list(info.audio_streams)
+        + list(info.subtitle_streams)
+        + list(info.attachment_streams)
+    )
+    pic_indices = {v.index for v in info.video_streams if v.is_attached_pic}
+
+    if not pic_indices:
+        return {"message": "No cover art found", "removed": 0}
+
+    # Build ffmpeg remux command mapping every stream except the attached_pic ones
+    cmd = ["ffmpeg", "-v", "quiet", "-i", file_path, "-y"]
+    for stream in sorted(all_streams, key=lambda s: s.index):
+        if stream.index not in pic_indices:
+            cmd.extend(["-map", f"0:{stream.index}"])
+    cmd.extend(["-c", "copy"])
+
+    suffix = secrets.token_hex(6)
+    temp_path = Path(file_path).with_name(f".remuxcode-covart-{suffix}.mkv")
+
+    try:
+        cmd.append(str(temp_path))
+        result = subprocess.run(cmd, check=False, capture_output=True, timeout=300)
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace")[-500:]
+            raise RuntimeError(f"ffmpeg failed: {err}")
+        temp_path.replace(file_path)
+        logger.info(
+            "Removed %d cover art stream(s) from %s",
+            len(pic_indices),
+            Path(file_path).name,
+        )
+        return {"message": "Cover art removed", "removed": len(pic_indices)}
+    except Exception as e:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/scan")
