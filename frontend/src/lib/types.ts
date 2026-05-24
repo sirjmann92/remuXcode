@@ -290,6 +290,7 @@ export interface BrowseMovie {
   is_hdr10_plus?: boolean;
   is_hdr10?: boolean;
   is_hlg?: boolean;
+  cover_art_count?: number;
 }
 
 export interface MoviesResponse {
@@ -359,6 +360,7 @@ export interface EpisodeFile {
   audio_codecs_to_convert?: string[];
   audio_codecs_to_drop?: string[];
   is_anime?: boolean;
+  cover_art_count?: number;
 }
 
 export interface Season {

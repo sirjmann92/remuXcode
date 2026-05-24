@@ -822,6 +822,9 @@ const sortOptions: { value: string; label: string }[] = [
                     {#if ep.has_dts_x}
                       <span class="badge badge-error badge-xs">DTS:X</span>
                     {/if}
+                    {#if ep.cover_art_count}
+                      <span class="badge badge-neutral badge-xs">Art</span>
+                    {/if}
                   </div>
                   <!-- Language details -->
                   {#if (ep.audio_languages.length > 0 || ep.subtitles.length > 0) && config}
