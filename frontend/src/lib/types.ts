@@ -324,6 +324,7 @@ export interface BrowseSeries {
   cleanup_count?: number;
   needs_work_count?: number;
   dts_x_count?: number;
+  cover_art_episodes?: number;
   audio_codecs: string[];
   video_codecs: string[];
 }

@@ -1361,6 +1361,7 @@ def _build_series_results(
                 cleanup_count = 0
                 work_count = 0
                 dts_x_count = 0
+                cover_art_eps = 0
                 cfg_audio = core.config.audio if core.config else None
                 cfg_video = core.config.video if core.config else None
                 audio_codecs_set: set[str] = set()
@@ -1458,11 +1459,15 @@ def _build_series_results(
                     if ep_analysis.get("has_dts_x"):
                         dts_x_count += 1
                         audio_codecs_set.add("DTS:X")
+                    # Count episodes with embedded cover art
+                    if ep_analysis.get("cover_art_count", 0) > 0:
+                        cover_art_eps += 1
                 item["audio_convert_count"] = audio_count
                 item["video_convert_count"] = video_count
                 item["cleanup_count"] = cleanup_count
                 item["needs_work_count"] = work_count
                 item["dts_x_count"] = dts_x_count
+                item["cover_art_episodes"] = cover_art_eps
                 item["audio_codecs"] = sorted(audio_codecs_set)
                 item["video_codecs"] = sorted(video_codecs_set)
         except Exception as e:
