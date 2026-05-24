@@ -374,8 +374,17 @@ class FFProbe:
 
         for stream in streams:
             codec_type = stream.get("codec_type")
+            disposition = stream.get("disposition", {})
 
             if codec_type == "video":
+                # Skip embedded cover art / poster images.  These are stored as
+                # video streams with attached_pic=1 but have no real dimensions,
+                # causing ffmpeg "dimensions not set" → header write failures.
+                if disposition.get("attached_pic", 0) == 1:
+                    tags = stream.get("tags", {})
+                    fname = tags.get("filename", f"stream #{stream.get('index', '?')}")
+                    logger.debug("Ignoring attached picture: %s", fname)
+                    continue
                 video_streams.append(self._parse_video_stream(stream))
             elif codec_type == "audio":
                 audio_streams.append(self._parse_audio_stream(stream))
