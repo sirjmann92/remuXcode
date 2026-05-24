@@ -115,6 +115,11 @@ class VideoStream:
     # These streams have no real video content and may lack valid dimension
     # metadata, causing ffmpeg header-write failures if mapped to the output.
     is_attached_pic: bool = False
+    # True only when the image is stored as a proper EBML Attachment
+    # (disposition.attached_pic == 1 in ffprobe).  False for image tracks
+    # detected via MIMETYPE/FILENAME tags — those are regular Matroska tracks
+    # and must be extracted with ffmpeg rather than mkvextract.
+    is_ebml_attachment: bool = False
 
     @property
     def is_hevc(self) -> bool:
@@ -534,6 +539,7 @@ class FFProbe:
             hdr_max_cll=hdr_max_cll,
             is_dolby_vision=is_dolby_vision,
             is_hdr10_plus=is_hdr10_plus,
+            is_ebml_attachment=stream.get("disposition", {}).get("attached_pic", 0) == 1,
             is_attached_pic=(
                 stream.get("disposition", {}).get("attached_pic", 0) == 1
                 or (stream.get("tags") or {}).get("MIMETYPE", "").lower().startswith("image/")

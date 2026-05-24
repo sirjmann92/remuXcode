@@ -627,6 +627,9 @@ const sortOptions: { value: string; label: string }[] = [
                 {#if movie.has_dts_x}
                   <span class="badge badge-error badge-xs">DTS:X</span>
                 {/if}
+                {#if movie.cover_art_count}
+                  <span class="badge badge-neutral badge-xs">Art</span>
+                {/if}
               </div>
               <div class="flex flex-col gap-1 items-end">
                 {#if movie.needs_video_conversion}

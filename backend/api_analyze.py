@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 import requests
 
 from backend import core
+from backend.utils.ffprobe import FFProbe
 
 logger = logging.getLogger("remuxcode")
 
@@ -54,6 +55,7 @@ def build_analysis_dict(info: Any) -> dict[str, Any]:
         "has_truehd": info.has_truehd,
         "subtitle_count": len(info.subtitle_streams),
         "subtitle_langs": [s.language or "" for s in info.subtitle_streams],
+        "cover_art_count": sum(1 for v in info.video_streams if v.is_attached_pic),
     }
 
 
@@ -71,7 +73,9 @@ def analyze_and_store(
         return False
     try:
         stat = p.stat()
-        info = core.ffprobe.get_file_info(file_path)
+        # Always probe with strip_cover_art=False for DB storage so cover art is recorded
+        # regardless of the global strip_cover_art config setting.
+        info = FFProbe(strip_cover_art=False).get_file_info(file_path)
         if not info:
             return False
         analysis = build_analysis_dict(info)

@@ -633,18 +633,20 @@ def serve_cover_art(
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        if Path(file_path).suffix.lower() in {".mkv", ".mka", ".mks", ".mk3d", ".webm"}:
-            # MKV/WebM stores cover art as EBML attachments; use mkvextract
-            info = FFProbe(strip_cover_art=False).get_file_info(file_path)
-            attached = sorted(
-                [v for v in info.video_streams if v.is_attached_pic],
-                key=lambda v: v.index,
-            )
-            try:
-                attachment_id = next(i + 1 for i, v in enumerate(attached) if v.index == index)
-            except StopIteration as e:
-                raise HTTPException(status_code=404, detail="Not an attached picture") from e
+        info = FFProbe(strip_cover_art=False).get_file_info(file_path)
+        attached = sorted(
+            [v for v in info.video_streams if v.is_attached_pic],
+            key=lambda v: v.index,
+        )
+        try:
+            target = next(v for v in attached if v.index == index)
+        except StopIteration as e:
+            raise HTTPException(status_code=404, detail="Not an attached picture") from e
 
+        if target.is_ebml_attachment:
+            # True EBML Attachment: mkvextract reads directly from the Attachments element
+            ebml_attached = [v for v in attached if v.is_ebml_attachment]
+            attachment_id = next(i + 1 for i, v in enumerate(ebml_attached) if v.index == index)
             with tempfile.TemporaryDirectory() as tmpdir:
                 out_path = str(Path(tmpdir) / "cover")
                 result = subprocess.run(
@@ -658,7 +660,8 @@ def serve_cover_art(
                     raise HTTPException(status_code=404, detail="Failed to extract cover art")
                 data = out_file.read_bytes()
         else:
-            # Other formats: extract image frame via ffmpeg
+            # Regular Matroska video track with image content (no attached_pic disposition).
+            # ffmpeg can demux this as a normal single-frame video stream.
             result = subprocess.run(
                 [
                     "ffmpeg",
@@ -736,16 +739,46 @@ def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
 
     try:
         if fp.suffix.lower() in {".mkv", ".mka", ".mks", ".mk3d", ".webm"}:
-            # MKV: mkvpropedit does in-place attachment removal — no full remux needed
-            result = subprocess.run(
-                ["mkvpropedit", file_path, "--delete-attachment", str(attachment_id)],
-                check=False,
-                capture_output=True,
-                timeout=60,
-            )
-            if result.returncode != 0:
-                err = result.stderr.decode(errors="replace")[-500:]
-                raise RuntimeError(f"mkvpropedit failed: {err}")
+            target = next((v for v in attached if v.index == index), None)
+            if target and target.is_ebml_attachment:
+                # True EBML Attachment: mkvpropedit does in-place removal, no remux
+                ebml_attached = [v for v in attached if v.is_ebml_attachment]
+                ebml_id = next(i + 1 for i, v in enumerate(ebml_attached) if v.index == index)
+                result = subprocess.run(
+                    ["mkvpropedit", file_path, "--delete-attachment", str(ebml_id)],
+                    check=False,
+                    capture_output=True,
+                    timeout=60,
+                )
+                if result.returncode != 0:
+                    err = result.stderr.decode(errors="replace")[-500:]
+                    raise RuntimeError(f"mkvpropedit failed: {err}")
+            else:
+                # Regular Matroska video track: requires ffmpeg remux to drop the stream
+                all_streams = (
+                    list(info.video_streams)
+                    + list(info.audio_streams)
+                    + list(info.subtitle_streams)
+                    + list(info.attachment_streams)
+                )
+                cmd = ["ffmpeg", "-v", "quiet", "-i", file_path, "-y"]
+                for stream in sorted(all_streams, key=lambda s: s.index):
+                    if stream.index != index:
+                        cmd.extend(["-map", f"0:{stream.index}"])
+                cmd.extend(["-c", "copy"])
+                suffix = secrets.token_hex(6)
+                temp_path = fp.with_name(f".remuxcode-covart-{suffix}.mkv")
+                try:
+                    result = subprocess.run(
+                        [*cmd, str(temp_path)], check=False, capture_output=True, timeout=300
+                    )
+                    if result.returncode != 0:
+                        err = result.stderr.decode(errors="replace")[-500:]
+                        raise RuntimeError(f"ffmpeg failed: {err}")
+                    temp_path.replace(file_path)
+                except Exception:
+                    temp_path.unlink(missing_ok=True)
+                    raise
         else:
             # Other formats: ffmpeg remux excluding only this stream
             all_streams = (
@@ -1113,6 +1146,7 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     # Use cached ffprobe result for video conversion if available
                     if "needs_video_conversion" in a:
                         item["needs_video_conversion"] = a["needs_video_conversion"]
+                    item["cover_art_count"] = a.get("cover_art_count", 0)
                     # Re-evaluate cleanup using stream-level data if titles are available
                     if cached_streams:
                         # Prefer DB subtitle langs over stale Radarr data
@@ -1593,6 +1627,7 @@ def get_series_detail(
             ep_item["has_dts"] = a.get("has_dts", ep_item["has_dts"])
             ep_item["has_truehd"] = a.get("has_truehd", ep_item["has_truehd"])
             ep_item["analyzed"] = True
+            ep_item["cover_art_count"] = a.get("cover_art_count", 0)
             # Re-evaluate cleanup with stream-level data if titles are available
             cached_streams = a.get("audio_streams", [])
             if cached_streams:
