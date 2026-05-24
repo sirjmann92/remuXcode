@@ -35,6 +35,9 @@ let removingIndices = $state(new Set<number>());
 let removeCoverArtError = $state('');
 let activeJobPaths = $state<Set<string>>(new Set());
 
+// Cover art lightbox
+let lightboxSrc = $state<string | null>(null);
+
 const langOptions = Object.entries(langNames).sort(([, a], [, b]) => a.localeCompare(b));
 
 $effect(() => {
@@ -299,11 +302,17 @@ async function handleRemoveCoverArt(streamIndex: number) {
                     <span class="badge badge-secondary badge-sm">Cover Art</span>
                   </div>
                   <div class="flex items-center gap-3">
-                    <img
-                      src="/api/cover-art?path={encodeURIComponent(path)}&index={v.index}"
-                      class="w-16 h-16 object-contain rounded border border-base-content/10"
-                      alt="Cover art"
-                    />
+                    <button
+                      class="cursor-zoom-in shrink-0"
+                      title="Click to enlarge"
+                      onclick={() => lightboxSrc = `/api/cover-art?path=${encodeURIComponent(path)}&index=${v.index}`}
+                    >
+                      <img
+                        src="/api/cover-art?path={encodeURIComponent(path)}&index={v.index}"
+                        class="w-16 h-16 object-contain rounded border border-base-content/10 hover:opacity-80 transition-opacity"
+                        alt="Cover art"
+                      />
+                    </button>
                     <div class="flex-1 text-xs text-base-content/50 space-y-1">
                       <div>{v.codec_long || v.codec}</div>
                       <button
@@ -513,4 +522,21 @@ async function handleRemoveCoverArt(streamIndex: number) {
     onclose={() => (showCustomEncode = false)}
     onqueued={() => { showCustomEncode = false; onclose(); }}
   />
+{/if}
+
+{#if lightboxSrc}
+  <div
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
+    role="button"
+    tabindex="-1"
+    aria-label="Close image preview"
+    onclick={() => lightboxSrc = null}
+    onkeydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') lightboxSrc = null; }}
+  >
+    <img
+      src={lightboxSrc}
+      class="max-w-full max-h-full object-contain rounded shadow-2xl"
+      alt="Cover art full size"
+    />
+  </div>
 {/if}
