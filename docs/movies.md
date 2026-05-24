@@ -104,7 +104,7 @@ Click **Analyze** on any movie to open a detailed stream inspection view. The mo
 | Tab | Shows |
 |-----|-------|
 | **General** | Container format, duration, overall bitrate, file size |
-| **Video** | Codec, profile, resolution, bit depth, framerate, pixel format, color space/transfer/primaries |
+| **Video** | Codec, profile, resolution, bit depth, framerate, pixel format, color space/transfer/primaries; embedded cover art thumbnails with a Remove button |
 | **Audio** | Each track: codec, channels, language, bitrate, whether it would be converted |
 | **Subtitles** | Each track: format, language, forced flag, SDH flag, whether it would be removed by cleanup |
 
@@ -118,6 +118,18 @@ When any value differs from the original, a **Fix Metadata (N)** button appears 
 - **Other containers** — ffmpeg remuxes with `-c copy` to apply the metadata, then atomically replaces the original.
 
 The modal closes automatically once the job is queued.
+
+### Cover Art
+
+If the file contains an embedded cover art stream (attached picture), the **Video** tab shows a thumbnail preview of the image alongside its stream index and codec.
+
+A **Remove** button strips all embedded cover art from the file immediately (no job is queued — the operation runs synchronously and the modal refreshes when done):
+
+- ffmpeg remuxes the file with `-c copy`, excluding the attached picture stream(s)
+- The original file is atomically replaced
+- The Remove button is disabled if a conversion job is already queued or running for this file
+
+This is useful for files where malformed cover art causes ffmpeg errors during conversion, or when you simply want a clean container without embedded images.
 
 ---
 

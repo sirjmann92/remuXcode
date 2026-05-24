@@ -1,5 +1,5 @@
 <script lang="ts">
-import { analyzeFile, retagFile } from '$lib/api';
+import { analyzeFile, getActiveJobs, removeCoverArt, retagFile } from '$lib/api';
 import { channelLabel, videoCodecLabel } from '$lib/format';
 import { langLabel, langNames } from '$lib/languages';
 import type { AnalyzeResult, RetagOverride } from '$lib/types';
@@ -30,14 +30,23 @@ let retagLoading = $state(false);
 let retagError = $state('');
 let retagSuccess = $state(false);
 
+// Cover art removal state
+let removingCoverArt = $state(false);
+let removeCoverArtError = $state('');
+let activeJobPaths = $state<Set<string>>(new Set());
+
 const langOptions = Object.entries(langNames).sort(([, a], [, b]) => a.localeCompare(b));
 
 $effect(() => {
   loading = true;
   error = '';
-  analyzeFile(path, radarr_movie_id, sonarr_episode_file_id)
-    .then((r) => {
+  Promise.all([
+    analyzeFile(path, radarr_movie_id, sonarr_episode_file_id),
+    getActiveJobs().catch(() => ({}) as Record<string, unknown>),
+  ])
+    .then(([r, jobs]) => {
       result = r;
+      activeJobPaths = new Set(Object.keys(jobs));
       audioEdits = r.audio_streams.map((a) => ({
         language: a.language ?? '',
         title: a.title ?? '',
@@ -152,6 +161,31 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
   if (v.is_hlg) parts.push('HLG');
   return parts.join(' + ');
 }
+
+async function handleRemoveCoverArt() {
+  if (!confirm('Remove all embedded cover art from this file? This cannot be undone.')) return;
+  removingCoverArt = true;
+  removeCoverArtError = '';
+  try {
+    await removeCoverArt(path);
+    // Re-fetch analysis to reflect the change
+    const [r, jobs] = await Promise.all([
+      analyzeFile(path, radarr_movie_id, sonarr_episode_file_id),
+      getActiveJobs().catch(() => ({}) as Record<string, unknown>),
+    ]);
+    result = r;
+    activeJobPaths = new Set(Object.keys(jobs));
+    audioEdits = r.audio_streams.map((a) => ({ language: a.language ?? '', title: a.title ?? '' }));
+    subEdits = r.subtitle_streams.map((s) => ({
+      language: s.language ?? '',
+      title: s.title ?? '',
+    }));
+  } catch (e) {
+    removeCoverArtError = e instanceof Error ? e.message : 'Failed to remove cover art';
+  } finally {
+    removingCoverArt = false;
+  }
+}
 </script>
 
 <div class="modal modal-open" role="dialog" aria-modal="true">
@@ -258,6 +292,31 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
         {:else}
           <div class="space-y-3">
             {#each result.video_streams as v, i}
+              {#if v.is_attached_pic}
+                <div class="card-glass rounded-box p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-medium text-sm">Stream #{v.index}</span>
+                    <span class="badge badge-secondary badge-sm">Cover Art</span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <img
+                      src="/api/cover-art?path={encodeURIComponent(path)}&index={v.index}"
+                      class="w-16 h-16 object-contain rounded border border-base-content/10"
+                      alt="Cover art"
+                    />
+                    <div class="flex-1 text-xs text-base-content/50 space-y-1">
+                      <div>{v.codec_long || v.codec}</div>
+                      <button
+                        class="btn btn-xs btn-error btn-outline mt-1"
+                        disabled={removingCoverArt || activeJobPaths.has(path)}
+                        onclick={handleRemoveCoverArt}
+                      >
+                        {#if removingCoverArt}Removing…{:else}Remove{/if}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              {:else}
               <div class="card-glass rounded-box p-3">
                 <div class="flex items-center justify-between mb-2">
                   <span class="font-medium text-sm">Stream #{v.index}</span>
@@ -289,7 +348,11 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
                   <div>{formatBitrate(v.bitrate)}</div>
                 </div>
               </div>
+              {/if}
             {/each}
+            {#if removeCoverArtError}
+              <div class="alert alert-error text-xs py-2 px-3">{removeCoverArtError}</div>
+            {/if}
           </div>
         {/if}
 
