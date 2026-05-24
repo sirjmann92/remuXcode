@@ -117,8 +117,8 @@ class VideoStream:
     is_attached_pic: bool = False
     # True only when the image is stored as a proper EBML Attachment
     # (disposition.attached_pic == 1 in ffprobe).  False for image tracks
-    # detected via MIMETYPE/FILENAME tags — those are regular Matroska tracks
-    # and must be extracted with ffmpeg rather than mkvextract.
+    # detected via MIMETYPE/FILENAME tags — those are regular Matroska video
+    # tracks extracted by piping the first 10 MB of the file to ffmpeg.
     is_ebml_attachment: bool = False
 
     @property
