@@ -645,73 +645,55 @@ def serve_cover_art(
         except StopIteration as e:
             raise HTTPException(status_code=404, detail="Not an attached picture") from e
 
-        if target.is_ebml_attachment and Path(file_path).suffix.lower() in {
-            ".mkv",
-            ".mka",
-            ".mks",
-            ".mk3d",
-            ".webm",
-        }:
-            # True EBML Attachment: mkvextract reads directly from the Attachments element
-            ebml_attached = [v for v in attached if v.is_ebml_attachment]
-            attachment_id = next(i + 1 for i, v in enumerate(ebml_attached) if v.index == index)
-            with tempfile.TemporaryDirectory() as tmpdir:
-                out_path = str(Path(tmpdir) / "cover")
-                result = subprocess.run(
-                    ["mkvextract", file_path, "attachments", f"{attachment_id}:{out_path}"],
-                    check=False,
-                    capture_output=True,
-                    timeout=30,
+        # Always use the ffmpeg pipe approach for extraction — this works for both
+        # EBML attachments (disposition.attached_pic=1) and bare V_MJPEG/V_PNG tracks.
+        # Using mkvextract for EBML attachments was unreliable because its 1-based
+        # attachment ID ordering may differ from ffprobe's global stream index ordering.
+        # ffmpeg's -map 0:{index} correctly addresses the stream by its ffprobe index
+        # regardless of how the MKV stores it.
+        #
+        # EBML attachments live in the Segment's Attachments element, which precedes
+        # the first Cluster in a properly muxed MKV (typically in the first few KB–MB).
+        # V_MJPEG/V_PNG track frames appear in the first Cluster.  50 MB covers both.
+        _READ_BYTES = 50 * 1024 * 1024  # 50 MB
+        with Path(file_path).open("rb") as _f:
+            chunk = _f.read(_READ_BYTES)
+        # Use a codec-matched output extension so ffmpeg doesn't transcode.
+        _ext = ".png" if target.codec_name.lower() == "png" else ".jpg"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = str(Path(tmpdir) / f"cover{_ext}")
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-v",
+                    "error",
+                    "-probesize",
+                    str(_READ_BYTES),
+                    "-analyzeduration",
+                    "0",
+                    "-i",
+                    "pipe:0",
+                    "-map",
+                    f"0:{index}",
+                    "-vcodec",
+                    "copy",
+                    "-frames:v",
+                    "1",
+                    out_path,
+                ],
+                input=chunk,
+                check=False,
+                capture_output=True,
+                timeout=15,
+            )
+            out_file = Path(out_path)
+            if result.returncode != 0 or not out_file.exists():
+                err = result.stderr.decode(errors="replace")[:200]
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Failed to extract cover art: {err}",
                 )
-                out_file = Path(out_path)
-                if result.returncode != 0 or not out_file.exists():
-                    raise HTTPException(status_code=404, detail="Failed to extract cover art")
-                data = out_file.read_bytes()
-        else:
-            # Regular video track (V_MJPEG, V_PNG) or non-Matroska attached picture.
-            # The cover art block is always in the first Cluster — near the start of the
-            # file — so we only need to read the first ~50 MB from the NAS.  Piping that
-            # chunk to ffmpeg via stdin is ~0.1 s vs ~30 s for a full random-access seek.
-            # 50 MB covers files with many embedded images (each 1–3 MB) comfortably.
-            _READ_BYTES = 50 * 1024 * 1024  # 50 MB
-            with Path(file_path).open("rb") as _f:
-                chunk = _f.read(_READ_BYTES)
-            # Use a codec-matched output extension so ffmpeg doesn't transcode.
-            _ext = ".png" if target.codec_name.lower() == "png" else ".jpg"
-            with tempfile.TemporaryDirectory() as tmpdir:
-                out_path = str(Path(tmpdir) / f"cover{_ext}")
-                result = subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-v",
-                        "error",
-                        "-probesize",
-                        str(_READ_BYTES),
-                        "-analyzeduration",
-                        "0",
-                        "-i",
-                        "pipe:0",
-                        "-map",
-                        f"0:{index}",
-                        "-vcodec",
-                        "copy",
-                        "-frames:v",
-                        "1",
-                        out_path,
-                    ],
-                    input=chunk,
-                    check=False,
-                    capture_output=True,
-                    timeout=15,
-                )
-                out_file = Path(out_path)
-                if result.returncode != 0 or not out_file.exists():
-                    err = result.stderr.decode(errors="replace")[:200]
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Failed to extract cover art: {err}",
-                    )
-                data = out_file.read_bytes()
+            data = out_file.read_bytes()
 
         media_type = "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
         return Response(

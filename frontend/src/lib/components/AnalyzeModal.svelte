@@ -572,7 +572,7 @@ async function executeRemoveCoverArt() {
 {/if}
 
 {#if confirmRemoveIndex !== null}
-  <div class="modal modal-open z-[200]" role="dialog" aria-modal="true">
+  <div class="modal modal-open z-[9999]" role="dialog" aria-modal="true">
     <div class="modal-box max-w-sm">
       <h3 class="font-semibold text-base mb-2">Remove Cover Art</h3>
       <p class="text-sm text-base-content/70 mb-4">Remove this embedded image? This cannot be undone.</p>
