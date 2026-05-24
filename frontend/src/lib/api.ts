@@ -205,10 +205,13 @@ export async function analyzeFile(
   return request(`/api/analyze?${params}`);
 }
 
-export async function removeCoverArt(path: string): Promise<{ message: string; removed: number }> {
+export async function removeCoverArt(
+  path: string,
+  index: number,
+): Promise<{ message: string; removed: number }> {
   return request('/api/cover-art/remove', {
     method: 'POST',
-    body: JSON.stringify({ path }),
+    body: JSON.stringify({ path, index }),
     headers: { 'Content-Type': 'application/json' },
   });
 }

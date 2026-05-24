@@ -694,13 +694,17 @@ def serve_cover_art(
 
 @router.post("/cover-art/remove")
 def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
-    """Remove all embedded cover art streams from a media file (in-place)."""
+    """Remove a single embedded cover art image from a media file."""
     path = data.get("path")
+    index = data.get("index")
     if not path:
         raise HTTPException(status_code=400, detail="Missing path")
+    if index is None:
+        raise HTTPException(status_code=400, detail="Missing index")
 
     file_path = translate_path(path)
-    if not Path(file_path).exists():
+    fp = Path(file_path)
+    if not fp.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
     # Guard: reject if the file is already queued or running
@@ -716,50 +720,65 @@ def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
                 detail="A job is already queued or running for this file",
             )
 
-    # Probe to identify attached_pic stream indices
+    # Probe to find the target stream
     info = FFProbe(strip_cover_art=False).get_file_info(file_path)
     if not info:
         raise HTTPException(status_code=500, detail="Failed to probe file")
 
-    all_streams = (
-        list(info.video_streams)
-        + list(info.audio_streams)
-        + list(info.subtitle_streams)
-        + list(info.attachment_streams)
+    attached = sorted(
+        [v for v in info.video_streams if v.is_attached_pic],
+        key=lambda v: v.index,
     )
-    pic_indices = {v.index for v in info.video_streams if v.is_attached_pic}
-
-    if not pic_indices:
-        return {"message": "No cover art found", "removed": 0}
-
-    # Build ffmpeg remux command mapping every stream except the attached_pic ones
-    cmd = ["ffmpeg", "-v", "quiet", "-i", file_path, "-y"]
-    for stream in sorted(all_streams, key=lambda s: s.index):
-        if stream.index not in pic_indices:
-            cmd.extend(["-map", f"0:{stream.index}"])
-    cmd.extend(["-c", "copy"])
-
-    suffix = secrets.token_hex(6)
-    temp_path = Path(file_path).with_name(f".remuxcode-covart-{suffix}.mkv")
+    try:
+        attachment_id = next(i + 1 for i, v in enumerate(attached) if v.index == index)
+    except StopIteration as e:
+        raise HTTPException(status_code=404, detail="Not an attached picture") from e
 
     try:
-        cmd.append(str(temp_path))
-        result = subprocess.run(cmd, check=False, capture_output=True, timeout=300)
-        if result.returncode != 0:
-            err = result.stderr.decode(errors="replace")[-500:]
-            raise RuntimeError(f"ffmpeg failed: {err}")
-        temp_path.replace(file_path)
-        logger.info(
-            "Removed %d cover art stream(s) from %s",
-            len(pic_indices),
-            Path(file_path).name,
-        )
-        return {"message": "Cover art removed", "removed": len(pic_indices)}
+        if fp.suffix.lower() in {".mkv", ".mka", ".mks", ".mk3d", ".webm"}:
+            # MKV: mkvpropedit does in-place attachment removal — no full remux needed
+            result = subprocess.run(
+                ["mkvpropedit", file_path, "--delete-attachment", str(attachment_id)],
+                check=False,
+                capture_output=True,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                err = result.stderr.decode(errors="replace")[-500:]
+                raise RuntimeError(f"mkvpropedit failed: {err}")
+        else:
+            # Other formats: ffmpeg remux excluding only this stream
+            all_streams = (
+                list(info.video_streams)
+                + list(info.audio_streams)
+                + list(info.subtitle_streams)
+                + list(info.attachment_streams)
+            )
+            cmd = ["ffmpeg", "-v", "quiet", "-i", file_path, "-y"]
+            for stream in sorted(all_streams, key=lambda s: s.index):
+                if stream.index != index:
+                    cmd.extend(["-map", f"0:{stream.index}"])
+            cmd.extend(["-c", "copy"])
+            suffix = secrets.token_hex(6)
+            temp_path = fp.with_name(f".remuxcode-covart-{suffix}.mkv")
+            cmd.append(str(temp_path))
+            try:
+                result = subprocess.run(cmd, check=False, capture_output=True, timeout=300)
+                if result.returncode != 0:
+                    err = result.stderr.decode(errors="replace")[-500:]
+                    raise RuntimeError(f"ffmpeg failed: {err}")
+                temp_path.replace(file_path)
+            except Exception:
+                temp_path.unlink(missing_ok=True)
+                raise
+
+        logger.info("Removed cover art (attachment %d) from %s", attachment_id, fp.name)
+        return {"message": "Cover art removed", "removed": 1}
+    except subprocess.TimeoutExpired as e:
+        raise HTTPException(status_code=504, detail="Cover art removal timed out") from e
+    except HTTPException:
+        raise
     except Exception as e:
-        if temp_path.exists():
-            temp_path.unlink(missing_ok=True)
-        if isinstance(e, HTTPException):
-            raise
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

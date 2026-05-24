@@ -31,7 +31,7 @@ let retagError = $state('');
 let retagSuccess = $state(false);
 
 // Cover art removal state
-let removingCoverArt = $state(false);
+let removingIndices = $state(new Set<number>());
 let removeCoverArtError = $state('');
 let activeJobPaths = $state<Set<string>>(new Set());
 
@@ -162,12 +162,12 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
   return parts.join(' + ');
 }
 
-async function handleRemoveCoverArt() {
-  if (!confirm('Remove all embedded cover art from this file? This cannot be undone.')) return;
-  removingCoverArt = true;
+async function handleRemoveCoverArt(streamIndex: number) {
+  if (!confirm('Remove this cover art image? This cannot be undone.')) return;
+  removingIndices = new Set([...removingIndices, streamIndex]);
   removeCoverArtError = '';
   try {
-    await removeCoverArt(path);
+    await removeCoverArt(path, streamIndex);
     // Re-fetch analysis to reflect the change
     const [r, jobs] = await Promise.all([
       analyzeFile(path, radarr_movie_id, sonarr_episode_file_id),
@@ -183,7 +183,7 @@ async function handleRemoveCoverArt() {
   } catch (e) {
     removeCoverArtError = e instanceof Error ? e.message : 'Failed to remove cover art';
   } finally {
-    removingCoverArt = false;
+    removingIndices = new Set([...removingIndices].filter((i) => i !== streamIndex));
   }
 }
 </script>
@@ -308,10 +308,10 @@ async function handleRemoveCoverArt() {
                       <div>{v.codec_long || v.codec}</div>
                       <button
                         class="btn btn-xs btn-error btn-outline mt-1"
-                        disabled={removingCoverArt || activeJobPaths.has(path)}
-                        onclick={handleRemoveCoverArt}
+                        disabled={removingIndices.has(v.index) || activeJobPaths.has(path)}
+                        onclick={() => handleRemoveCoverArt(v.index)}
                       >
-                        {#if removingCoverArt}Removing…{:else}Remove{/if}
+                        {#if removingIndices.has(v.index)}Removing…{:else}Remove{/if}
                       </button>
                     </div>
                   </div>
