@@ -1150,6 +1150,9 @@ const sortOptions: { value: string; label: string }[] = [
                 {#if (series.dts_x_count ?? 0) > 0}
                   <span class="badge badge-error badge-sm">{series.dts_x_count} DTS:X</span>
                 {/if}
+                {#if (series.cover_art_episodes ?? 0) > 0}
+                  <span class="badge badge-neutral badge-sm">{series.cover_art_episodes} Art</span>
+                {/if}
                 <span class="text-xs text-base-content/30">{formatSize(series.size_on_disk)}</span>
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
