@@ -767,27 +767,25 @@ def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
                     err = result.stderr.decode(errors="replace")[-500:]
                     raise RuntimeError(f"mkvpropedit failed: {err}")
             else:
-                # Regular Matroska video track: requires ffmpeg remux to drop the stream
-                all_streams = (
-                    list(info.video_streams)
-                    + list(info.audio_streams)
-                    + list(info.subtitle_streams)
-                    + list(info.attachment_streams)
-                )
-                cmd = ["ffmpeg", "-v", "quiet", "-i", file_path, "-y"]
-                for stream in sorted(all_streams, key=lambda s: s.index):
-                    if stream.index != index:
-                        cmd.extend(["-map", f"0:{stream.index}"])
-                cmd.extend(["-c", "copy"])
+                # Regular Matroska video track: use mkvmerge to rebuild without the stream.
+                # mkvmerge preserves all Matroska metadata (chapters, tags, attachments)
+                # and is faster than ffmpeg for Matroska containers.
+                # Track IDs for mkvmerge are 0-based and match ffprobe stream indices
+                # for non-attachment tracks.
+                video_ids_to_keep = [v.index for v in info.video_streams if v.index != index]
                 suffix = secrets.token_hex(6)
                 temp_path = fp.with_name(f".remuxcode-covart-{suffix}.mkv")
                 try:
-                    result = subprocess.run(
-                        [*cmd, str(temp_path)], check=False, capture_output=True, timeout=300
-                    )
-                    if result.returncode != 0:
+                    cmd = ["mkvmerge", "-o", str(temp_path)]
+                    if video_ids_to_keep:
+                        cmd += ["--video-tracks", ",".join(str(i) for i in video_ids_to_keep)]
+                    else:
+                        cmd += ["--no-video"]
+                    cmd.append(file_path)
+                    result = subprocess.run(cmd, check=False, capture_output=True, timeout=600)
+                    if result.returncode not in (0, 1):  # mkvmerge exits 1 on warnings
                         err = result.stderr.decode(errors="replace")[-500:]
-                        raise RuntimeError(f"ffmpeg failed: {err}")
+                        raise RuntimeError(f"mkvmerge failed: {err}")
                     temp_path.replace(file_path)
                 except Exception:
                     temp_path.unlink(missing_ok=True)
