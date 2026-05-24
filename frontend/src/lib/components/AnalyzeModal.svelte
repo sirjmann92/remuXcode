@@ -42,6 +42,7 @@ let retagSuccess = $state(false);
 let removingIndices = $state(new Set<number>());
 let removeCoverArtError = $state('');
 let activeJobPaths = $state<Set<string>>(new Set());
+let confirmRemoveIndex = $state<number | null>(null);
 
 // Cover art lightbox
 let lightboxSrc = $state<string | null>(null);
@@ -174,7 +175,13 @@ function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
 }
 
 async function handleRemoveCoverArt(streamIndex: number) {
-  if (!confirm('Remove this cover art image? This cannot be undone.')) return;
+  confirmRemoveIndex = streamIndex;
+}
+
+async function executeRemoveCoverArt() {
+  const streamIndex = confirmRemoveIndex;
+  if (streamIndex === null) return;
+  confirmRemoveIndex = null;
   removingIndices = new Set([...removingIndices, streamIndex]);
   removeCoverArtError = '';
   try {
@@ -561,5 +568,26 @@ async function handleRemoveCoverArt(streamIndex: number) {
       class="max-w-full max-h-full object-contain rounded shadow-2xl"
       alt="Cover art full size"
     />
+  </div>
+{/if}
+
+{#if confirmRemoveIndex !== null}
+  <div class="modal modal-open z-[200]" role="dialog" aria-modal="true">
+    <div class="modal-box max-w-sm">
+      <h3 class="font-semibold text-base mb-2">Remove Cover Art</h3>
+      <p class="text-sm text-base-content/70 mb-4">Remove this embedded image? This cannot be undone.</p>
+      <div class="modal-action mt-0">
+        <button class="btn btn-ghost btn-sm" onclick={() => confirmRemoveIndex = null}>Cancel</button>
+        <button class="btn btn-error btn-sm" onclick={executeRemoveCoverArt}>Remove</button>
+      </div>
+    </div>
+    <div
+      class="modal-backdrop"
+      role="button"
+      tabindex="-1"
+      aria-label="Cancel"
+      onclick={() => confirmRemoveIndex = null}
+      onkeydown={(e) => { if (e.key === 'Escape') confirmRemoveIndex = null; }}
+    ></div>
   </div>
 {/if}
