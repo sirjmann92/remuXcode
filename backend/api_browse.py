@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 import secrets
 import subprocess
+import tempfile
 import threading
 import time
 from typing import Any
@@ -632,33 +633,59 @@ def serve_cover_art(
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-v",
-                "quiet",
-                "-i",
-                file_path,
-                "-map",
-                f"0:{index}",
-                "-an",
-                "-sn",
-                "-dn",
-                "-frames:v",
-                "1",
-                "-f",
-                "mjpeg",
-                "pipe:1",
-            ],
-            check=False,
-            capture_output=True,
-            timeout=15,
-        )
-        if result.returncode != 0 or not result.stdout:
-            raise HTTPException(status_code=404, detail="Failed to extract cover art")
+        if Path(file_path).suffix.lower() in {".mkv", ".mka", ".mks", ".mk3d", ".webm"}:
+            # MKV/WebM stores cover art as EBML attachments; use mkvextract
+            info = FFProbe(strip_cover_art=False).get_file_info(file_path)
+            attached = sorted(
+                [v for v in info.video_streams if v.is_attached_pic],
+                key=lambda v: v.index,
+            )
+            try:
+                attachment_id = next(i + 1 for i, v in enumerate(attached) if v.index == index)
+            except StopIteration as e:
+                raise HTTPException(status_code=404, detail="Not an attached picture") from e
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = str(Path(tmpdir) / "cover")
+                result = subprocess.run(
+                    ["mkvextract", file_path, "attachments", f"{attachment_id}:{out_path}"],
+                    check=False,
+                    capture_output=True,
+                    timeout=30,
+                )
+                out_file = Path(out_path)
+                if result.returncode != 0 or not out_file.exists():
+                    raise HTTPException(status_code=404, detail="Failed to extract cover art")
+                data = out_file.read_bytes()
+        else:
+            # Other formats: extract image frame via ffmpeg
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-v",
+                    "quiet",
+                    "-i",
+                    file_path,
+                    "-map",
+                    f"0:{index}",
+                    "-frames:v",
+                    "1",
+                    "-f",
+                    "mjpeg",
+                    "pipe:1",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=15,
+            )
+            if result.returncode != 0 or not result.stdout:
+                raise HTTPException(status_code=404, detail="Failed to extract cover art")
+            data = result.stdout
+
+        media_type = "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
         return Response(
-            content=result.stdout,
-            media_type="image/jpeg",
+            content=data,
+            media_type=media_type,
             headers={"Cache-Control": "public, max-age=3600"},
         )
     except subprocess.TimeoutExpired as e:
