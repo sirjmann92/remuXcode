@@ -28,6 +28,7 @@ import {
   invalidateSeries,
   setCachedSeries,
 } from '$lib/stores';
+import { tick } from 'svelte';
 import type {
   ActiveJobsMap,
   BrowseSeries,
@@ -70,6 +71,16 @@ let scanPollTimer: ReturnType<typeof setInterval> | null = null;
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
 let deepLinkFile: string | null = $page.url.searchParams.get('file');
+let scrollY = $state(0);
+let savedScrollY = 0;
+
+$effect(() => {
+  function onScroll() {
+    scrollY = window.scrollY;
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  return () => window.removeEventListener('scroll', onScroll);
+});
 
 /** Strip leading articles for Sonarr/Radarr-style title sorting. */
 function sortTitle(title: string): string {
@@ -316,6 +327,7 @@ async function rescanShow() {
 }
 
 async function openDetail(series: BrowseSeries) {
+  savedScrollY = window.scrollY;
   detailLoading = true;
   expandedSeasons = {};
   try {
@@ -328,8 +340,10 @@ async function openDetail(series: BrowseSeries) {
 }
 
 function closeDetail() {
+  const y = savedScrollY;
   selectedSeries = null;
   selectedEps = new Set();
+  tick().then(() => window.scrollTo({ top: y, behavior: 'instant' }));
 }
 
 function toggleSeason(num: number) {
@@ -1202,4 +1216,16 @@ const sortOptions: { value: string; label: string }[] = [
     </div>
     <div class="modal-backdrop" role="button" tabindex="-1" aria-label="Close" onclick={() => (showRefreshConfirm = false)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showRefreshConfirm = false; }}></div>
   </div>
+{/if}
+
+{#if scrollY > 300}
+  <button
+    class="btn btn-circle btn-sm fixed bottom-6 right-6 z-50 shadow-lg"
+    onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+    aria-label="Back to top"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+    </svg>
+  </button>
 {/if}
