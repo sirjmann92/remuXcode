@@ -111,6 +111,10 @@ class VideoStream:
     is_dolby_vision: bool = False
     # HDR10+ dynamic metadata detected (SMPTE ST 2094-40 side data)
     is_hdr10_plus: bool = False
+    # True when this is an embedded cover art / poster image (attached_pic=1).
+    # These streams have no real video content and may lack valid dimension
+    # metadata, causing ffmpeg header-write failures if mapped to the output.
+    is_attached_pic: bool = False
 
     @property
     def is_hevc(self) -> bool:
@@ -303,9 +307,20 @@ class MediaInfo:
 class FFProbe:
     """Wrapper around ffprobe for media file analysis."""
 
-    def __init__(self, ffprobe_path: str = "ffprobe"):
-        """Initialize with path to the ffprobe executable."""
+    def __init__(self, ffprobe_path: str = "ffprobe", strip_cover_art: bool = True):
+        """Initialize with path to the ffprobe executable.
+
+        Args:
+            ffprobe_path: Path to the ffprobe binary.
+            strip_cover_art: When True (default), attached picture streams
+                (embedded cover art / poster images) are excluded from
+                ``video_streams`` in the returned ``MediaInfo``.  Set to
+                False to include them; note that some MJPEG cover-art
+                streams lack dimension metadata and may cause ffmpeg
+                header-write failures when mapped to an output file.
+        """
         self.ffprobe_path = ffprobe_path
+        self.strip_cover_art = strip_cover_art
 
     def get_file_info(self, file_path: str) -> MediaInfo | None:
         """Get complete information about a media file.
@@ -377,14 +392,14 @@ class FFProbe:
             disposition = stream.get("disposition", {})
 
             if codec_type == "video":
-                # Skip embedded cover art / poster images.  These are stored as
-                # video streams with attached_pic=1 but have no real dimensions,
-                # causing ffmpeg "dimensions not set" → header write failures.
-                if disposition.get("attached_pic", 0) == 1:
+                is_pic = disposition.get("attached_pic", 0) == 1
+                if is_pic:
                     tags = stream.get("tags", {})
                     fname = tags.get("filename", f"stream #{stream.get('index', '?')}")
-                    logger.debug("Ignoring attached picture: %s", fname)
-                    continue
+                    if self.strip_cover_art:
+                        logger.debug("Stripping attached picture: %s", fname)
+                        continue
+                    logger.debug("Keeping attached picture: %s", fname)
                 video_streams.append(self._parse_video_stream(stream))
             elif codec_type == "audio":
                 audio_streams.append(self._parse_audio_stream(stream))
@@ -509,6 +524,7 @@ class FFProbe:
             hdr_max_cll=hdr_max_cll,
             is_dolby_vision=is_dolby_vision,
             is_hdr10_plus=is_hdr10_plus,
+            is_attached_pic=stream.get("disposition", {}).get("attached_pic", 0) == 1,
         )
 
     def _parse_audio_stream(self, stream: dict) -> AudioStream:
