@@ -661,31 +661,40 @@ def serve_cover_art(
                 data = out_file.read_bytes()
         else:
             # Regular Matroska video track with image content (no attached_pic disposition).
-            # ffmpeg can demux this as a normal single-frame video stream.
-            # Write to a temp file — piping large images via stdout deadlocks
-            # when the image exceeds the OS pipe buffer (~64 KB).
+            # Use mkvextract tracks — it reads from the Matroska index directly and is
+            # orders of magnitude faster than ffmpeg scanning the full file on NAS.
+            # Matroska track numbers are 1-based; ffprobe stream indices are 0-based.
+            mkv_track_num = index + 1
             with tempfile.TemporaryDirectory() as tmpdir:
                 out_path = str(Path(tmpdir) / "cover.jpg")
                 result = subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-v",
-                        "quiet",
-                        "-i",
-                        file_path,
-                        "-map",
-                        f"0:{index}",
-                        "-frames:v",
-                        "1",
-                        out_path,
-                    ],
+                    ["mkvextract", file_path, "tracks", f"{mkv_track_num}:{out_path}"],
                     check=False,
                     capture_output=True,
                     timeout=30,
                 )
                 out_file = Path(out_path)
                 if result.returncode != 0 or not out_file.exists():
-                    raise HTTPException(status_code=404, detail="Failed to extract cover art")
+                    # Fallback: ffmpeg (handles edge cases where track numbering differs)
+                    result2 = subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-v",
+                            "quiet",
+                            "-i",
+                            file_path,
+                            "-map",
+                            f"0:{index}",
+                            "-frames:v",
+                            "1",
+                            out_path,
+                        ],
+                        check=False,
+                        capture_output=True,
+                        timeout=60,
+                    )
+                    if result2.returncode != 0 or not out_file.exists():
+                        raise HTTPException(status_code=404, detail="Failed to extract cover art")
                 data = out_file.read_bytes()
 
         media_type = "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
