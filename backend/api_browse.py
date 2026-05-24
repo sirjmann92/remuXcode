@@ -675,7 +675,11 @@ def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
 
     # Guard: reject if the file is already queued or running
     if core.job_queue:
-        active_paths = {j["file_path"] for j in core.job_queue.get_pending_jobs()}
+        active_paths = {
+            j.file_path
+            for j in core.job_queue.get_all_jobs()
+            if j.status.value in ("pending", "running")
+        }
         if file_path in active_paths:
             raise HTTPException(
                 status_code=409,
