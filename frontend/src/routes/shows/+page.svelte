@@ -1,4 +1,5 @@
 <script lang="ts">
+import { tick } from 'svelte';
 import { goto } from '$app/navigation';
 import { page } from '$app/stores';
 import {
@@ -28,7 +29,6 @@ import {
   invalidateSeries,
   setCachedSeries,
 } from '$lib/stores';
-import { tick } from 'svelte';
 import type {
   ActiveJobsMap,
   BrowseSeries,
