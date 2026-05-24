@@ -751,9 +751,17 @@ def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
         if fp.suffix.lower() in {".mkv", ".mka", ".mks", ".mk3d", ".webm"}:
             target = next((v for v in attached if v.index == index), None)
             if target and target.is_ebml_attachment:
-                # True EBML Attachment: mkvpropedit does in-place removal, no remux
-                ebml_attached = [v for v in attached if v.is_ebml_attachment]
-                ebml_id = next(i + 1 for i, v in enumerate(ebml_attached) if v.index == index)
+                # True EBML Attachment: mkvpropedit does in-place removal, no remux.
+                # mkvpropedit attachment IDs count ALL attachments in stream-index
+                # order (codec_type="attachment" fonts/icons + is_ebml_attachment
+                # images). Must include info.attachment_streams (fonts) alongside the
+                # image streams to get the correct 1-based ID — using only images
+                # would point at the wrong attachment when fonts precede images.
+                all_att_indices = sorted(
+                    [a.index for a in info.attachment_streams]
+                    + [v.index for v in info.video_streams if v.is_ebml_attachment]
+                )
+                ebml_id = all_att_indices.index(index) + 1
                 result = subprocess.run(
                     ["mkvpropedit", file_path, "--delete-attachment", str(ebml_id)],
                     check=False,
