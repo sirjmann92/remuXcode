@@ -645,7 +645,13 @@ def serve_cover_art(
         except StopIteration as e:
             raise HTTPException(status_code=404, detail="Not an attached picture") from e
 
-        if target.is_ebml_attachment:
+        if target.is_ebml_attachment and Path(file_path).suffix.lower() in {
+            ".mkv",
+            ".mka",
+            ".mks",
+            ".mk3d",
+            ".webm",
+        }:
             # True EBML Attachment: mkvextract reads directly from the Attachments element
             ebml_attached = [v for v in attached if v.is_ebml_attachment]
             attachment_id = next(i + 1 for i, v in enumerate(ebml_attached) if v.index == index)
@@ -662,20 +668,23 @@ def serve_cover_art(
                     raise HTTPException(status_code=404, detail="Failed to extract cover art")
                 data = out_file.read_bytes()
         else:
-            # Regular Matroska video track (V_MJPEG) with image content.
+            # Regular video track (V_MJPEG, V_PNG) or non-Matroska attached picture.
             # The cover art block is always in the first Cluster — near the start of the
-            # file — so we only need to read the first ~10 MB from the NAS.  Piping that
+            # file — so we only need to read the first ~50 MB from the NAS.  Piping that
             # chunk to ffmpeg via stdin is ~0.1 s vs ~30 s for a full random-access seek.
-            _READ_BYTES = 10 * 1024 * 1024  # 10 MB
+            # 50 MB covers files with many embedded images (each 1–3 MB) comfortably.
+            _READ_BYTES = 50 * 1024 * 1024  # 50 MB
             with Path(file_path).open("rb") as _f:
                 chunk = _f.read(_READ_BYTES)
+            # Use a codec-matched output extension so ffmpeg doesn't transcode.
+            _ext = ".png" if target.codec_name.lower() == "png" else ".jpg"
             with tempfile.TemporaryDirectory() as tmpdir:
-                out_path = str(Path(tmpdir) / "cover.jpg")
+                out_path = str(Path(tmpdir) / f"cover{_ext}")
                 result = subprocess.run(
                     [
                         "ffmpeg",
                         "-v",
-                        "quiet",
+                        "error",
                         "-probesize",
                         str(_READ_BYTES),
                         "-analyzeduration",
@@ -684,6 +693,8 @@ def serve_cover_art(
                         "pipe:0",
                         "-map",
                         f"0:{index}",
+                        "-vcodec",
+                        "copy",
                         "-frames:v",
                         "1",
                         out_path,
@@ -695,7 +706,11 @@ def serve_cover_art(
                 )
                 out_file = Path(out_path)
                 if result.returncode != 0 or not out_file.exists():
-                    raise HTTPException(status_code=404, detail="Failed to extract cover art")
+                    err = result.stderr.decode(errors="replace")[:200]
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Failed to extract cover art: {err}",
+                    )
                 data = out_file.read_bytes()
 
         media_type = "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
@@ -798,13 +813,14 @@ def remove_cover_art(data: dict[str, Any]) -> dict[str, Any]:
                 + list(info.subtitle_streams)
                 + list(info.attachment_streams)
             )
-            cmd = ["ffmpeg", "-v", "quiet", "-i", file_path, "-y"]
+            cmd = ["ffmpeg", "-v", "error", "-i", file_path, "-y"]
             for stream in sorted(all_streams, key=lambda s: s.index):
                 if stream.index != index:
                     cmd.extend(["-map", f"0:{stream.index}"])
             cmd.extend(["-c", "copy"])
             suffix = secrets.token_hex(6)
-            temp_path = fp.with_name(f".remuxcode-covart-{suffix}.mkv")
+            # Preserve original extension so ffmpeg selects the correct output muxer.
+            temp_path = fp.with_name(f".remuxcode-covart-{suffix}{fp.suffix}")
             cmd.append(str(temp_path))
             try:
                 result = subprocess.run(cmd, check=False, capture_output=True, timeout=300)

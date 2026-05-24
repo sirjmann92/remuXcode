@@ -408,6 +408,8 @@ class FFProbe:
                     disposition.get("attached_pic", 0) == 1
                     or mimetype.lower().startswith("image/")
                     or filename.lower().endswith(_IMAGE_EXTS)
+                    # Bare V_MJPEG or V_PNG tracks often have no MIMETYPE/FILENAME tag
+                    or stream.get("codec_name", "").lower() in ("mjpeg", "png")
                 )
                 if is_pic:
                     fname = filename or f"stream #{stream.get('index', '?')}"
@@ -552,6 +554,8 @@ class FFProbe:
                 .get("filename", "")
                 .lower()
                 .endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"))
+                # Bare V_MJPEG or V_PNG tracks often carry no MIMETYPE/FILENAME tag
+                or stream.get("codec_name", "").lower() in ("mjpeg", "png")
             ),
         )
 
