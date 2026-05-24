@@ -908,7 +908,17 @@ const sortOptions: { value: string; label: string }[] = [
 {/if}
 
 {#if analyzePath}
-  <AnalyzeModal path={analyzePath.path} poster_url={analyzePath.poster} media_type="movie" radarr_movie_id={analyzePath.radarr_movie_id} onclose={() => (analyzePath = null)} />
+  <AnalyzeModal
+    path={analyzePath.path}
+    poster_url={analyzePath.poster}
+    media_type="movie"
+    radarr_movie_id={analyzePath.radarr_movie_id}
+    onclose={() => (analyzePath = null)}
+    oncoverartchanged={(p, count) => {
+      const m = movies.find((m) => m.path === p);
+      if (m) m.cover_art_count = count;
+    }}
+  />
 {/if}
 
 {#if customEncodePath}
