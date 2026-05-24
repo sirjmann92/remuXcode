@@ -1394,7 +1394,7 @@ def initialize_components() -> None:
     _p_core_ids, _is_hybrid = get_cpu_info()
     _affinity_fn = make_affinity_fn(_p_core_ids) if config.ffmpeg_pin_to_p_cores else None
 
-    ffprobe = FFProbe()
+    ffprobe = FFProbe(strip_cover_art=config.strip_cover_art)
     anime_detector = AnimeDetector(
         sonarr_url=config.sonarr.url,
         sonarr_api_key=config.sonarr.api_key,

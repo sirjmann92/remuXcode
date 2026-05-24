@@ -226,6 +226,11 @@ class Config:
         self.ffmpeg_pin_to_p_cores: bool = bool(
             self._get("processing.ffmpeg_pin_to_p_cores", False)
         )
+        # Strip embedded cover-art / poster images from the output.  Defaults
+        # to True because some MJPEG attached_pic streams lack dimension
+        # metadata and cause ffmpeg "dimensions not set" header failures.
+        # Set to False to preserve cover art (may fail on malformed images).
+        self.strip_cover_art: bool = bool(self._get("general.strip_cover_art", True))
 
     @property
     def effective_ffmpeg_threads(self) -> int:
