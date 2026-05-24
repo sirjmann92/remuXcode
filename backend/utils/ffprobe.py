@@ -392,10 +392,20 @@ class FFProbe:
             disposition = stream.get("disposition", {})
 
             if codec_type == "video":
-                is_pic = disposition.get("attached_pic", 0) == 1
+                tags = stream.get("tags", {})
+                # Some MKV files store cover art as a regular Matroska track
+                # without setting the attached_pic disposition bit. Detect these
+                # via MIMETYPE/FILENAME tags that ffprobe surfaces from the track.
+                mimetype = tags.get("MIMETYPE") or tags.get("mimetype", "")
+                filename = tags.get("FILENAME") or tags.get("filename", "")
+                _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
+                is_pic = (
+                    disposition.get("attached_pic", 0) == 1
+                    or mimetype.lower().startswith("image/")
+                    or filename.lower().endswith(_IMAGE_EXTS)
+                )
                 if is_pic:
-                    tags = stream.get("tags", {})
-                    fname = tags.get("filename", f"stream #{stream.get('index', '?')}")
+                    fname = filename or f"stream #{stream.get('index', '?')}"
                     if self.strip_cover_art:
                         logger.debug("Stripping attached picture: %s", fname)
                         continue
@@ -524,7 +534,19 @@ class FFProbe:
             hdr_max_cll=hdr_max_cll,
             is_dolby_vision=is_dolby_vision,
             is_hdr10_plus=is_hdr10_plus,
-            is_attached_pic=stream.get("disposition", {}).get("attached_pic", 0) == 1,
+            is_attached_pic=(
+                stream.get("disposition", {}).get("attached_pic", 0) == 1
+                or (stream.get("tags") or {}).get("MIMETYPE", "").lower().startswith("image/")
+                or (stream.get("tags") or {}).get("mimetype", "").lower().startswith("image/")
+                or (stream.get("tags") or {})
+                .get("FILENAME", "")
+                .lower()
+                .endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"))
+                or (stream.get("tags") or {})
+                .get("filename", "")
+                .lower()
+                .endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"))
+            ),
         )
 
     def _parse_audio_stream(self, stream: dict) -> AudioStream:
