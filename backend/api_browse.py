@@ -634,6 +634,8 @@ def serve_cover_art(
 
     try:
         info = FFProbe(strip_cover_art=False).get_file_info(file_path)
+        if not info:
+            raise HTTPException(status_code=500, detail="Failed to probe file")
         attached = sorted(
             [v for v in info.video_streams if v.is_attached_pic],
             key=lambda v: v.index,

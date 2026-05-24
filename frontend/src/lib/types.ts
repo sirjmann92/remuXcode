@@ -477,9 +477,3 @@ export interface ScanProgress {
   failed: number;
   current_file: string | null;
 }
-
-export interface AnalysisStats {
-  total_analyzed: number;
-  radarr_files: number;
-  sonarr_files: number;
-}

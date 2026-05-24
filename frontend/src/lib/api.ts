@@ -1,6 +1,5 @@
 import type {
   ActiveJobsMap,
-  AnalysisStats,
   AnalyzeResult,
   ConfigSummary,
   EncodeOptions,
@@ -250,8 +249,4 @@ export async function getScanProgress(): Promise<ScanProgress> {
 
 export async function stopScan(): Promise<{ message: string }> {
   return request('/api/analyze/scan/stop', { method: 'POST' });
-}
-
-export async function getAnalysisStats(): Promise<AnalysisStats> {
-  return request('/api/analyze/stats');
 }
