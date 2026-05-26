@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 
 from backend.utils.config import AudioConfig
@@ -380,7 +381,13 @@ class AudioConverter:
                     error=ffmpeg_error_summary(returncode, stderr_text),
                 )
 
-            if not temp_output.exists():
+            # NFS/SMB attribute caching can delay a freshly-written file from appearing;
+            # retry a few times before giving up.
+            for _delay in (0, 1, 3):
+                if temp_output.exists():
+                    break
+                time.sleep(_delay)
+            else:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 return AudioConversionResult(
                     success=False,
