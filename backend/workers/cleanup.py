@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 
 from backend.utils.config import CleanupConfig
@@ -507,7 +508,13 @@ class StreamCleanup:
                     error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
-            if not temp_output.exists():
+            # NFS/SMB attribute caching can delay a freshly-written file from appearing;
+            # retry a few times before giving up.
+            for _delay in (0, 1, 3):
+                if temp_output.exists():
+                    break
+                time.sleep(_delay)
+            else:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 return CleanupResult(
                     success=False,

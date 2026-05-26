@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 
 from backend.utils.anime_detect import AnimeDetector, ContentType
@@ -396,7 +397,13 @@ class VideoConverter:
             # Can happen on FUSE/mergerfs when a cross-device rename (EXDEV)
             # causes shutil.move to fall back to copy2, and the source disk is
             # transiently unavailable (spindown / heavy I/O at that moment).
-            if not temp_file.exists():
+            # NFS/SMB attribute caching can delay a freshly-written file from appearing;
+            # retry a few times before giving up.
+            for _delay in (0, 1, 3):
+                if temp_file.exists():
+                    break
+                time.sleep(_delay)
+            else:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 return VideoConversionResult(
                     success=False,
