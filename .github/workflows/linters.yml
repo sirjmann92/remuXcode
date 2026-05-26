@@ -68,7 +68,7 @@ jobs:
         run: npx svelte-kit sync
 
       - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
+        run: pre-commit run --all-files
 
       - name: Run mypy
         run: mypy "./backend/" --install-types --non-interactive --config-file pyproject.toml
