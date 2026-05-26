@@ -107,13 +107,28 @@ def detect_hw_capabilities(*, force: bool = False) -> HWAccelCaps:
     if SW_AV1_ENCODER in encoder_text:
         caps.av1_encoders.append(SW_AV1_ENCODER)
 
-    # 3. If QSV was found in the encoder list, verify it can actually initialise
+    # 3. Test each QSV encoder individually — presence in `ffmpeg -encoders` only
+    # means the codec is compiled in, not that the GPU supports it.  For example,
+    # av1_qsv requires Intel Arc / Meteor Lake+; Xe-LP iGPUs (UHD 7xx) only support
+    # hevc_qsv and h264_qsv.  We probe each encoder with a 1-frame test encode so
+    # the caps list only contains encoders that actually work on this machine.
     if caps.qsv_available:
-        if not caps.render_devices or not _test_qsv():
-            logger.info("QSV encoder listed but init failed — disabling")
+        if not caps.render_devices:
             caps.qsv_available = False
             caps.hevc_encoders = [e for e in caps.hevc_encoders if "_qsv" not in e]
             caps.av1_encoders = [e for e in caps.av1_encoders if "_qsv" not in e]
+        else:
+            for enc in list(caps.hevc_encoders):
+                if enc.endswith("_qsv") and not _test_qsv_encoder(enc):
+                    logger.info("%s encode test failed — removing from available encoders", enc)
+                    caps.hevc_encoders.remove(enc)
+            for enc in list(caps.av1_encoders):
+                if enc.endswith("_qsv") and not _test_qsv_encoder(enc):
+                    logger.info("%s encode test failed — removing from available encoders", enc)
+                    caps.av1_encoders.remove(enc)
+            caps.qsv_available = any(
+                "_qsv" in e for e in caps.hevc_encoders + caps.av1_encoders
+            )
 
     if caps.vaapi_available and not caps.render_devices:
         caps.vaapi_available = False
@@ -211,11 +226,13 @@ def _detect_gpu_vendor() -> str:
     return ""
 
 
-def _test_qsv() -> bool:
-    """Quick test: can QSV initialise and encode on this machine.
+def _test_qsv_encoder(encoder: str) -> bool:
+    """Test whether a specific QSV encoder can actually encode on this machine.
 
-    Uses ``-init_hw_device qsv`` + software-decoded synthetic input to
-    match the actual encoding pipeline (SW decode → QSV encode).
+    Presence in ``ffmpeg -encoders`` only means the codec is compiled in.
+    This probe runs a 1-frame encode to verify the GPU supports it at runtime.
+    For example, av1_qsv is compiled into FFmpeg but is unsupported on Xe-LP
+    iGPUs (Intel UHD 7xx / 12th–13th gen integrated graphics).
     """
     try:
         result = subprocess.run(
@@ -237,7 +254,9 @@ def _test_qsv() -> bool:
                 "-frames:v",
                 "1",
                 "-c:v",
-                "hevc_qsv",
+                encoder,
+                "-global_quality",
+                "28",
                 "-f",
                 "null",
                 "-",

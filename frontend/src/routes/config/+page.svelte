@@ -68,6 +68,30 @@ const liveQualityField = $derived(
 
 const qualityMax = $derived(effectiveMethod === 'vaapi' ? 52 : isAv1Sw ? 63 : 51);
 
+// Compute which codecs are actually supported for the active hw_accel method.
+// Caps lists only contain encoders that passed a live 1-frame encode probe,
+// so this correctly excludes e.g. av1_qsv on Xe-LP iGPUs.
+const av1SupportedByMethod = $derived.by(() => {
+  if (!hwAccel) return true; // unknown — allow until caps load
+  if (effectiveMethod === 'none') return true; // software SVT-AV1 always available
+  const methodKey = `${effectiveMethod}_` as const; // "qsv_" | "vaapi_" | "nvenc_"
+  return hwAccel.av1_encoders.some(e => e.startsWith(methodKey));
+});
+
+const heveSupportedByMethod = $derived.by(() => {
+  if (!hwAccel) return true;
+  if (effectiveMethod === 'none') return true;
+  const methodKey = `${effectiveMethod}_` as const;
+  return hwAccel.hevc_encoders.some(e => e.startsWith(methodKey));
+});
+
+const qualityRangeHint = $derived(
+  effectiveMethod === 'qsv' ? '1–51' :
+  effectiveMethod === 'vaapi' ? '1–52' :
+  effectiveMethod === 'nvenc' ? '1–51' :
+  isAv1Sw ? '1–63' : '0–51'
+);
+
 async function fetchConfig() {
   loading = true;
   error = '';
@@ -322,10 +346,10 @@ $effect(() => {
               <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
               <div class="space-y-2 mt-2">
                 {#each [
-                  { field: 'ac3_bitrate', label: 'AC3 Bitrate', hint: 'kbps for Dolby Digital 5.1 output', min: 64, max: 6144 },
-                  { field: 'eac3_bitrate', label: 'EAC3 Bitrate', hint: 'kbps for Dolby Digital Plus output', min: 64, max: 6144 },
-                  { field: 'aac_surround_bitrate', label: 'AAC Surround Bitrate', hint: 'kbps for AAC 5.1+ output', min: 64, max: 6144 },
-                  { field: 'aac_stereo_bitrate', label: 'AAC Stereo Bitrate', hint: 'kbps for AAC stereo output', min: 64, max: 6144 },
+                  { field: 'ac3_bitrate', label: 'AC3 Bitrate', hint: 'kbps for Dolby Digital 5.1 output (64–640)', min: 64, max: 640 },
+                  { field: 'eac3_bitrate', label: 'EAC3 Bitrate', hint: 'kbps for Dolby Digital Plus output (64–6144)', min: 64, max: 6144 },
+                  { field: 'aac_surround_bitrate', label: 'AAC Surround Bitrate', hint: 'kbps for AAC 5.1+ output (64–1024)', min: 64, max: 1024 },
+                  { field: 'aac_stereo_bitrate', label: 'AAC Stereo Bitrate', hint: 'kbps for AAC stereo output (64–320)', min: 64, max: 320 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
                     <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
@@ -364,10 +388,16 @@ $effect(() => {
                 value={config.video.codec}
                 onchange={(e) => { config!.video.codec = e.currentTarget.value; save('video', 'codec', e.currentTarget.value); }}
               >
-                <option value="hevc">HEVC</option>
-                <option value="av1">AV1</option>
+                <option value="hevc" disabled={!heveSupportedByMethod} title={heveSupportedByMethod ? '' : `HEVC not supported by ${effectiveMethod.toUpperCase()} on this GPU`}>HEVC</option>
+                <option value="av1" disabled={!av1SupportedByMethod} title={av1SupportedByMethod ? '' : `AV1 not supported by ${effectiveMethod.toUpperCase()} on this GPU`}>AV1</option>
               </select>
             </div>
+            {#if !av1SupportedByMethod && config.video.codec === 'av1'}
+              <div class="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/30 text-xs text-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                AV1 is not supported by {effectiveMethod.toUpperCase()} on this GPU. Switch to HEVC, or use CPU encoding (None).
+              </div>
+            {/if}
             {#each [
               { field: 'convert_10bit_x264', label: 'Convert 10-bit x264', hint: 'Re-encode 10-bit H.264 files (common in anime releases)' },
               { field: 'convert_8bit_x264', label: 'Convert 8-bit x264', hint: 'Re-encode standard 8-bit H.264 files' },
@@ -377,7 +407,10 @@ $effect(() => {
               { field: 'dv_to_hdr10', label: 'Convert Dolby Vision → HDR10', hint: 'Strip DV RPU layer and encode; static HDR10 base is preserved. Off = skip DV files.', shortHint: 'Re-encode to static HDR10. Off = skip DV files.' },
               { field: 'hdr10plus_to_hdr10', label: 'Convert HDR10+ → HDR10', hint: 'Strip dynamic SMPTE 2094-40 metadata and encode; static HDR10 base is preserved. Off = skip HDR10+ files.', shortHint: 'Re-encode to static HDR10. Off = skip HDR10+ files.' },
             ] as item}
-              <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
+              <label
+                class="flex items-center justify-between cursor-pointer"
+                title={item.hint}
+              >
                 <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.shortHint ?? item.hint}</span></span>
                 <input
                   type="checkbox"
@@ -388,7 +421,7 @@ $effect(() => {
               </label>
             {/each}
             <div class="flex items-center justify-between">
-              <span>Anime {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for anime (lower = better)</span></span>
+              <span>Anime {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality for anime ({qualityRangeHint}, lower = better)</span></span>
               {#key animeQualityField}
               <input
                 type="number"
@@ -402,7 +435,7 @@ $effect(() => {
               {/key}
             </div>
             <div class="flex items-center justify-between">
-              <span>Standard {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality level for standard content (lower = better)</span></span>
+              <span>Standard {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality for standard content ({qualityRangeHint}, lower = better)</span></span>
               {#key liveQualityField}
               <input
                 type="number"
