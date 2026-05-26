@@ -1292,6 +1292,7 @@ class VideoConverter:
             # when the format doesn't match, so only set it for 8-bit main.
             if not is_10bit:
                 cmd.extend(["-profile:v", "main"])
+            # look_ahead (ICQ mode) is supported by hevc_qsv but not av1_qsv.
             cmd.extend(["-look_ahead", "1", "-look_ahead_depth", "40"])
 
         cmd.extend(["-fps_mode", "cfr"])
