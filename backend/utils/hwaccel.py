@@ -126,9 +126,7 @@ def detect_hw_capabilities(*, force: bool = False) -> HWAccelCaps:
                 if enc.endswith("_qsv") and not _test_qsv_encoder(enc):
                     logger.info("%s encode test failed — removing from available encoders", enc)
                     caps.av1_encoders.remove(enc)
-            caps.qsv_available = any(
-                "_qsv" in e for e in caps.hevc_encoders + caps.av1_encoders
-            )
+            caps.qsv_available = any("_qsv" in e for e in caps.hevc_encoders + caps.av1_encoders)
 
     if caps.vaapi_available and not caps.render_devices:
         caps.vaapi_available = False
