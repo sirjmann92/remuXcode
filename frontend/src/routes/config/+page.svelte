@@ -75,22 +75,55 @@ const av1SupportedByMethod = $derived.by(() => {
   if (!hwAccel) return true; // unknown — allow until caps load
   if (effectiveMethod === 'none') return true; // software SVT-AV1 always available
   const methodKey = `${effectiveMethod}_` as const; // "qsv_" | "vaapi_" | "nvenc_"
-  return hwAccel.av1_encoders.some(e => e.startsWith(methodKey));
+  return hwAccel.av1_encoders.some((e) => e.startsWith(methodKey));
 });
 
 const heveSupportedByMethod = $derived.by(() => {
   if (!hwAccel) return true;
   if (effectiveMethod === 'none') return true;
   const methodKey = `${effectiveMethod}_` as const;
-  return hwAccel.hevc_encoders.some(e => e.startsWith(methodKey));
+  return hwAccel.hevc_encoders.some((e) => e.startsWith(methodKey));
 });
 
 const qualityRangeHint = $derived(
-  effectiveMethod === 'qsv' ? '1–51' :
-  effectiveMethod === 'vaapi' ? '1–52' :
-  effectiveMethod === 'nvenc' ? '1–51' :
-  isAv1Sw ? '1–63' : '0–51'
+  effectiveMethod === 'qsv'
+    ? '1–51'
+    : effectiveMethod === 'vaapi'
+      ? '1–52'
+      : effectiveMethod === 'nvenc'
+        ? '1–51'
+        : isAv1Sw
+          ? '1–63'
+          : '0–51',
 );
+
+// --- Codec availability logic ---
+const supportedCodecs = $derived.by(() => {
+  if (!hwAccel) return ['hevc', 'av1']; // fallback
+  if (effectiveMethod === 'none') return ['hevc', 'av1']; // software always available
+  const codecs: string[] = [];
+  if (effectiveMethod === 'qsv') {
+    if (hwAccel.hevc_encoders.includes('hevc_qsv')) codecs.push('hevc');
+    if (hwAccel.av1_encoders.includes('av1_qsv')) codecs.push('av1');
+  } else if (effectiveMethod === 'vaapi') {
+    if (hwAccel.hevc_encoders.includes('hevc_vaapi')) codecs.push('hevc');
+    if (hwAccel.av1_encoders.includes('av1_vaapi')) codecs.push('av1');
+  } else if (effectiveMethod === 'nvenc') {
+    if (hwAccel.hevc_encoders.includes('hevc_nvenc')) codecs.push('hevc');
+    if (hwAccel.av1_encoders.includes('av1_nvenc')) codecs.push('av1');
+  }
+  return codecs;
+});
+
+$effect(() => {
+  if (!config) return;
+  // If the selected codec is not supported, auto-switch to the first available
+  if (!supportedCodecs.includes(config.video.codec)) {
+    const fallback = supportedCodecs[0] || 'hevc';
+    config.video.codec = fallback;
+    save('video', 'codec', fallback);
+  }
+});
 
 async function fetchConfig() {
   loading = true;
@@ -388,14 +421,18 @@ $effect(() => {
                 value={config.video.codec}
                 onchange={(e) => { config!.video.codec = e.currentTarget.value; save('video', 'codec', e.currentTarget.value); }}
               >
-                <option value="hevc" disabled={!heveSupportedByMethod} title={heveSupportedByMethod ? '' : `HEVC not supported by ${effectiveMethod.toUpperCase()} on this GPU`}>HEVC</option>
-                <option value="av1" disabled={!av1SupportedByMethod} title={av1SupportedByMethod ? '' : `AV1 not supported by ${effectiveMethod.toUpperCase()} on this GPU`}>AV1</option>
+                {#if supportedCodecs.includes('hevc')}
+                  <option value="hevc">HEVC</option>
+                {/if}
+                {#if supportedCodecs.includes('av1')}
+                  <option value="av1">AV1</option>
+                {/if}
               </select>
             </div>
-            {#if !av1SupportedByMethod && config.video.codec === 'av1'}
+            {#if !av1SupportedByMethod}
               <div class="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/30 text-xs text-warning">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                AV1 is not supported by {effectiveMethod.toUpperCase()} on this GPU. Switch to HEVC, or use CPU encoding (None).
+                AV1 is not supported by {effectiveMethod.toUpperCase()} on this GPU. Only HEVC is available for hardware encoding.
               </div>
             {/if}
             {#each [
