@@ -1141,7 +1141,9 @@ class VideoConverter:
         Instead, explicitly unset individual stale stats tags; FFmpeg's MKV muxer
         then auto-generates correct values from the actual encoded output.
         """
-        stale = ("BPS", "NUMBER_OF_BYTES", "NUMBER_OF_FRAMES", "DURATION", "SOURCE_ID")
+        # "title" is included so source stream titles like "Dolby Vision P7 FEL"
+        # are not carried into a re-encoded output that no longer contains DV data.
+        stale = ("BPS", "NUMBER_OF_BYTES", "NUMBER_OF_FRAMES", "DURATION", "SOURCE_ID", "title")
         flags: list[str] = []
         for tag in stale:
             flags += ["-metadata:s:v:0", f"{tag}="]
