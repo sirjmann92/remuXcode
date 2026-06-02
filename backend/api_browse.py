@@ -374,6 +374,16 @@ def _needs_cleanup_from_streams(
             if keep_audio and len(keep_audio) < len(audio_streams):
                 return True
 
+        # Check if the first preferred-language track has fewer channels than a
+        # better track later in the list — cleanup will reorder to fix this.
+        if keep and audio_streams:
+            preferred = [s for s in audio_streams if (s.get("language") or "").lower() in keep]
+            if len(preferred) > 1:
+                first_ch = preferred[0].get("channels") or 0
+                best_ch = max(s.get("channels") or 0 for s in preferred)
+                if best_ch > first_ch:
+                    return True
+
     return False
 
 
@@ -596,7 +606,9 @@ def analyze_file(
     ]
     subtitle_stream_dicts = [{"language": s.language} for s in info.subtitle_streams]
     subtitle_langs = [s.language or "und" for s in info.subtitle_streams]
-    audio_stream_dicts_for_cleanup = [{"language": a.language} for a in info.audio_streams]
+    audio_stream_dicts_for_cleanup = [
+        {"language": a.language, "channels": a.channels} for a in info.audio_streams
+    ]
 
     return {
         "file": str(info.path),
