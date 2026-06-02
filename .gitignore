@@ -44,6 +44,10 @@ Thumbs.db
 # Legacy/personal files
 legacy/
 
+# AI assistant context files (contain LAN IPs and key references)
+CLAUDE.md
+.github/copilot-instructions.md
+
 # Docker config volume (runtime state and secrets)
 config/.api_key
 config/jobs.db
