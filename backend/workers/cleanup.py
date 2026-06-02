@@ -749,15 +749,36 @@ class StreamCleanup:
         return False
 
     def _needs_reorder(self, audio_streams: list[AudioStream], original_lang: str) -> bool:
-        """Return True if the preferred language exists but isn't the first audio track."""
-        if len(audio_streams) < 2 or original_lang == "eng":
+        """Return True if audio tracks need reordering.
+
+        Triggers when:
+        - The preferred language exists but isn't the first track (e.g. JPN first, ENG second), or
+        - Multiple tracks share the same preferred language but a higher-channel track
+          isn't first (e.g. ENG 2.0 default, ENG 5.1 non-default).
+        """
+        if len(audio_streams) < 2:
             return False
         preferred_langs = [lang for lang in self.config.keep_languages if lang != original_lang]
         if not preferred_langs:
             return False
         first_lang = (audio_streams[0].language or "").lower()
         has_preferred = any((s.language or "").lower() in preferred_langs for s in audio_streams)
-        return has_preferred and first_lang not in preferred_langs
+        # Preferred language isn't first
+        if has_preferred and first_lang not in preferred_langs:
+            return True
+        # Multiple tracks with the same preferred language — highest channel count should be first
+        if first_lang in preferred_langs:
+            preferred_tracks = [
+                s
+                for s in audio_streams
+                if (s.language or "").lower() in preferred_langs and not s.is_commentary
+            ]
+            if len(preferred_tracks) > 1:
+                first_channels = audio_streams[0].channels or 0
+                best_channels = max(s.channels or 0 for s in preferred_tracks)
+                if best_channels > first_channels:
+                    return True
+        return False
 
     def _needs_language_tagging(self, audio_streams: list[AudioStream], original_lang: str) -> bool:
         """Return True if any audio stream is missing a language tag and we can infer it."""
@@ -784,15 +805,22 @@ class StreamCleanup:
 
         preferred_langs = [lang for lang in self.config.keep_languages if lang != original_lang]
 
-        def sort_key(stream: AudioStream) -> tuple[int, int]:
+        def sort_key(stream: AudioStream) -> tuple[int, int, int]:
             commentary_rank = 1 if (deprioritize and stream.is_commentary) else 0
-            if not preferred_langs or original_lang == "eng":
-                return (commentary_rank, 0)
             lang = (stream.language or "").lower()
-            for i, pl in enumerate(preferred_langs):
-                if lang == pl:
-                    return (commentary_rank, i)
-            return (commentary_rank, len(preferred_langs))
+            if not preferred_langs or original_lang == "eng":
+                lang_rank = 0
+            else:
+                for i, pl in enumerate(preferred_langs):
+                    if lang == pl:
+                        lang_rank = i
+                        break
+                else:
+                    lang_rank = len(preferred_langs)
+            # Within the same language group, sort by channel count descending
+            # so 5.1 comes before 2.0, etc.
+            channel_rank = -(stream.channels or 0)
+            return (commentary_rank, lang_rank, channel_rank)
 
         return sorted(audio_streams, key=sort_key)
 
