@@ -362,6 +362,7 @@ async function executeRemoveCoverArt() {
                   <div class="flex gap-1 flex-wrap justify-end">
                     {#if v.is_hevc}<span class="badge badge-success badge-xs">HEVC</span>{/if}
                     {#if v.is_h264}<span class="badge badge-ghost badge-xs">H.264</span>{/if}
+                    {#if v.is_interlaced}<span class="badge badge-warning badge-xs">Interlaced</span>{/if}
                     {#if v.is_dolby_vision}<span class="badge badge-secondary badge-xs">DV</span>{/if}
                     {#if v.is_hdr10_plus}<span class="badge badge-warning badge-xs">HDR10+</span>
                     {:else if v.is_hdr10}<span class="badge badge-warning badge-xs">HDR10</span>{/if}
@@ -383,6 +384,8 @@ async function executeRemoveCoverArt() {
                   <div>{v.pix_fmt} ({v.bit_depth}-bit)</div>
                   <div class="text-base-content/50">Frame Rate</div>
                   <div>{formatFrameRate(v.frame_rate)}</div>
+                  <div class="text-base-content/50">Scan Type</div>
+                  <div>{v.is_interlaced ? 'Interlaced' : 'Progressive'}</div>
                   <div class="text-base-content/50">Bitrate</div>
                   <div>{formatBitrate(v.bitrate)}</div>
                 </div>
