@@ -29,6 +29,7 @@ async def get_config_summary() -> dict[str, Any]:
             "convert_10bit_x264": cfg.video.convert_10bit_x264,
             "convert_8bit_x264": cfg.video.convert_8bit_x264,
             "convert_legacy_codecs": cfg.video.convert_legacy_codecs,
+            "deinterlace": cfg.video.deinterlace,
             "process_anime": cfg.video.process_anime,
             "process_live_action": cfg.video.process_live_action,
             "dv_to_hdr10": cfg.video.dv_to_hdr10,
@@ -204,6 +205,7 @@ class VideoUpdate(BaseModel):
     convert_10bit_x264: bool | None = None
     convert_8bit_x264: bool | None = None
     convert_legacy_codecs: bool | None = None
+    deinterlace: bool | None = None
     process_anime: bool | None = None
     process_live_action: bool | None = None
     dv_to_hdr10: bool | None = None

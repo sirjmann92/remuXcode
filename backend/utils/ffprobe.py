@@ -120,6 +120,12 @@ class VideoStream:
     # detected via MIMETYPE/FILENAME tags — those are regular Matroska video
     # tracks extracted by piping the first 10 MB of the file to ffmpeg.
     is_ebml_attachment: bool = False
+    field_order: str | None = None
+
+    @property
+    def is_interlaced(self) -> bool:
+        """Check if stream is interlaced (MBAFF, TFF, BFF, or interleaved fields)."""
+        return bool(self.field_order) and self.field_order != "progressive"
 
     @property
     def is_hevc(self) -> bool:
@@ -541,6 +547,7 @@ class FFProbe:
             hdr_max_cll=hdr_max_cll,
             is_dolby_vision=is_dolby_vision,
             is_hdr10_plus=is_hdr10_plus,
+            field_order=stream.get("field_order") or None,
             is_ebml_attachment=stream.get("disposition", {}).get("attached_pic", 0) == 1,
             is_attached_pic=(
                 stream.get("disposition", {}).get("attached_pic", 0) == 1

@@ -106,6 +106,7 @@ class VideoConfig:
     convert_10bit_x264: bool = True
     convert_8bit_x264: bool = False
     convert_legacy_codecs: bool = True  # VC-1, MPEG-2, MPEG-4/Xvid/DivX
+    deinterlace: bool = True  # Convert interlaced sources to progressive on encode
 
     # Whether to process anime content
     process_anime: bool = True

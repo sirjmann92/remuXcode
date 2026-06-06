@@ -37,6 +37,7 @@ def build_analysis_dict(info: Any) -> dict[str, Any]:
         "is_hdr10_plus": v.is_hdr10_plus if v else False,
         "is_hdr10": v.is_hdr10 if v else False,
         "is_hlg": v.is_hlg if v else False,
+        "is_interlaced": v.is_interlaced if v else False,
         "audio_streams": [
             {
                 "codec": a.codec_name,

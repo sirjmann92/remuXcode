@@ -247,6 +247,8 @@ def _needs_video_conversion(info: Any, is_anime: bool) -> bool:
         return True
     if video.is_legacy_codec and cfg.convert_legacy_codecs:
         return True
+    if cfg.deinterlace and video.is_interlaced:
+        return True
     return False
 
 

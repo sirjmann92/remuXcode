@@ -144,6 +144,7 @@ export interface ConfigSummary {
     convert_10bit_x264: boolean;
     convert_8bit_x264: boolean;
     convert_legacy_codecs: boolean;
+    deinterlace: boolean;
     process_anime: boolean;
     process_live_action: boolean;
     dv_to_hdr10: boolean;
