@@ -558,6 +558,7 @@ def analyze_file(
             "hdr_master_display": v.hdr_master_display,
             "hdr_max_cll": v.hdr_max_cll,
             "is_attached_pic": v.is_attached_pic,
+            "is_interlaced": v.is_interlaced,
         }
         for v in info.video_streams
     ]

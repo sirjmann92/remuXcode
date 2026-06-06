@@ -413,6 +413,7 @@ export interface AnalyzeVideoStream {
   hdr_master_display: string | null;
   hdr_max_cll: string | null;
   is_attached_pic: boolean;
+  is_interlaced: boolean;
 }
 
 export interface AnalyzeAudioStream {
