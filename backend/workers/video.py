@@ -151,6 +151,11 @@ class VideoConverter:
         if video is None:
             return False
 
+        # Interlaced check before codec short-circuit: an interlaced file at
+        # the target codec still needs re-encoding to become progressive.
+        if self.config.deinterlace and video.is_interlaced:
+            return True
+
         # Already target codec - skip
         if self.target_codec == "av1" and video.is_av1:
             logger.debug("Skipping AV1 file: %s", file_path)
@@ -671,6 +676,7 @@ class VideoConverter:
         encode_options: dict | None = None,
         video: VideoStream | None = None,
         reset_pts: bool = False,
+        deinterlace: bool = False,
     ) -> list[str]:
         """Build a single -vf filter chain for software encoders (HEVC, AV1).
 
@@ -686,6 +692,10 @@ class VideoConverter:
         and raises "Impossible to convert … auto_scale_0".
         """
         parts: list[str] = []
+
+        # --- Deinterlace (must be first — before scale/fps/format) ---
+        if deinterlace:
+            parts.append("yadif=mode=0")
 
         # --- Optional scale (downscale only) ---
         if encode_options:
@@ -843,6 +853,7 @@ class VideoConverter:
             framerate,
             encode_options=encode_options,
             video=video,
+            deinterlace=self.config.deinterlace and bool(video and video.is_interlaced),
         )
         cmd.extend(vf_args)
 
@@ -1003,6 +1014,7 @@ class VideoConverter:
             framerate,
             encode_options=encode_options,
             video=video,
+            deinterlace=self.config.deinterlace and bool(video and video.is_interlaced),
         )
         cmd.extend(vf_args)
 
@@ -1155,6 +1167,7 @@ class VideoConverter:
         encode_options: dict | None,
         video: VideoStream | None,
         reset_pts: bool = False,
+        deinterlace: bool = False,
     ) -> str:
         """Build the SW filter chain run *before* hwupload for HW encoders.
 
@@ -1163,6 +1176,10 @@ class VideoConverter:
         be concatenated with the hwupload command (e.g. ``…,hwupload``).
         """
         parts: list[str] = []
+
+        # Deinterlace (must be first — before scale/PTS/format/hwupload)
+        if deinterlace:
+            parts.append("yadif=mode=0")
 
         if encode_options:
             target_res = encode_options.get("target_resolution")
@@ -1277,7 +1294,12 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to QSV surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
+                self._build_preupload_sw_filter(
+                    upload_fmt,
+                    encode_options,
+                    video,
+                    deinterlace=self.config.deinterlace and bool(video and video.is_interlaced),
+                )
                 + ",hwupload=extra_hw_frames=64",
                 "-c:v:0",
                 encoder,
@@ -1382,7 +1404,13 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to VAAPI surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video) + ",hwupload",
+                self._build_preupload_sw_filter(
+                    upload_fmt,
+                    encode_options,
+                    video,
+                    deinterlace=self.config.deinterlace and bool(video and video.is_interlaced),
+                )
+                + ",hwupload",
                 "-c:v:0",
                 encoder,
                 "-rc_mode",
@@ -1480,7 +1508,12 @@ class VideoConverter:
                 "0",
                 # Upload SW-decoded frames to CUDA surface for HW encoding
                 "-filter:v:0",
-                self._build_preupload_sw_filter(upload_fmt, encode_options, video)
+                self._build_preupload_sw_filter(
+                    upload_fmt,
+                    encode_options,
+                    video,
+                    deinterlace=self.config.deinterlace and bool(video and video.is_interlaced),
+                )
                 + ",hwupload_cuda",
                 "-c:v:0",
                 encoder,
