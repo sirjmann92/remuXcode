@@ -439,7 +439,7 @@ $effect(() => {
               { field: 'convert_10bit_x264', label: 'Convert 10-bit x264', hint: 'Re-encode 10-bit H.264 files (common in anime releases)' },
               { field: 'convert_8bit_x264', label: 'Convert 8-bit x264', hint: 'Re-encode standard 8-bit H.264 files' },
               { field: 'convert_legacy_codecs', label: 'Convert Legacy Codecs', hint: 'Re-encode VC-1, MPEG-2, MPEG-4/Xvid/DivX to the target codec' },
-              { field: 'deinterlace', label: 'Deinterlace', hint: 'Convert interlaced content (1080i, 480i) to progressive on encode. Recommended — interlaced AV1 cannot direct-play on NVIDIA Shield and most players.', shortHint: 'Convert interlaced (1080i) to progressive on encode' },
+              { field: 'deinterlace', label: 'Deinterlace', hint: 'Recommended: Most players cannot direct play interlaced AV1/HEVC content' },
               { field: 'process_anime', label: 'Process Anime', hint: 'Apply video conversion to anime content' },
               { field: 'process_live_action', label: 'Process Standard', hint: 'Apply video conversion to standard (non-anime) content' },
               { field: 'dv_to_hdr10', label: 'Convert Dolby Vision → HDR10', hint: 'Strip DV RPU layer and encode; static HDR10 base is preserved. Off = skip DV files.', shortHint: 'Re-encode to static HDR10. Off = skip DV files.' },
