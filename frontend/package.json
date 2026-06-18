@@ -15,7 +15,7 @@
     "daisyui": "^5.5.23"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.16",
+    "@biomejs/biome": "2.5.0",
     "@sveltejs/adapter-static": "^3.0.0",
     "@sveltejs/kit": "^2.65.2",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
