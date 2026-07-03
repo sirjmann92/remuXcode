@@ -1,21 +1,75 @@
 @import "tailwindcss";
-@import "daisyui/daisyui.css";
+@plugin "daisyui" {
+  themes: dark --default, light;
+}
 
-@theme {
+/* Customize the built-in "dark"/"light" themes with our own brand colors.
+ * Using @plugin "daisyui/theme" (rather than the previous raw
+ * `@import "daisyui/daisyui.css"` + manual [data-theme] override) means only
+ * these 2 themes are generated instead of all ~35 daisyUI built-ins — each
+ * additional built-in theme ships its own `:root:has(input.theme-controller
+ * [value=...]:checked)` selector, and with 35 of them present the browser had
+ * to redo a full-document style recalculation across every element on every
+ * theme toggle, which is what made switching themes visibly slow/locked on
+ * pages with a lot of DOM nodes (Movies/Shows grids, long Jobs lists).
+ * Unlisted properties (radius, sizes, neutral colors, etc.) are inherited
+ * from daisyUI's built-in "dark"/"light" theme definitions.
+ *
+ * primary/secondary are pinned to the exact favicon.svg colors (#605dff bg,
+ * #f43098 "X") in both themes — the logo doesn't change with theme, so
+ * neither should the brand colors used next to it (Navbar "remuXcode"
+ * wordmark). accent is a separate teal, distinct from warning's amber, so
+ * badges reusing these slots (Video/Anime/etc.) don't collide in color when
+ * shown in the same row. Every color has an explicit *-content pair so text
+ * contrast is deliberate instead of inherited from daisyUI's unrelated
+ * built-in theme defaults — only warning (bright amber on the dark theme)
+ * needs dark text; everything else uses white consistently. */
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: true;
+  color-scheme: dark;
   --color-base-100: #1d232a;
   --color-base-200: #191e24;
   --color-base-300: #15191e;
   --color-base-content: #a6adbb;
-  --color-primary: #7c3aed;
+  --color-primary: #605dff;
   --color-primary-content: #ffffff;
-  --color-secondary: #06b6d4;
+  --color-secondary: #f43098;
   --color-secondary-content: #ffffff;
-  --color-accent: #f59e0b;
-  --color-accent-content: #000000;
+  --color-accent: #14b8a6;
+  --color-accent-content: #ffffff;
   --color-success: #22c55e;
+  --color-success-content: #ffffff;
   --color-warning: #f59e0b;
+  --color-warning-content: #000000;
   --color-error: #ef4444;
+  --color-error-content: #ffffff;
   --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --radius-box: 0.75rem;
+}
+
+@plugin "daisyui/theme" {
+  name: "light";
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #f3f4f6;
+  --color-base-300: #e5e7eb;
+  --color-base-content: #1f2937;
+  --color-primary: #605dff;
+  --color-primary-content: #ffffff;
+  --color-secondary: #f43098;
+  --color-secondary-content: #ffffff;
+  --color-accent: #0d9488;
+  --color-accent-content: #ffffff;
+  --color-success: #16a34a;
+  --color-success-content: #ffffff;
+  --color-warning: #d97706;
+  --color-warning-content: #ffffff;
+  --color-error: #dc2626;
+  --color-error-content: #ffffff;
+  --color-info: #2563eb;
+  --color-info-content: #ffffff;
   --radius-box: 0.75rem;
 }
 
@@ -25,11 +79,19 @@ html {
   scrollbar-width: thin;
 }
 
-/* Glass-style cards */
+/* Glass-style cards. Note: intentionally no backdrop-filter/blur here — the
+   page background behind these cards is a flat solid color, so blur adds no
+   visible effect but is expensive to recomposite. With this class reused
+   across large grids (Movies/Shows posters, Jobs list, etc.), a real
+   backdrop-blur made theme toggling visibly laggy (multi-second repaint). */
 .card-glass {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(8px);
+}
+
+[data-theme="light"] .card-glass {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.005) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 /* Stat card hover lift */

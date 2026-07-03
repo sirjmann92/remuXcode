@@ -14,6 +14,7 @@ Each job is displayed as a card showing:
 - **Status badge** — Pending, Running, Completed, Failed, or Cancelled
 - **Job type** — the conversion type: Full, Audio, Video, or Cleanup
 - **Source** — how the job was created: Webhook, API, or Batch
+- **Custom Encode badge** — shown when the job uses non-default encode options (resolution downscale, HDR/DV strip, or forced re-encode), so you can tell at a glance whether a queued or running job will use your library-wide settings or a one-off override
 - **Media type** — Movie or Episode
 - **Start time** and **completion time** (locale-formatted)
 - **Elapsed time** for completed jobs
@@ -35,6 +36,15 @@ If a phase produced no output (nothing to convert), it is marked as skipped or s
 ### Errors
 
 If a job fails, the full error message is displayed in a monospace block. A **Copy** button (clipboard icon) copies the error text to your clipboard — useful for filing bug reports or troubleshooting with FFmpeg output.
+
+### Viewing Logs & Commands
+
+Click the log icon on a job card (any status except Pending) to open its **log panel** — a scrollable, filterable view of everything that happened during the job:
+
+- Filter by source (**app** / **ffmpeg**) and level (**info** / **warning** / **error** / **stats**)
+- Auto-scrolls to the newest entry while you're at the bottom; stops auto-scrolling if you scroll up to read history
+- Includes the exact `ffmpeg`/`mkvpropedit` command line(s) run for each phase (logged as an `app`/`info` entry immediately before execution), so you can see precisely what was executed for troubleshooting or to reproduce a conversion manually
+- Persists across container restarts (see **Job Persistence** below) — logs for jobs still running when the container restarts are flushed to disk at least every 30 seconds, so you lose at most a few seconds of the most recent output
 
 ---
 
@@ -125,7 +135,9 @@ The **↺** button on a failed job card creates a new job for the same file and 
 
 ## Load More
 
-The Jobs page loads up to 100 jobs at a time. If there are more, a **Load more** button appears at the bottom. Clicking it appends the next page. Note that loading more jobs disables auto-refresh for that session (to prevent the list from jumping).
+The Jobs page loads up to 100 jobs at a time. If there are more, a **Load more** button appears at the bottom. Clicking it appends the next page. Background refreshes (auto-refresh polling, cancel/delete actions) re-fetch however many jobs you've currently loaded rather than collapsing the list back to the first page, so previously-loaded pages stay visible.
+
+A **back-to-top** button appears in the bottom-right corner once you've scrolled down, for quickly returning to the top of a long queue.
 
 ---
 
@@ -136,5 +148,6 @@ All jobs are stored in `config/jobs.db` (SQLite). On container restart:
 - **Pending** jobs are automatically resumed in queue order
 - **Running** jobs (interrupted mid-encode) are re-queued and started again
 - **Completed / Failed / Cancelled** jobs remain in history until deleted
+- **Logs** (the per-job log panel contents) persist across restarts too — saved at job start/completion and flushed periodically (every 30 seconds) while a job is running
 
 Jobs older than the configured **Job Retention** period are pruned automatically on startup (default: 30 days).

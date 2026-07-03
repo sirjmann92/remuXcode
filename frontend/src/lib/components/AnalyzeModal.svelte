@@ -274,7 +274,7 @@ async function executeRemoveCoverArt() {
           <div class="flex items-center gap-2">
             {result.content_type}
             {#if result.is_anime}
-              <span class="badge badge-secondary badge-xs">Anime</span>
+              <span class="badge badge-accent badge-xs">Anime</span>
             {/if}
           </div>
           <div class="text-base-content/50">Streams</div>

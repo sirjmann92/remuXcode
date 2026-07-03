@@ -6,6 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="remuXcode - Unified Media Transcoding Service" />
     <title>remuXcode</title>
+    <script>
+      // Applied before first paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var stored = localStorage.getItem('remuxcode-theme');
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.dataset.theme = stored;
+          }
+        } catch (e) {
+          /* localStorage unavailable (private browsing, etc.) — keep default */
+        }
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

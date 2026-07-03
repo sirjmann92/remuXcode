@@ -155,6 +155,16 @@ function sizeDetail(original?: number, newSize?: number): string | null {
   return `${formatSize(original)} → ${formatSize(newSize)} (${pct > 0 ? '+' : ''}${pct.toFixed(0)}%)`;
 }
 
+function customEncodeSummary(opts: NonNullable<Job['encode_options']>): string {
+  const parts: string[] = [];
+  if (opts.target_resolution && opts.target_resolution !== 'original') {
+    parts.push(`Downscale to ${opts.target_resolution}`);
+  }
+  if (opts.strip_hdr) parts.push('Strip HDR/DV → SDR');
+  if (opts.force_encode) parts.push('Force re-encode');
+  return parts.length > 0 ? parts.join(' · ') : 'Custom encode options';
+}
+
 const phaseColors: Record<JobPhase, string> = {
   audio: 'badge-warning',
   video: 'badge-secondary',
@@ -252,6 +262,15 @@ async function handleRetry() {
         <StatusBadge status={job.status} />
         <span class="badge badge-outline badge-xs text-base-content/40">{job.job_type}</span>
         <span class="badge badge-outline badge-xs text-base-content/40">{job.source}</span>
+        {#if job.encode_options}
+          <span
+            class="badge badge-accent badge-xs gap-0.5"
+            title={customEncodeSummary(job.encode_options)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
+            Custom Encode
+          </span>
+        {/if}
         {#if noWorkNeeded}
           <span class="badge badge-ghost badge-xs text-base-content/40 gap-0.5">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>

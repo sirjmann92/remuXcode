@@ -639,7 +639,7 @@ const sortOptions: { value: string; label: string }[] = [
           <div class="flex flex-wrap gap-1.5 text-xs">
             <span class="badge badge-ghost badge-sm">{selectedSeries.year}</span>
             {#if selectedSeries.is_anime}
-              <span class="badge badge-secondary badge-sm">Anime</span>
+              <span class="badge badge-accent badge-sm">Anime</span>
             {/if}
             <span class="badge badge-ghost badge-sm">{selectedSeries.status}</span>
             {#each selectedSeries.genres.slice(0, 4) as genre}
@@ -825,7 +825,7 @@ const sortOptions: { value: string; label: string }[] = [
                       <span class="badge badge-ghost badge-xs">{ep.resolution}</span>
                     {/if}
                     {#if ep.needs_video_conversion}
-                      <span class="badge badge-error badge-xs">Video</span>
+                      <span class="badge badge-secondary badge-xs">Video</span>
                     {/if}
                     {#if ep.needs_audio_conversion}
                       <span class="badge badge-warning badge-xs">Audio</span>
@@ -1140,7 +1140,7 @@ const sortOptions: { value: string; label: string }[] = [
                   <span>·</span>
                   <span>{series.episode_file_count} episode{series.episode_file_count !== 1 ? 's' : ''}</span>
                   {#if series.is_anime}
-                    <span class="badge badge-secondary badge-xs">Anime</span>
+                    <span class="badge badge-accent badge-xs">Anime</span>
                   {/if}
                 </div>
               </div>

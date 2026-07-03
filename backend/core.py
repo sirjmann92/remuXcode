@@ -152,6 +152,7 @@ class ConversionJob:
             "poster_url": self.poster_url,
             "media_type": self.media_type,
             "output_path": self.output_path,
+            "encode_options": self.encode_options,
         }
 
 
@@ -340,6 +341,7 @@ class JobQueue:
             "poster_url": job.poster_url,
             "media_type": job.media_type,
             "encode_options": job.encode_options,
+            "log_lines": job.log_lines,
         }
         if job.result:
             job_data["video_converted"] = (
@@ -458,6 +460,12 @@ class JobQueue:
             with contextlib.suppress(ValueError, TypeError):
                 encode_options = _json.loads(encode_options_json)
 
+        log_lines: list[dict[str, Any]] = []
+        log_lines_json = row.get("log_lines_json")
+        if log_lines_json:
+            with contextlib.suppress(ValueError, TypeError):
+                log_lines = _json.loads(log_lines_json)
+
         return ConversionJob(
             id=row["id"],
             job_type=job_type,
@@ -475,10 +483,16 @@ class JobQueue:
             poster_url=row.get("poster_url"),
             media_type=row.get("media_type"),
             encode_options=encode_options,
+            log_lines=log_lines,
         )
 
     def _watchdog_loop(self) -> None:
-        """Periodically check for stale running jobs and fail them."""
+        """Periodically check for stale running jobs and fail them.
+
+        Also periodically flushes running jobs' in-memory logs to the job
+        store, so a container restart mid-encode doesn't lose the log output
+        accumulated so far (previously only persisted at job start/finish).
+        """
         while self.running:
             try:
                 time.sleep(30)  # Check every 30 seconds
@@ -486,6 +500,9 @@ class JobQueue:
                 with self.lock:
                     running_jobs = [j for j in self.jobs.values() if j.status == JobStatus.RUNNING]
                 for job in running_jobs:
+                    if self.job_store:
+                        self._save_job_to_store(job)
+
                     last_update = job.last_progress_at or job.started_at or job.created_at
                     stale_seconds = now - last_update
                     if stale_seconds < self.stale_timeout:
@@ -574,7 +591,11 @@ class JobQueue:
                     for o in raw_overrides
                 ]
                 job.log("app", "info", f"Retagging {len(overrides)} track(s)")
-                retag_result = Retagger().retag(job.file_path, overrides)
+                retag_result = Retagger().retag(
+                    job.file_path,
+                    overrides,
+                    log_cb=lambda src, lvl, msg: job.log(src, lvl, msg),
+                )
                 job.result = {"retag": retag_result.to_dict()}
                 if not retag_result.success:
                     job.status = JobStatus.FAILED

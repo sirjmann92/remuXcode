@@ -7,6 +7,7 @@ we fall back to an ffmpeg -c copy remux to a temp file followed by safe_replace.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path
@@ -74,7 +75,12 @@ class TrackOverride:
 class Retagger:
     """Corrects stream metadata without transcoding."""
 
-    def retag(self, file_path: str, overrides: list[TrackOverride]) -> RetagResult:
+    def retag(
+        self,
+        file_path: str,
+        overrides: list[TrackOverride],
+        log_cb: Callable[[str, str, str], None] | None = None,
+    ) -> RetagResult:
         """Apply track metadata overrides to *file_path*.
 
         For MKV files this is done in-place with mkvpropedit.
@@ -92,14 +98,19 @@ class Retagger:
             return RetagResult(success=True, file=file_path)
 
         if path.suffix.lower() == ".mkv":
-            return self._retag_mkv(file_path, overrides)
-        return self._retag_ffmpeg(file_path, overrides)
+            return self._retag_mkv(file_path, overrides, log_cb=log_cb)
+        return self._retag_ffmpeg(file_path, overrides, log_cb=log_cb)
 
     # ------------------------------------------------------------------
     # MKV path — mkvpropedit (in-place, instant)
     # ------------------------------------------------------------------
 
-    def _retag_mkv(self, file_path: str, overrides: list[TrackOverride]) -> RetagResult:
+    def _retag_mkv(
+        self,
+        file_path: str,
+        overrides: list[TrackOverride],
+        log_cb: Callable[[str, str, str], None] | None = None,
+    ) -> RetagResult:
         """Use mkvpropedit to rewrite track headers in-place."""
         cmd = ["mkvpropedit", file_path]
         changes: list[TrackChange] = []
@@ -132,6 +143,8 @@ class Retagger:
             # No actual edits (all overrides were no-ops)
             return RetagResult(success=True, file=file_path)
 
+        if log_cb:
+            log_cb("app", "info", f"$ {' '.join(cmd)}")
         try:
             proc = subprocess.run(
                 cmd,
@@ -165,7 +178,12 @@ class Retagger:
     # Non-MKV fallback — ffmpeg -c copy remux
     # ------------------------------------------------------------------
 
-    def _retag_ffmpeg(self, file_path: str, overrides: list[TrackOverride]) -> RetagResult:
+    def _retag_ffmpeg(
+        self,
+        file_path: str,
+        overrides: list[TrackOverride],
+        log_cb: Callable[[str, str, str], None] | None = None,
+    ) -> RetagResult:
         """Remux with ffmpeg -c copy applying metadata overrides.
 
         Creates a temp MKV next to the original, then replaces the original.
@@ -214,6 +232,8 @@ class Retagger:
 
             cmd.append(str(tmp_path))
 
+            if log_cb:
+                log_cb("app", "info", f"$ {' '.join(cmd)}")
             proc = subprocess.run(
                 cmd,
                 check=False,

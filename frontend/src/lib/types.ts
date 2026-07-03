@@ -46,6 +46,7 @@ export interface Job {
   poster_url: string | null;
   media_type: MediaType | null;
   output_path: string | null;
+  encode_options: EncodeOptions | null;
 }
 
 export interface JobsCounts {

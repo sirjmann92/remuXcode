@@ -361,6 +361,8 @@ class VideoConverter:
                 attachments=info.attachment_streams or None,
             )
             logger.debug("Running: %s", " ".join(cmd))
+            if log_cb:
+                log_cb("app", "info", f"$ {' '.join(cmd)}")
 
             # Estimate total frames for progress when out_time_us is N/A
             # (common with HW encoders like QSV).
@@ -482,8 +484,11 @@ class VideoConverter:
             # so MediaInfo and media servers report the correct AV1 bitrate.
             if output_path.suffix.lower() == ".mkv":
                 try:
+                    _stats_cmd = ["mkvpropedit", "--add-track-statistics-tags", str(output_path)]
+                    if log_cb:
+                        log_cb("app", "info", f"$ {' '.join(_stats_cmd)}")
                     proc_stats = subprocess.run(
-                        ["mkvpropedit", "--add-track-statistics-tags", str(output_path)],
+                        _stats_cmd,
                         check=False,
                         capture_output=True,
                         text=True,

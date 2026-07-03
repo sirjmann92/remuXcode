@@ -448,6 +448,10 @@ def analyze_file(
     # MediaInfo scan catches HDR10+ — use the caller-supplied IDs first, then fall
     # back to whatever IDs were previously stored in the media cache.
     _extra_dv = _extra_hdr10plus = _extra_hdr10 = _extra_hlg = False
+    # Resolved stable IDs to attach to the cache row so the movies/shows list
+    # bulk lookup (keyed on these IDs) can find this analysis afterward.
+    _radarr_movie_file_id: int | None = None
+    _resolved_sonarr_episode_file_id: int | None = sonarr_episode_file_id
     if core.config:
         _drt = ""
         # Primary: use IDs passed by the frontend (always available from the movie/show page)
@@ -459,12 +463,9 @@ def analyze_file(
                     timeout=5,
                 )
                 if _r.ok:
-                    _drt = (
-                        _r.json()
-                        .get("movieFile", {})
-                        .get("mediaInfo", {})
-                        .get("videoDynamicRangeType", "")
-                    )
+                    _movie_file = _r.json().get("movieFile", {})
+                    _radarr_movie_file_id = _movie_file.get("id")
+                    _drt = _movie_file.get("mediaInfo", {}).get("videoDynamicRangeType", "")
             except Exception:
                 pass
         elif sonarr_episode_file_id and core.config.sonarr.url and core.config.sonarr.api_key:
@@ -492,6 +493,7 @@ def analyze_file(
                     )
                     if _r.ok:
                         _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+                        _radarr_movie_file_id = _radarr_mf_id
                 except Exception:
                     pass
             elif _sonarr_ef_id and core.config.sonarr.url and core.config.sonarr.api_key:
@@ -503,6 +505,7 @@ def analyze_file(
                     )
                     if _r.ok:
                         _drt = _r.json().get("mediaInfo", {}).get("videoDynamicRangeType", "")
+                        _resolved_sonarr_episode_file_id = _sonarr_ef_id
                 except Exception:
                     pass
         if _drt:
@@ -522,7 +525,14 @@ def analyze_file(
                 analysis["is_hdr10_plus"] = analysis.get("is_hdr10_plus", False) or _extra_hdr10plus
                 analysis["is_hdr10"] = analysis.get("is_hdr10", False) or _extra_hdr10
                 analysis["is_hlg"] = analysis.get("is_hlg", False) or _extra_hlg
-            core.media_store.upsert(file_path, analysis, stat.st_mtime, stat.st_size)
+            core.media_store.upsert(
+                file_path,
+                analysis,
+                stat.st_mtime,
+                stat.st_size,
+                radarr_movie_file_id=_radarr_movie_file_id,
+                sonarr_episode_file_id=_resolved_sonarr_episode_file_id,
+            )
             logger.info("Stored analysis for %s", Path(file_path).name)
         except Exception:
             logger.warning("Failed to store analysis in media.db", exc_info=True)

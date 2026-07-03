@@ -343,6 +343,8 @@ class AudioConverter:
                 str(input_path), str(temp_output), info, streams_to_convert, streams_to_drop
             )
             logger.debug("Running: %s", " ".join(cmd))
+            if log_cb:
+                log_cb("app", "info", f"$ {' '.join(cmd)}")
 
             # Estimate total frames for progress reporting.  When video is
             # copied (-c:v copy), ffmpeg doesn't populate out_time_us so we

@@ -622,7 +622,7 @@ const sortOptions: { value: string; label: string }[] = [
             <div class="absolute top-2 left-2 right-2 flex justify-between items-start pointer-events-none">
               <div class="flex flex-col gap-1 items-start">
                 {#if movie.is_anime}
-                  <span class="badge badge-secondary badge-xs">Anime</span>
+                  <span class="badge badge-accent badge-xs">Anime</span>
                 {/if}
                 {#if movie.has_dts_x}
                   <span class="badge badge-error badge-xs">DTS:X</span>
@@ -633,7 +633,7 @@ const sortOptions: { value: string; label: string }[] = [
               </div>
               <div class="flex flex-col gap-1 items-end">
                 {#if movie.needs_video_conversion}
-                  <span class="badge badge-error badge-xs">Video</span>
+                  <span class="badge badge-secondary badge-xs">Video</span>
                 {/if}
                 {#if movie.needs_audio_conversion}
                   <span class="badge badge-warning badge-xs">Audio</span>
@@ -816,7 +816,7 @@ const sortOptions: { value: string; label: string }[] = [
 
           {#if detailMovie.needs_video_conversion}
             <div class="flex items-start gap-2">
-              <span class="badge badge-warning badge-sm shrink-0">Video</span>
+              <span class="badge badge-secondary badge-sm shrink-0">Video</span>
               <p class="text-sm">{detailMovie.video_codec} will be re-encoded</p>
             </div>
           {/if}

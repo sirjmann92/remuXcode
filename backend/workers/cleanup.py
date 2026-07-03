@@ -346,7 +346,7 @@ class StreamCleanup:
                             original_language=original_lang,
                             error=f"Failed to move chain file to output: {exc}",
                         )
-                mkvp_ok = self._run_mkvpropedit_titles(str(target), info)
+                mkvp_ok = self._run_mkvpropedit_titles(str(target), info, log_cb=log_cb)
                 if mkvp_ok:
                     logger.info("Fixed track titles via mkvpropedit: %s", target.name)
                     return CleanupResult(
@@ -469,6 +469,8 @@ class StreamCleanup:
                 inferred_langs=inferred_langs or None,
             )
             logger.debug("Running: %s", " ".join(cmd))
+            if log_cb:
+                log_cb("app", "info", f"$ {' '.join(cmd)}")
 
             # Estimate total frames for progress (out_time_us stays 0 with -c:v copy)
             total_frames: float | None = None
@@ -929,7 +931,12 @@ class StreamCleanup:
             qualifiers.append("SDH")
         return f"{base} ({', '.join(qualifiers)})" if qualifiers else base
 
-    def _run_mkvpropedit_titles(self, file_path: str, info: MediaInfo) -> bool:
+    def _run_mkvpropedit_titles(
+        self,
+        file_path: str,
+        info: MediaInfo,
+        log_cb: Callable[[str, str, str], None] | None = None,
+    ) -> bool:
         """Fix wrong track titles in-place using mkvpropedit.
 
         Uses 1-based type-specific track numbering (track:a1, track:s1, …) which
@@ -952,6 +959,8 @@ class StreamCleanup:
         if len(cmd) == 2:
             return True  # Nothing to edit
 
+        if log_cb:
+            log_cb("app", "info", f"$ {' '.join(cmd)}")
         try:
             proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
             if proc.returncode != 0:

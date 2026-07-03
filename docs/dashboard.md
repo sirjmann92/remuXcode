@@ -23,6 +23,7 @@ When a job is running, it appears in the **In Progress** section with:
 
 - File name (basename)
 - Current phase: **Audio**, **Video**, or **Cleanup**
+- **Custom Encode badge** — shown when the job uses non-default encode options (resolution downscale, HDR/DV strip, or forced re-encode)
 - Live progress bar (percentage complete)
 - Elapsed time since the job started
 - Before/after file size delta displayed on each phase as it completes
@@ -64,3 +65,5 @@ The navbar links to all pages:
 | Shows | `/shows` | Browse and process TV library |
 | Jobs | `/jobs` | Full job history and controls |
 | Settings | `/config` | All configuration |
+
+A light/dark mode toggle is available in the top bar. Your preference is saved in the browser and persists across visits.
