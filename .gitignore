@@ -33,6 +33,10 @@ coverage.xml
 .vscode/
 .idea/
 
+# Claude Code — settings.local.json is personal and machine-specific;
+# a shared .claude/settings.json (if ever added) should still be tracked
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db

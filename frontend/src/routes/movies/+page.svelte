@@ -21,6 +21,7 @@ import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
 import ConvertOptionsModal from '$lib/components/ConvertOptionsModal.svelte';
 import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
 import { langName } from '$lib/languages';
+import { buildResolutionOptions, resolutionMatches } from '$lib/resolution';
 import {
   deduplicatedMoviesFetch,
   getCachedMovies,
@@ -37,6 +38,7 @@ let search = $state('');
 let filter: string = $state('any');
 let audioFormat: string = $state('any');
 let videoFormat: string = $state('any');
+let resolutionFilter: string = $state('any');
 let sortBy: string = $state('needsWork');
 let queueing: Record<number, boolean> = $state({});
 let queueingAll = $state(false);
@@ -173,6 +175,11 @@ const filtered = $derived.by(() => {
   // Video format filter
   if (videoFormat !== 'any') {
     result = result.filter((m) => videoCodecMatches(m.video_codec ?? '', videoFormat));
+  }
+
+  // Resolution filter
+  if (resolutionFilter !== 'any') {
+    result = result.filter((m) => resolutionMatches(m.resolution ?? '', resolutionFilter));
   }
 
   if (search) {
@@ -371,6 +378,7 @@ const audioOptions = $derived(
   ),
 );
 const videoOptions = $derived(buildVideoOptions(movies.map((m) => m.video_codec)));
+const resolutionOptions = $derived(buildResolutionOptions(movies.map((m) => m.resolution ?? '')));
 
 // Reset filter if selected value is no longer in contextual options
 $effect(() => {
@@ -381,6 +389,11 @@ $effect(() => {
 $effect(() => {
   if (videoFormat !== 'any' && !videoOptions.some((o) => o.value === videoFormat)) {
     videoFormat = 'any';
+  }
+});
+$effect(() => {
+  if (resolutionFilter !== 'any' && !resolutionOptions.some((o) => o.value === resolutionFilter)) {
+    resolutionFilter = 'any';
   }
 });
 
@@ -419,6 +432,11 @@ const sortOptions: { value: string; label: string }[] = [
       <select class="select select-sm select-bordered w-36" bind:value={videoFormat}>
         {#each videoOptions as vf}
           <option value={vf.value}>{vf.label}</option>
+        {/each}
+      </select>
+      <select class="select select-sm select-bordered w-36" bind:value={resolutionFilter}>
+        {#each resolutionOptions as rf}
+          <option value={rf.value}>{rf.label}</option>
         {/each}
       </select>
       <select class="select select-sm select-bordered w-auto ml-auto" bind:value={sortBy}>

@@ -235,6 +235,14 @@ export async function refreshRadarr(): Promise<{ message: string }> {
   return request('/api/config/refresh/radarr', { method: 'POST' });
 }
 
+export async function testSonarrWebhook(): Promise<{ message: string }> {
+  return request('/api/config/test-webhook/sonarr', { method: 'POST' });
+}
+
+export async function testRadarrWebhook(): Promise<{ message: string }> {
+  return request('/api/config/test-webhook/radarr', { method: 'POST' });
+}
+
 export async function cleanupTempDirs(): Promise<{ cleaned: number; message: string }> {
   return request('/api/config/cleanup-temp', { method: 'POST' });
 }

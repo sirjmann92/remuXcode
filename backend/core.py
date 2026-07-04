@@ -1112,6 +1112,79 @@ def refresh_sonarr() -> None:
     _poll_command(sonarr_url, sonarr_key, cmd_id, "Sonarr library refresh", max_wait=120)
 
 
+def _find_webhook_notification(base_url: str, api_key: str) -> dict[str, Any] | None:
+    """Return the 'Custom Converter' webhook notification resource, if configured."""
+    resp = requests.get(
+        f"{base_url}/api/v3/notification",
+        headers={"X-Api-Key": api_key},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    for notification in resp.json():
+        if (
+            notification.get("implementation") == "Webhook"
+            and notification.get("name") == "Custom Converter"
+        ):
+            return notification
+    return None
+
+
+def _test_webhook_notification(base_url: str, api_key: str, service: str) -> str:
+    """Ask Sonarr/Radarr to send a real test webhook to remuXcode.
+
+    This exercises both directions: the remuXcode -> Sonarr/Radarr API call
+    (auth/reachability) and the Sonarr/Radarr -> remuXcode webhook delivery
+    that the API call triggers, so failures can be attributed to whichever
+    side actually broke.
+    """
+    try:
+        notification = _find_webhook_notification(base_url, api_key)
+    except requests.RequestException as e:
+        raise RuntimeError(f"Could not reach {service} API: {e}") from e
+
+    if notification is None:
+        raise RuntimeError(
+            f"No 'Custom Converter' webhook notification found in {service}. "
+            "Add it under Settings > Connect first."
+        )
+
+    resp = requests.post(
+        f"{base_url}/api/v3/notification/test",
+        headers={"X-Api-Key": api_key},
+        json=notification,
+        timeout=30,
+    )
+    if resp.status_code == 200:
+        return f"{service} successfully sent a test webhook to remuXcode"
+
+    try:
+        errors = resp.json()
+        detail = (
+            "; ".join(e.get("errorMessage", str(e)) for e in errors)
+            if isinstance(errors, list)
+            else str(errors)
+        )
+    except ValueError:
+        detail = resp.text
+    raise RuntimeError(f"{service} could not deliver the test webhook: {detail}")
+
+
+def test_sonarr_webhook() -> str:
+    """Trigger Sonarr's own notification test for the 'Custom Converter' webhook."""
+    sonarr_url, sonarr_key = _get_sonarr_config()
+    if not sonarr_url or not sonarr_key:
+        raise RuntimeError("Sonarr not configured")
+    return _test_webhook_notification(sonarr_url, sonarr_key, "Sonarr")
+
+
+def test_radarr_webhook() -> str:
+    """Trigger Radarr's own notification test for the 'Custom Converter' webhook."""
+    radarr_url, radarr_key = _get_radarr_config()
+    if not radarr_url or not radarr_key:
+        raise RuntimeError("Radarr not configured")
+    return _test_webhook_notification(radarr_url, radarr_key, "Radarr")
+
+
 def _trigger_radarr_rename(file_path: str) -> RenameResult:
     radarr_url, radarr_key = _get_radarr_config()
 

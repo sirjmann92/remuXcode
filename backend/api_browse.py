@@ -1397,6 +1397,7 @@ def _build_series_results(
                 cfg_video = core.config.video if core.config else None
                 audio_codecs_set: set[str] = set()
                 video_codecs_set: set[str] = set()
+                resolutions_set: set[str] = set()
 
                 # Bulk lookup analysis for this series' episode files
                 ep_file_ids = [ef.get("id") for ef in episode_files if ef.get("id")]
@@ -1486,6 +1487,9 @@ def _build_series_results(
                         audio_codecs_set.add(ac_raw)
                     if vc_raw:
                         video_codecs_set.add(vc_raw)
+                    res_raw = mi.get("resolution", "")
+                    if res_raw:
+                        resolutions_set.add(res_raw)
                     # Check for DTS:X from analysis cache
                     if ep_analysis.get("has_dts_x"):
                         dts_x_count += 1
@@ -1501,6 +1505,7 @@ def _build_series_results(
                 item["cover_art_episodes"] = cover_art_eps
                 item["audio_codecs"] = sorted(audio_codecs_set)
                 item["video_codecs"] = sorted(video_codecs_set)
+                item["resolutions"] = sorted(resolutions_set)
         except Exception as e:
             logger.warning("Error getting episodes for series %s: %s", series_id, e)
 

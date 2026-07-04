@@ -169,6 +169,28 @@ def refresh_radarr_library() -> dict[str, str]:
         raise HTTPException(status_code=502, detail=f"Radarr refresh failed: {e}") from e
 
 
+@router.post("/config/test-webhook/sonarr")
+def test_sonarr_webhook() -> dict[str, str]:
+    """Ask Sonarr to send a real test webhook to remuXcode's /api/webhook."""
+    try:
+        return {"message": core.test_sonarr_webhook()}
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Sonarr webhook test failed: {e}") from e
+
+
+@router.post("/config/test-webhook/radarr")
+def test_radarr_webhook() -> dict[str, str]:
+    """Ask Radarr to send a real test webhook to remuXcode's /api/webhook."""
+    try:
+        return {"message": core.test_radarr_webhook()}
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Radarr webhook test failed: {e}") from e
+
+
 @router.post("/config/cleanup-temp")
 def cleanup_temp_files() -> dict[str, Any]:
     """Remove orphaned temp/chain directories left by failed or interrupted jobs."""

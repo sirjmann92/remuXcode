@@ -26,6 +26,7 @@ export const VIDEO_CODEC_GROUPS: CodecGroup[] = [
   { value: 'av1', label: 'AV1' },
   { value: 'mpeg2', label: 'MPEG-2' },
   { value: 'vc1', label: 'VC-1' },
+  { value: 'legacy', label: 'Legacy (Xvid/DivX)' },
 ];
 
 /** Test if an audio codec string matches a filter group value. */
@@ -73,6 +74,8 @@ export function videoCodecMatches(codec: string, filterValue: string): boolean {
       return vc.includes('MPEG2');
     case 'vc1':
       return vc.includes('VC1') || vc.includes('VC-1');
+    case 'legacy':
+      return ['MPEG4', 'MPEG-4', 'XVID', 'DIVX', 'WMV', 'MSMPEG4'].some((c) => vc.includes(c));
     default:
       return false;
   }

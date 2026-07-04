@@ -329,6 +329,7 @@ export interface BrowseSeries {
   cover_art_episodes?: number;
   audio_codecs: string[];
   video_codecs: string[];
+  resolutions?: string[];
 }
 
 export interface SeriesResponse {

@@ -23,6 +23,7 @@ import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
 import ConvertOptionsModal from '$lib/components/ConvertOptionsModal.svelte';
 import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
 import { langName } from '$lib/languages';
+import { buildResolutionOptions, resolutionMatches } from '$lib/resolution';
 import {
   deduplicatedSeriesFetch,
   getCachedSeries,
@@ -47,6 +48,7 @@ let search = $state('');
 let filter: string = $state('any');
 let audioFormat: string = $state('any');
 let videoFormat: string = $state('any');
+let resolutionFilter: string = $state('any');
 let sortBy: string = $state('needsWork');
 
 // Detail view state
@@ -237,6 +239,13 @@ const filtered = $derived.by(() => {
   if (videoFormat !== 'any') {
     result = result.filter((s) =>
       (s.video_codecs ?? []).some((c) => videoCodecMatches(c, videoFormat)),
+    );
+  }
+
+  // Resolution filter
+  if (resolutionFilter !== 'any') {
+    result = result.filter((s) =>
+      (s.resolutions ?? []).some((r) => resolutionMatches(r, resolutionFilter)),
     );
   }
 
@@ -497,7 +506,7 @@ function seasonNeedsWork(season: Season): number {
 const filteredSeasons = $derived.by(() => {
   if (!selectedSeries) return [];
   const seasons = selectedSeries.seasons;
-  if (audioFormat === 'any' && videoFormat === 'any') return seasons;
+  if (audioFormat === 'any' && videoFormat === 'any' && resolutionFilter === 'any') return seasons;
 
   return seasons
     .map((season) => {
@@ -508,6 +517,8 @@ const filteredSeasons = $derived.by(() => {
         )
           return false;
         if (videoFormat !== 'any' && !videoCodecMatches(ep.video_codec ?? '', videoFormat))
+          return false;
+        if (resolutionFilter !== 'any' && !resolutionMatches(ep.resolution ?? '', resolutionFilter))
           return false;
         return true;
       });
@@ -585,6 +596,9 @@ const audioOptions = $derived(
   ),
 );
 const videoOptions = $derived(buildVideoOptions(seriesList.flatMap((s) => s.video_codecs ?? [])));
+const resolutionOptions = $derived(
+  buildResolutionOptions(seriesList.flatMap((s) => s.resolutions ?? [])),
+);
 
 // Reset filter if selected value is no longer in contextual options
 $effect(() => {
@@ -595,6 +609,11 @@ $effect(() => {
 $effect(() => {
   if (videoFormat !== 'any' && !videoOptions.some((o) => o.value === videoFormat)) {
     videoFormat = 'any';
+  }
+});
+$effect(() => {
+  if (resolutionFilter !== 'any' && !resolutionOptions.some((o) => o.value === resolutionFilter)) {
+    resolutionFilter = 'any';
   }
 });
 
@@ -954,6 +973,13 @@ const sortOptions: { value: string; label: string }[] = [
             {/each}
           </select>
         {/if}
+        {#if resolutionOptions.length > 1}
+          <select class="select select-sm select-bordered w-36" bind:value={resolutionFilter}>
+            {#each resolutionOptions as rf}
+              <option value={rf.value}>{rf.label}</option>
+            {/each}
+          </select>
+        {/if}
         <select class="select select-sm select-bordered w-auto ml-auto" bind:value={sortBy}>
           {#each sortOptions as s}
             <option value={s.value}>{s.label}</option>
@@ -1153,7 +1179,7 @@ const sortOptions: { value: string; label: string }[] = [
                   </span>
                 {/if}
                 {#if (series.video_convert_count ?? 0) > 0}
-                  <span class="badge badge-error badge-sm">{series.video_convert_count} video</span>
+                  <span class="badge badge-secondary badge-sm">{series.video_convert_count} video</span>
                 {/if}
                 {#if (series.audio_convert_count ?? 0) > 0}
                   <span class="badge badge-warning badge-sm">{series.audio_convert_count} audio</span>

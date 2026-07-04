@@ -1,5 +1,11 @@
 <script lang="ts">
-import { getConfig, regenerateApiKey, updateConfig } from '$lib/api';
+import {
+  getConfig,
+  regenerateApiKey,
+  testRadarrWebhook,
+  testSonarrWebhook,
+  updateConfig,
+} from '$lib/api';
 import type { ConfigSummary } from '$lib/types';
 
 let config: ConfigSummary | null = $state(null);
@@ -10,6 +16,10 @@ let saveMsg = $state('');
 let keyCopied = $state(false);
 let keyVisible = $state(false);
 let regenerating = $state(false);
+let testingSonarr = $state(false);
+let testingRadarr = $state(false);
+let sonarrTestResult: { ok: boolean; message: string } | null = $state(null);
+let radarrTestResult: { ok: boolean; message: string } | null = $state(null);
 
 async function fetchConfig() {
   loading = true;
@@ -60,6 +70,32 @@ async function handleRegenerate() {
     error = e instanceof Error ? e.message : 'Failed to regenerate key';
   } finally {
     regenerating = false;
+  }
+}
+
+async function handleTestSonarrWebhook() {
+  testingSonarr = true;
+  sonarrTestResult = null;
+  try {
+    const res = await testSonarrWebhook();
+    sonarrTestResult = { ok: true, message: res.message };
+  } catch (e) {
+    sonarrTestResult = { ok: false, message: e instanceof Error ? e.message : 'Test failed' };
+  } finally {
+    testingSonarr = false;
+  }
+}
+
+async function handleTestRadarrWebhook() {
+  testingRadarr = true;
+  radarrTestResult = null;
+  try {
+    const res = await testRadarrWebhook();
+    radarrTestResult = { ok: true, message: res.message };
+  } catch (e) {
+    radarrTestResult = { ok: false, message: e instanceof Error ? e.message : 'Test failed' };
+  } finally {
+    testingRadarr = false;
   }
 }
 
@@ -162,7 +198,22 @@ $effect(() => {
               <span class="badge badge-xs {config.sonarr.configured ? 'badge-success' : 'badge-ghost'}">
                 {config.sonarr.configured ? 'Connected' : 'Not configured'}
               </span>
+              <button
+                class="btn btn-xs btn-ghost"
+                disabled={!config.sonarr.configured || testingSonarr}
+                onclick={handleTestSonarrWebhook}
+                title="Ask Sonarr to send a real test webhook to remuXcode"
+              >
+                {#if testingSonarr}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                  Test Webhook
+                {/if}
+              </button>
             </div>
+            {#if sonarrTestResult}
+              <p class="text-xs {sonarrTestResult.ok ? 'text-success' : 'text-error'}">{sonarrTestResult.message}</p>
+            {/if}
           </div>
         </div>
       </div>
@@ -197,7 +248,22 @@ $effect(() => {
               <span class="badge badge-xs {config.radarr.configured ? 'badge-success' : 'badge-ghost'}">
                 {config.radarr.configured ? 'Connected' : 'Not configured'}
               </span>
+              <button
+                class="btn btn-xs btn-ghost"
+                disabled={!config.radarr.configured || testingRadarr}
+                onclick={handleTestRadarrWebhook}
+                title="Ask Radarr to send a real test webhook to remuXcode"
+              >
+                {#if testingRadarr}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                  Test Webhook
+                {/if}
+              </button>
             </div>
+            {#if radarrTestResult}
+              <p class="text-xs {radarrTestResult.ok ? 'text-success' : 'text-error'}">{radarrTestResult.message}</p>
+            {/if}
           </div>
         </div>
       </div>

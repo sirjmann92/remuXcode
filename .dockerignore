@@ -1,6 +1,7 @@
 # Node and Python cache
 frontend/node_modules
 frontend/build
+frontend/.svelte-kit
 __pycache__/
 *.pyc
 *.pyo
@@ -8,12 +9,20 @@ backend/__pycache__/
 backend/utils/__pycache__/
 backend/workers/__pycache__/
 
+# Python virtualenv (never used by the image; only bloats build context)
+.venv/
+venv/
+
 # Logs
 logs/
 *.log
 
 # Database
 *.db
+
+# Runtime config volume (secrets/state; Dockerfile never COPYs this, but
+# exclude explicitly so a future COPY change can't accidentally bake it in)
+config/
 
 # OS files
 .DS_Store

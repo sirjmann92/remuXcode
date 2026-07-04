@@ -11,6 +11,7 @@
 ### Automation & Integration
 
 - Sonarr/Radarr webhook receiver (On Import Complete, On File Import, On File Upgrade)
+- **Webhook test button** — Integrations page button that asks Sonarr/Radarr's own API to fire a real test webhook at remuXcode, verifying both the remuXcode→Sonarr/Radarr API call and the Sonarr/Radarr→remuXcode delivery in one round trip
 - Post-conversion rename trigger via Sonarr/Radarr API — Sonarr RescanSeries + polled rename; Radarr polled rename
 - Job persistence (SQLite) — survives container restarts, resumes pending jobs in queue order
 - Anime detection — path patterns, NFO genre parsing, Sonarr/Radarr API genres and studio names
@@ -80,7 +81,6 @@
 ### Quality of Life
 
 - **Settings change detection** — surface files in the library that no longer match current conversion settings (e.g. after loosening or tightening a rule)
-- **Webhook test button** — send a test payload from the Settings page to verify connectivity end-to-end
 - **In-UI log viewer** — tail recent log output from the Settings or Jobs page without needing shell access
 
 ### Known Issues
