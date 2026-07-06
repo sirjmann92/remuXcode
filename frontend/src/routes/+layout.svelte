@@ -49,7 +49,7 @@ const pageTitle = $derived.by(() => {
           remu<span class="text-secondary">X</span>code
         </a>
         <!-- Page title (desktop) -->
-        <h1 class="hidden lg:block text-sm font-medium text-base-content/60">{pageTitle}</h1>
+        <h1 class="hidden lg:block text-sm font-medium text-base-content/95">{pageTitle}</h1>
       </div>
 
       <!-- Right side placeholder for future profile/actions -->

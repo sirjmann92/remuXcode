@@ -226,7 +226,7 @@ async function executeRemoveCoverArt() {
     <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={onclose}>✕</button>
 
     <h3 class="text-lg font-semibold mb-1">File Analysis</h3>
-    <p class="text-xs text-base-content/40 truncate mb-4" title={path}>{fileName(path)}</p>
+    <p class="text-xs text-base-content/85 truncate mb-4" title={path}>{fileName(path)}</p>
 
     {#if loading}
       <div class="flex justify-center py-12">
@@ -236,7 +236,7 @@ async function executeRemoveCoverArt() {
       <div class="alert alert-error">
         <span>{error}</span>
         {#if error.toLowerCase().includes('not found')}
-          <p class="text-xs mt-1 opacity-70">The file may have been moved, deleted, or is still downloading. Try refreshing the library in Radarr/Sonarr.</p>
+          <p class="text-xs mt-1 text-base-content/85">The file may have been moved, deleted, or is still downloading. Try refreshing the library in Radarr/Sonarr.</p>
         {/if}
       </div>
     {:else if result}
@@ -244,13 +244,13 @@ async function executeRemoveCoverArt() {
       <div class="tabs tabs-bordered mb-4">
         <button class="tab {activeTab === 'general' ? 'tab-active' : ''}" onclick={() => activeTab = 'general'}>General</button>
         <button class="tab {activeTab === 'video' ? 'tab-active' : ''}" onclick={() => activeTab = 'video'}>
-          Video <span class="text-xs text-base-content/40 ml-1">({result.video_streams.length})</span>
+          Video <span class="text-xs text-base-content/85 ml-1">({result.video_streams.length})</span>
         </button>
         <button class="tab {activeTab === 'audio' ? 'tab-active' : ''}" onclick={() => activeTab = 'audio'}>
-          Audio <span class="text-xs text-base-content/40 ml-1">({result.audio_streams.length})</span>
+          Audio <span class="text-xs text-base-content/85 ml-1">({result.audio_streams.length})</span>
         </button>
         <button class="tab {activeTab === 'subtitles' ? 'tab-active' : ''}" onclick={() => activeTab = 'subtitles'}>
-          Subs <span class="text-xs text-base-content/40 ml-1">({result.subtitle_streams.length})</span>
+          Subs <span class="text-xs text-base-content/85 ml-1">({result.subtitle_streams.length})</span>
         </button>
       </div>
 
@@ -260,29 +260,29 @@ async function executeRemoveCoverArt() {
       <!-- General -->
       {#if activeTab === 'general'}
         <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-          <div class="text-base-content/50">Format</div>
+          <div class="text-base-content/85">Format</div>
           <div>{result.format}</div>
-          <div class="text-base-content/50">Duration</div>
+          <div class="text-base-content/85">Duration</div>
           <div>{formatDuration(result.duration)}</div>
-          <div class="text-base-content/50">Size</div>
+          <div class="text-base-content/85">Size</div>
           <div>{formatSize(result.size)}</div>
-          <div class="text-base-content/50">Bitrate</div>
+          <div class="text-base-content/85">Bitrate</div>
           <div>{formatBitrate(result.bitrate)}</div>
-          <div class="text-base-content/50">Chapters</div>
+          <div class="text-base-content/85">Chapters</div>
           <div>{result.chapters}</div>
-          <div class="text-base-content/50">Content Type</div>
+          <div class="text-base-content/85">Content Type</div>
           <div class="flex items-center gap-2">
             {result.content_type}
             {#if result.is_anime}
               <span class="badge badge-accent badge-xs">Anime</span>
             {/if}
           </div>
-          <div class="text-base-content/50">Streams</div>
+          <div class="text-base-content/85">Streams</div>
           <div>{result.video_streams.length}V / {result.audio_streams.length}A / {result.subtitle_streams.length}S</div>
         </div>
 
         {#if result.needs_audio_conversion || result.needs_video_conversion || result.needs_cleanup}
-          <div class="divider text-xs text-base-content/30">Work Needed</div>
+          <div class="divider text-xs text-base-content/75">Work Needed</div>
           <div class="flex flex-wrap gap-2">
             {#if result.audio_codecs_to_convert?.length}
               <span class="badge badge-warning badge-sm">{result.audio_codecs_to_convert.join(', ')} will be converted</span>
@@ -303,13 +303,13 @@ async function executeRemoveCoverArt() {
         {/if}
 
         {#if Object.keys(result.format_tags).length > 0}
-          <div class="divider text-xs text-base-content/30">Container Tags</div>
+          <div class="divider text-xs text-base-content/75">Container Tags</div>
           <div class="overflow-x-auto">
             <table class="table table-xs">
               <tbody>
                 {#each Object.entries(result.format_tags) as [key, value]}
                   <tr>
-                    <td class="text-base-content/50 font-mono text-xs w-40">{key}</td>
+                    <td class="text-base-content/85 font-mono text-xs w-40">{key}</td>
                     <td class="text-xs break-all">{value}</td>
                   </tr>
                 {/each}
@@ -321,7 +321,7 @@ async function executeRemoveCoverArt() {
       <!-- Video Streams -->
       {:else if activeTab === 'video'}
         {#if result.video_streams.length === 0}
-          <p class="text-sm text-base-content/40 py-4 text-center">No video streams</p>
+          <p class="text-sm text-base-content/85 py-4 text-center">No video streams</p>
         {:else}
           <div class="space-y-3">
             {#each result.video_streams as v, i}
@@ -343,7 +343,7 @@ async function executeRemoveCoverArt() {
                         alt="Cover art"
                       />
                     </button>
-                    <div class="flex-1 text-xs text-base-content/50 space-y-1">
+                    <div class="flex-1 text-xs text-base-content/85 space-y-1">
                       <div>{v.codec_long || v.codec}</div>
                       <button
                         class="btn btn-xs btn-error btn-outline mt-1"
@@ -370,23 +370,23 @@ async function executeRemoveCoverArt() {
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                  <div class="text-base-content/50">Codec</div>
+                  <div class="text-base-content/85">Codec</div>
                   <div>{v.codec_long || v.codec}</div>
-                  <div class="text-base-content/50">Resolution</div>
+                  <div class="text-base-content/85">Resolution</div>
                   <div>{v.resolution}</div>
-                  <div class="text-base-content/50">Profile</div>
+                  <div class="text-base-content/85">Profile</div>
                   <div>{v.profile ?? '—'}</div>
                   {#if hdrLabel(v)}
-                    <div class="text-base-content/50">HDR</div>
+                    <div class="text-base-content/85">HDR</div>
                     <div>{hdrLabel(v)}</div>
                   {/if}
-                  <div class="text-base-content/50">Pixel Format</div>
+                  <div class="text-base-content/85">Pixel Format</div>
                   <div>{v.pix_fmt} ({v.bit_depth}-bit)</div>
-                  <div class="text-base-content/50">Frame Rate</div>
+                  <div class="text-base-content/85">Frame Rate</div>
                   <div>{formatFrameRate(v.frame_rate)}</div>
-                  <div class="text-base-content/50">Scan Type</div>
+                  <div class="text-base-content/85">Scan Type</div>
                   <div>{v.is_interlaced ? 'Interlaced' : 'Progressive'}</div>
-                  <div class="text-base-content/50">Bitrate</div>
+                  <div class="text-base-content/85">Bitrate</div>
                   <div>{formatBitrate(v.bitrate)}</div>
                 </div>
               </div>
@@ -401,7 +401,7 @@ async function executeRemoveCoverArt() {
       <!-- Audio Streams -->
       {:else if activeTab === 'audio'}
         {#if result.audio_streams.length === 0}
-          <p class="text-sm text-base-content/40 py-4 text-center">No audio streams</p>
+          <p class="text-sm text-base-content/85 py-4 text-center">No audio streams</p>
         {:else}
           <div class="space-y-3">
             {#each result.audio_streams as a, i}
@@ -409,7 +409,7 @@ async function executeRemoveCoverArt() {
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-sm">Stream #{a.index}</span>
-                    <span class="text-xs text-base-content/40">{langLabel(a.language)}</span>
+                    <span class="text-xs text-base-content/85">{langLabel(a.language)}</span>
                   </div>
                   <div class="flex gap-1">
                     {#if a.is_default}<span class="badge badge-ghost badge-xs">Default</span>{/if}
@@ -419,22 +419,22 @@ async function executeRemoveCoverArt() {
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                  <div class="text-base-content/50">Codec</div>
+                  <div class="text-base-content/85">Codec</div>
                   <div>{a.codec_long || a.codec}</div>
-                  <div class="text-base-content/50">Channels</div>
+                  <div class="text-base-content/85">Channels</div>
                   <div>{channelLabel(a.channels, a.channel_layout)}</div>
-                  <div class="text-base-content/50">Sample Rate</div>
+                  <div class="text-base-content/85">Sample Rate</div>
                   <div>{(a.sample_rate / 1000).toFixed(1)} kHz</div>
-                  <div class="text-base-content/50">Bitrate</div>
+                  <div class="text-base-content/85">Bitrate</div>
                   <div>{formatBitrate(a.bitrate)}</div>
                   {#if a.title}
-                    <div class="text-base-content/50">Title</div>
+                    <div class="text-base-content/85">Title</div>
                     <div>{a.title}</div>
                   {/if}
                 </div>
                 {#if audioEdits[i]}
                   <div class="flex items-center gap-2 mt-2 pt-2 border-t border-base-content/10">
-                    <span class="text-xs text-base-content/40 shrink-0">Fix:</span>
+                    <span class="text-xs text-base-content/85 shrink-0">Fix:</span>
                     <select
                       class="select select-xs flex-1 min-w-0"
                       bind:value={audioEdits[i].language}
@@ -460,7 +460,7 @@ async function executeRemoveCoverArt() {
       <!-- Subtitle Streams -->
       {:else if activeTab === 'subtitles'}
         {#if result.subtitle_streams.length === 0}
-          <p class="text-sm text-base-content/40 py-4 text-center">No subtitle streams</p>
+          <p class="text-sm text-base-content/85 py-4 text-center">No subtitle streams</p>
         {:else}
           <div class="overflow-x-auto">
             <table class="table table-xs">
@@ -578,7 +578,7 @@ async function executeRemoveCoverArt() {
   <div class="modal modal-open z-[9999]" role="dialog" aria-modal="true">
     <div class="modal-box max-w-sm">
       <h3 class="font-semibold text-base mb-2">Remove Cover Art</h3>
-      <p class="text-sm text-base-content/70 mb-4">Remove this embedded image? This cannot be undone.</p>
+      <p class="text-sm text-base-content/95 mb-4">Remove this embedded image? This cannot be undone.</p>
       <div class="modal-action mt-0">
         <button class="btn btn-ghost btn-sm" onclick={() => confirmRemoveIndex = null}>Cancel</button>
         <button class="btn btn-error btn-sm" onclick={executeRemoveCoverArt}>Remove</button>

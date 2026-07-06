@@ -57,7 +57,6 @@ video:
   # Common HEVC settings
   pix_fmt: yuv420p10le  # 10-bit output
   profile: main10
-  level: "4.1"
 
   # VBV settings for streaming compatibility
   # Lower values force more efficient encoding (important for anime)

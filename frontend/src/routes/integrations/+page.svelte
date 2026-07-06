@@ -130,8 +130,8 @@ $effect(() => {
     <!-- API Key -->
     <div class="card-glass rounded-box">
       <div class="p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">API Key</h2>
-        <p class="text-xs opacity-60 mb-3">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">API Key</h2>
+        <p class="text-xs text-base-content/85 mb-3">
           Use this key as the <code class="bg-base-300 px-1 rounded">X-API-Key</code> header
           when configuring Sonarr/Radarr webhook connections.
         </p>
@@ -171,11 +171,11 @@ $effect(() => {
       <!-- Sonarr -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Sonarr</h2>
-          <p class="text-xs text-base-content/40 mb-3">Connect to Sonarr for library browsing, metadata, and post-conversion rename triggers.</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">Sonarr</h2>
+          <p class="text-xs text-base-content/85 mb-3">Connect to Sonarr for library browsing, metadata, and post-conversion rename triggers.</p>
           <div class="space-y-3 text-sm">
             <div class="flex items-center justify-between" title="Sonarr instance URL (e.g. http://192.168.1.100:8989)">
-              <span class="text-xs">URL<span class="block text-xs text-base-content/30 font-normal">Sonarr server address</span></span>
+              <span class="text-xs font-medium">URL<span class="block text-xs text-base-content/75 font-normal">Sonarr server address</span></span>
               <input
                 type="text"
                 class="input input-xs input-bordered w-52 font-mono text-xs"
@@ -185,7 +185,7 @@ $effect(() => {
               />
             </div>
             <div class="flex items-center justify-between" title="Sonarr API key from Settings → General → Security">
-              <span class="text-xs">API Key<span class="block text-xs text-base-content/30 font-normal">Found in Sonarr → Settings → General</span></span>
+              <span class="text-xs font-medium">API Key<span class="block text-xs text-base-content/75 font-normal">Found in Sonarr → Settings → General</span></span>
               <input
                 type="password"
                 class="input input-xs input-bordered w-52 font-mono text-xs"
@@ -221,11 +221,11 @@ $effect(() => {
       <!-- Radarr -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Radarr</h2>
-          <p class="text-xs text-base-content/40 mb-3">Connect to Radarr for library browsing, metadata, and post-conversion rename triggers.</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">Radarr</h2>
+          <p class="text-xs text-base-content/85 mb-3">Connect to Radarr for library browsing, metadata, and post-conversion rename triggers.</p>
           <div class="space-y-3 text-sm">
             <div class="flex items-center justify-between" title="Radarr instance URL (e.g. http://192.168.1.100:7878)">
-              <span class="text-xs">URL<span class="block text-xs text-base-content/30 font-normal">Radarr server address</span></span>
+              <span class="text-xs font-medium">URL<span class="block text-xs text-base-content/75 font-normal">Radarr server address</span></span>
               <input
                 type="text"
                 class="input input-xs input-bordered w-52 font-mono text-xs"
@@ -235,7 +235,7 @@ $effect(() => {
               />
             </div>
             <div class="flex items-center justify-between" title="Radarr API key from Settings → General → Security">
-              <span class="text-xs">API Key<span class="block text-xs text-base-content/30 font-normal">Found in Radarr → Settings → General</span></span>
+              <span class="text-xs font-medium">API Key<span class="block text-xs text-base-content/75 font-normal">Found in Radarr → Settings → General</span></span>
               <input
                 type="password"
                 class="input input-xs input-bordered w-52 font-mono text-xs"
@@ -273,7 +273,7 @@ $effect(() => {
     {#if config.path_mappings.length > 0}
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-3">Path Mappings</h2>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-3">Path Mappings</h2>
           <div class="overflow-x-auto">
             <table class="table table-xs">
               <thead>

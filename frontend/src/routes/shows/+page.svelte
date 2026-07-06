@@ -765,7 +765,7 @@ const sortOptions: { value: string; label: string }[] = [
             <span class="font-medium">
               {season.season_number === 0 ? 'Specials' : `Season ${season.season_number}`}
             </span>
-            <span class="text-sm text-base-content/40">
+            <span class="text-sm text-base-content/85">
               {season.episode_count} episode{season.episode_count !== 1 ? 's' : ''}
             </span>
           </div>
@@ -779,7 +779,7 @@ const sortOptions: { value: string; label: string }[] = [
             {#if seasonNeedsWork(season) > 0}
               <span class="badge badge-warning badge-sm">{seasonNeedsWork(season)} need work</span>
             {/if}
-            <span class="text-sm text-base-content/40">{formatSize(season.size)}</span>
+            <span class="text-sm text-base-content/85">{formatSize(season.size)}</span>
             <button
               class="btn btn-ghost btn-xs"
               title="Custom encode season (downscale / HDR)"
@@ -827,7 +827,7 @@ const sortOptions: { value: string; label: string }[] = [
                   <div class="w-4 shrink-0"></div>
                 {/if}
                 <!-- Episode number -->
-                <span class="text-sm text-base-content/30 w-8 text-right shrink-0">
+                <span class="text-sm text-base-content/75 w-8 text-right shrink-0">
                   {ep.episode_number}
                 </span>
                 <!-- Title -->
@@ -868,18 +868,18 @@ const sortOptions: { value: string; label: string }[] = [
                     {@const keepAudio = (isAnime && config.cleanup.anime_keep_original_audio) ? ep.audio_languages : (!isAnime && config.cleanup.keep_original_audio) ? ep.audio_languages : keptTracks(ep.audio_languages, config)}
                     <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                       {#if ep.audio_languages.length > 0}
-                        <span class="text-xs text-base-content/30">
+                        <span class="text-xs text-base-content/75">
                           Audio:
                           {#if keepAudio.length > 0}<span class="text-success/70">{trackSummary(keepAudio)}</span>{/if}
-                          {#if keepAudio.length > 0 && removeAudio.length > 0}<span class="text-base-content/20"> · </span>{/if}
+                          {#if keepAudio.length > 0 && removeAudio.length > 0}<span class="text-base-content/75"> · </span>{/if}
                           {#if removeAudio.length > 0}<span class="text-error/60 line-through">{trackSummary(removeAudio)}</span>{/if}
                         </span>
                       {/if}
                       {#if ep.subtitles.length > 0}
-                        <span class="text-xs text-base-content/30">
+                        <span class="text-xs text-base-content/75">
                           Subs:
                           {#if keepSubs.length > 0}<span class="text-success/70">{trackSummary(keepSubs)}</span>{/if}
-                          {#if keepSubs.length > 0 && removeSubs.length > 0}<span class="text-base-content/20"> · </span>{/if}
+                          {#if keepSubs.length > 0 && removeSubs.length > 0}<span class="text-base-content/75"> · </span>{/if}
                           {#if removeSubs.length > 0}<span class="text-error/60 line-through">{trackSummary(removeSubs)}</span>{/if}
                         </span>
                       {/if}
@@ -887,7 +887,7 @@ const sortOptions: { value: string; label: string }[] = [
                   {/if}
                 </div>
                 <!-- Size -->
-                <span class="text-xs text-base-content/30 shrink-0">{formatSize(ep.size)}</span>
+                <span class="text-xs text-base-content/75 shrink-0">{formatSize(ep.size)}</span>
                 <!-- Job status -->
                 {#if getJobStatus(ep.path)}
                   {@const job = getJobStatus(ep.path)!}
@@ -895,7 +895,7 @@ const sortOptions: { value: string; label: string }[] = [
                     <span class="loading loading-spinner loading-xs text-primary"></span>
                     <span class="text-xs capitalize text-primary">{job.status}</span>
                     {#if job.status === 'running' && job.progress > 0}
-                      <span class="text-xs text-base-content/40">{Math.round(job.progress)}%</span>
+                      <span class="text-xs text-base-content/85">{Math.round(job.progress)}%</span>
                     {/if}
                   </span>
                 {/if}
@@ -987,7 +987,7 @@ const sortOptions: { value: string; label: string }[] = [
         </select>
       </div>
       <div class="relative">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/75" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
         </svg>
         <input
@@ -998,7 +998,7 @@ const sortOptions: { value: string; label: string }[] = [
         />
         {#if search}
           <button
-            class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/40"
+            class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/85"
             onclick={() => (search = '')}
             title="Clear search"
             aria-label="Clear search"
@@ -1013,7 +1013,7 @@ const sortOptions: { value: string; label: string }[] = [
 
     <div class="flex items-center justify-between">
     <div class="flex items-center gap-2">
-      <div class="text-sm text-base-content/50">
+      <div class="text-sm text-base-content/85">
         {listSummary.total} show{listSummary.total !== 1 ? 's' : ''}
         {#if listSummary.needsWorkEps > 0}
           <span class="text-warning">· {listSummary.needsWorkEps} episode{listSummary.needsWorkEps !== 1 ? 's' : ''} need work</span>
@@ -1023,7 +1023,7 @@ const sortOptions: { value: string; label: string }[] = [
         <span class="text-xs text-success">{refreshMsg}</span>
       {/if}
       <button
-        class="btn btn-ghost btn-xs text-base-content/40"
+        class="btn btn-ghost btn-xs text-base-content/85"
         onclick={reloadSeries}
         disabled={reloading}
         title="Clear cache and reload series data from Sonarr"
@@ -1036,7 +1036,7 @@ const sortOptions: { value: string; label: string }[] = [
         Reload
       </button>
       <button
-        class="btn btn-ghost btn-xs text-base-content/40"
+        class="btn btn-ghost btn-xs text-base-content/85"
         onclick={() => (showRefreshConfirm = true)}
         disabled={refreshingLibrary || !config?.sonarr?.configured}
         title="Force Sonarr to re-read all series files from disk"
@@ -1059,7 +1059,7 @@ const sortOptions: { value: string; label: string }[] = [
         </button>
       {:else}
         <button
-          class="btn btn-ghost btn-xs text-base-content/40"
+          class="btn btn-ghost btn-xs text-base-content/85"
           onclick={handleStartScan}
           disabled={!config?.sonarr?.configured}
           title="Analyze all episode files with ffprobe for detailed codec info"
@@ -1087,7 +1087,7 @@ const sortOptions: { value: string; label: string }[] = [
     <!-- Scan progress bar -->
     {#if scanProgress?.running && scanProgress.type === 'series' && scanProgress.total > 0}
       <div class="card-glass rounded-box p-3">
-        <div class="flex items-center justify-between text-xs text-base-content/50 mb-1">
+        <div class="flex items-center justify-between text-xs text-base-content/85 mb-1">
           <span>Analyzing library… {scanProgress.analyzed + scanProgress.skipped}/{scanProgress.total}</span>
           <span class="truncate ml-2 max-w-[200px]">{scanProgress.current_file ?? ''}</span>
         </div>
@@ -1103,39 +1103,39 @@ const sortOptions: { value: string; label: string }[] = [
     {:else if loadError}
       <div class="card-glass rounded-box p-12 text-center">
         <p class="text-base text-error/80">Failed to load shows</p>
-        <p class="text-sm text-base-content/40 mt-1">Check that Sonarr is configured and reachable.</p>
+        <p class="text-sm text-base-content/85 mt-1">Check that Sonarr is configured and reachable.</p>
       </div>
     {:else if filtered.length === 0}
       <div class="card-glass rounded-box p-12 text-center">
         {#if analysisFiltersActive}
-          <p class="text-base text-base-content/40">No shows match this filter</p>
-          <p class="text-sm text-base-content/30 mt-1">Some filters (DTS:X, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
+          <p class="text-base text-base-content/85">No shows match this filter</p>
+          <p class="text-sm text-base-content/75 mt-1">Some filters (DTS:X, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
         {:else if search}
-          <p class="text-base text-base-content/40">No shows match your search</p>
-          <p class="text-sm text-base-content/30 mt-1">Try a different spelling or clear the search.</p>
+          <p class="text-base text-base-content/85">No shows match your search</p>
+          <p class="text-sm text-base-content/75 mt-1">Try a different spelling or clear the search.</p>
         {:else if filter === 'needs_conversion'}
           <p class="text-2xl mb-1">&#127881;</p>
-          <p class="text-base text-base-content/60">Every episode is in peak condition.</p>
-          <p class="text-sm text-base-content/30 mt-1">Your library called — it says thanks.</p>
+          <p class="text-base text-base-content/95">Every episode is in peak condition.</p>
+          <p class="text-sm text-base-content/75 mt-1">Your library called — it says thanks.</p>
         {:else if filter === 'video'}
           <p class="text-2xl mb-1">&#127916;</p>
-          <p class="text-base text-base-content/60">All video tracks are already on point.</p>
-          <p class="text-sm text-base-content/30 mt-1">Not a re-encode in sight. Well done.</p>
+          <p class="text-base text-base-content/95">All video tracks are already on point.</p>
+          <p class="text-sm text-base-content/75 mt-1">Not a re-encode in sight. Well done.</p>
         {:else if filter === 'audio'}
           <p class="text-2xl mb-1">&#127911;</p>
-          <p class="text-base text-base-content/60">Audio is impeccable across all episodes.</p>
-          <p class="text-sm text-base-content/30 mt-1">Nothing to transcode here — just vibes.</p>
+          <p class="text-base text-base-content/95">Audio is impeccable across all episodes.</p>
+          <p class="text-sm text-base-content/75 mt-1">Nothing to transcode here — just vibes.</p>
         {:else if filter === 'cleanup'}
           <p class="text-2xl mb-1">&#10024;</p>
-          <p class="text-base text-base-content/60">No stray tracks or subtitles to remove.</p>
-          <p class="text-sm text-base-content/30 mt-1">Marie Kondo would be proud.</p>
+          <p class="text-base text-base-content/95">No stray tracks or subtitles to remove.</p>
+          <p class="text-sm text-base-content/75 mt-1">Marie Kondo would be proud.</p>
         {:else if filter === 'anime'}
           <p class="text-2xl mb-1">&#128517;</p>
-          <p class="text-base text-base-content/60">No anime series found.</p>
-          <p class="text-sm text-base-content/30 mt-1">Sonarr doesn't seem to have any anime tagged. Give it time.</p>
+          <p class="text-base text-base-content/95">No anime series found.</p>
+          <p class="text-sm text-base-content/75 mt-1">Sonarr doesn't seem to have any anime tagged. Give it time.</p>
         {:else}
-          <p class="text-base text-base-content/40">No shows found</p>
-          <p class="text-sm text-base-content/30 mt-1">Make sure Sonarr has series in your library.</p>
+          <p class="text-base text-base-content/85">No shows found</p>
+          <p class="text-sm text-base-content/75 mt-1">Make sure Sonarr has series in your library.</p>
         {/if}
       </div>
     {:else}
@@ -1159,7 +1159,7 @@ const sortOptions: { value: string; label: string }[] = [
               <!-- Info -->
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-medium truncate">{series.title}</h3>
-                <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-base-content/40">
+                <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-base-content/85">
                   <span>{series.year}</span>
                   <span>·</span>
                   <span>{series.season_count} season{series.season_count !== 1 ? 's' : ''}</span>
@@ -1193,8 +1193,8 @@ const sortOptions: { value: string; label: string }[] = [
                 {#if (series.cover_art_episodes ?? 0) > 0}
                   <span class="badge badge-neutral badge-sm">{series.cover_art_episodes} Art</span>
                 {/if}
-                <span class="text-xs text-base-content/30">{formatSize(series.size_on_disk)}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <span class="text-xs text-base-content/75">{formatSize(series.size_on_disk)}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/75" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
               </div>
@@ -1234,7 +1234,7 @@ const sortOptions: { value: string; label: string }[] = [
   <div class="modal modal-open">
     <div class="modal-box max-w-sm">
       <h3 class="font-bold text-lg">Refresh Sonarr Library</h3>
-      <p class="py-4 text-sm text-base-content/70">This will force Sonarr to re-read metadata for <strong>every series</strong> in your library from disk. Depending on library size, this could take a long time.</p>
+      <p class="py-4 text-sm text-base-content/95">This will force Sonarr to re-read metadata for <strong>every series</strong> in your library from disk. Depending on library size, this could take a long time.</p>
       <div class="modal-action">
         <button class="btn btn-ghost btn-sm" onclick={() => (showRefreshConfirm = false)}>Cancel</button>
         <button class="btn btn-warning btn-sm" onclick={handleRefreshLibrary}>Refresh Library</button>

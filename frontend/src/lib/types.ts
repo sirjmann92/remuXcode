@@ -170,7 +170,6 @@ export interface ConfigSummary {
     av1_live_action_film_grain: number;
     vbv_maxrate: number;
     vbv_bufsize: number;
-    level: string;
     profile: string;
     pix_fmt: string;
     hw_accel: string;

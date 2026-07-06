@@ -253,11 +253,11 @@ $effect(() => {
     <!-- Hardware Acceleration -->
     <div class="card-glass rounded-box">
       <div class="p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Hardware Acceleration</h2>
-        <p class="text-xs text-base-content/40 mb-3">Use GPU hardware encoding for faster video conversion. Requires <code class="bg-base-300 px-1 rounded">/dev/dri</code> passthrough in your compose file.</p>
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">Hardware Acceleration</h2>
+        <p class="text-xs text-base-content/85 mb-3">Use GPU hardware encoding for faster video conversion. Requires <code class="bg-base-300 px-1 rounded">/dev/dri</code> passthrough in your compose file.</p>
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between">
-            <span>Mode<span class="block text-xs text-base-content/30 font-normal">
+            <span class="font-medium">Mode<span class="block text-xs text-base-content/75 font-normal">
               {#if !hwAccel?.render_devices?.length}
                 No GPU detected — mount <code class="bg-base-300 px-0.5 rounded">/dev/dri</code> to enable
               {:else if hwAccel.gpu_vendor}
@@ -284,7 +284,7 @@ $effect(() => {
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                 Using {effectiveMethod.toUpperCase()}
               </span>
-              <span class="text-xs text-base-content/30">auto-detected</span>
+              <span class="text-xs text-base-content/75">auto-detected</span>
             </div>
           {/if}
           {#if hwAccel?.render_devices?.length}
@@ -303,8 +303,8 @@ $effect(() => {
               {/if}
             </div>
             <details class="border-t border-base-content/10 pt-2 mt-2">
-              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Details</summary>
-              <div class="mt-2 space-y-1 text-xs text-base-content/50">
+              <summary class="text-xs text-base-content/85 cursor-pointer hover:text-base-content/95 select-none">Details</summary>
+              <div class="mt-2 space-y-1 text-xs text-base-content/85">
                 <div><span class="font-medium">Devices:</span> {hwAccel.render_devices.join(', ')}</div>
                 <div><span class="font-medium">HEVC encoders:</span> {hwAccel.hevc_encoders.join(', ') || 'none'}</div>
                 <div><span class="font-medium">AV1 encoders:</span> {hwAccel.av1_encoders.join(', ') || 'none'}</div>
@@ -319,64 +319,64 @@ $effect(() => {
       <!-- Audio -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Audio Processing</h2>
-          <p class="text-xs text-base-content/40 mb-3">Convert lossless and legacy audio codecs to smaller, compatible formats.</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">Audio Processing</h2>
+          <p class="text-xs text-base-content/85 mb-3">Convert lossless and legacy audio codecs to smaller, compatible formats.</p>
           <div class="space-y-2 text-sm">
             <label class="flex items-center justify-between cursor-pointer" title="Enable automatic audio conversion">
-              <span>Enabled<span class="block text-xs text-base-content/30 font-normal">Enable automatic audio conversion</span></span>
+              <span class="font-medium">Enabled<span class="block text-xs text-base-content/75 font-normal">Enable automatic audio conversion</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.enabled} onchange={() => toggleBool('audio', 'enabled')} />
             </label>
             <div class="{config.audio.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
             <!-- Process Anime -->
             <label class="flex items-center justify-between cursor-pointer" title="Apply audio conversion to anime content">
-              <span>Process Anime<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to anime content</span></span>
+              <span class="font-medium">Process Anime<span class="block text-xs text-base-content/75 font-normal">Apply audio conversion to anime content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.process_anime} onchange={() => toggleBool('audio', 'process_anime')} />
             </label>
             <!-- Process Standard -->
             <label class="flex items-center justify-between cursor-pointer" title="Apply audio conversion to standard (non-anime) content">
-              <span>Process Standard<span class="block text-xs text-base-content/30 font-normal">Apply audio conversion to standard (non-anime) content</span></span>
+              <span class="font-medium">Process Standard<span class="block text-xs text-base-content/75 font-normal">Apply audio conversion to standard (non-anime) content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.process_live_action} onchange={() => toggleBool('audio', 'process_live_action')} />
             </label>
             <!-- Convert DTS -->
             <label class="flex items-center justify-between cursor-pointer" title="Re-encode DTS/DTS-HD audio to EAC3 or AC3">
-              <span>Convert DTS<span class="block text-xs text-base-content/30 font-normal">Re-encode DTS/DTS-HD audio to EAC3 or AC3</span></span>
+              <span class="font-medium">Convert DTS<span class="block text-xs text-base-content/75 font-normal">Re-encode DTS/DTS-HD audio to EAC3 or AC3</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.convert_dts} onchange={() => toggleBool('audio', 'convert_dts')} />
             </label>
             <div class="pl-4 {config.audio.convert_dts ? '' : 'opacity-40 pointer-events-none'} transition-opacity">
               <label class="flex items-center justify-between cursor-pointer" title="Retain the original DTS track alongside the converted one">
-                <span>Keep Original<span class="block text-xs text-base-content/30 font-normal">Retain the original DTS track alongside the converted one</span></span>
+                <span class="font-medium">Keep Original<span class="block text-xs text-base-content/75 font-normal">Retain the original DTS track alongside the converted one</span></span>
                 <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.keep_original} onchange={() => toggleBool('audio', 'keep_original')} />
               </label>
             </div>
             <!-- Convert DTS:X -->
             <label class="flex items-center justify-between cursor-pointer" title="Re-encode DTS:X (object-based) audio to EAC3 or AC3">
-              <span>Convert DTS:X<span class="block text-xs text-base-content/30 font-normal">Re-encode DTS:X (object-based) audio to EAC3 or AC3</span></span>
+              <span class="font-medium">Convert DTS:X<span class="block text-xs text-base-content/75 font-normal">Re-encode DTS:X (object-based) audio to EAC3 or AC3</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.convert_dts_x} onchange={() => toggleBool('audio', 'convert_dts_x')} />
             </label>
             <div class="pl-4 {config.audio.convert_dts_x ? '' : 'opacity-40 pointer-events-none'} transition-opacity">
               <label class="flex items-center justify-between cursor-pointer" title="Retain the original DTS:X track alongside the converted one">
-                <span>Keep Original DTS:X<span class="block text-xs text-base-content/30 font-normal">Retain the original DTS:X track alongside the converted one</span></span>
+                <span class="font-medium">Keep Original DTS:X<span class="block text-xs text-base-content/75 font-normal">Retain the original DTS:X track alongside the converted one</span></span>
                 <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.keep_original_dts_x} onchange={() => toggleBool('audio', 'keep_original_dts_x')} />
               </label>
             </div>
             <!-- Convert TrueHD -->
             <label class="flex items-center justify-between cursor-pointer" title="Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)">
-              <span>Convert TrueHD<span class="block text-xs text-base-content/30 font-normal">Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)</span></span>
+              <span class="font-medium">Convert TrueHD<span class="block text-xs text-base-content/75 font-normal">Re-encode Dolby TrueHD/Atmos audio (lossless → lossy)</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.convert_truehd} onchange={() => toggleBool('audio', 'convert_truehd')} />
             </label>
             <!-- Original as Secondary -->
             <label class="flex items-center justify-between cursor-pointer" title="Place the converted track before the original so players use it by default">
-              <span>Original as Secondary<span class="block text-xs text-base-content/30 font-normal">Place the converted track first so players use it by default</span></span>
+              <span class="font-medium">Original as Secondary<span class="block text-xs text-base-content/75 font-normal">Place the converted track first so players use it by default</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.original_as_secondary} onchange={() => toggleBool('audio', 'original_as_secondary')} />
             </label>
             <!-- Prefer AC3 -->
             <label class="flex items-center justify-between cursor-pointer" title="Use AC3 (Dolby Digital) instead of EAC3 for wider device support">
-              <span>Prefer AC3<span class="block text-xs text-base-content/30 font-normal">Use AC3 (Dolby Digital) instead of EAC3 for wider device support</span></span>
+              <span class="font-medium">Prefer AC3<span class="block text-xs text-base-content/75 font-normal">Use AC3 (Dolby Digital) instead of EAC3 for wider device support</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.audio.prefer_ac3} onchange={() => toggleBool('audio', 'prefer_ac3')} />
             </label>
             <!-- Advanced -->
             <details class="border-t border-base-content/10 pt-2 mt-3">
-              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
+              <summary class="text-xs text-base-content/85 cursor-pointer hover:text-base-content/95 select-none">Advanced</summary>
               <div class="space-y-2 mt-2">
                 {#each [
                   { field: 'ac3_bitrate', label: 'AC3 Bitrate', hint: 'kbps for Dolby Digital 5.1 output (64–640)', min: 64, max: 640 },
@@ -385,7 +385,7 @@ $effect(() => {
                   { field: 'aac_stereo_bitrate', label: 'AAC Stereo Bitrate', hint: 'kbps for AAC stereo output (64–320)', min: 64, max: 320 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="number"
                       class="input input-xs input-bordered w-20 text-center font-mono"
@@ -406,16 +406,16 @@ $effect(() => {
       <!-- Video -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Video Processing</h2>
-          <p class="text-xs text-base-content/40 mb-3">Re-encode video to modern codecs for smaller file sizes.</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">Video Processing</h2>
+          <p class="text-xs text-base-content/85 mb-3">Re-encode video to modern codecs for smaller file sizes.</p>
           <div class="space-y-2 text-sm">
             <label class="flex items-center justify-between cursor-pointer" title="Enable automatic video conversion">
-              <span>Enabled<span class="block text-xs text-base-content/30 font-normal">Enable automatic video conversion</span></span>
+              <span class="font-medium">Enabled<span class="block text-xs text-base-content/75 font-normal">Enable automatic video conversion</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.video.enabled} onchange={() => toggleBool('video', 'enabled')} />
             </label>
             <div class="{config.video.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
             <div class="flex items-center justify-between">
-              <span>Target Codec<span class="block text-xs text-base-content/30 font-normal">Output codec for converted video</span></span>
+              <span class="font-medium">Target Codec<span class="block text-xs text-base-content/75 font-normal">Output codec for converted video</span></span>
               <select
                 class="select select-xs select-bordered w-24"
                 value={config.video.codec}
@@ -449,7 +449,7 @@ $effect(() => {
                 class="flex items-center justify-between cursor-pointer"
                 title={item.hint}
               >
-                <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.shortHint ?? item.hint}</span></span>
+                <span class="font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.shortHint ?? item.hint}</span></span>
                 <input
                   type="checkbox"
                   class="toggle toggle-sm toggle-primary shrink-0 ml-3"
@@ -459,7 +459,7 @@ $effect(() => {
               </label>
             {/each}
             <div class="flex items-center justify-between">
-              <span>Anime {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality for anime ({qualityRangeHint}, lower = better)</span></span>
+              <span class="font-medium">Anime {qualityLabel}<span class="block text-xs text-base-content/75 font-normal">Quality for anime ({qualityRangeHint}, lower = better)</span></span>
               {#key animeQualityField}
               <input
                 type="number"
@@ -473,7 +473,7 @@ $effect(() => {
               {/key}
             </div>
             <div class="flex items-center justify-between">
-              <span>Standard {qualityLabel}<span class="block text-xs text-base-content/30 font-normal">Quality for standard content ({qualityRangeHint}, lower = better)</span></span>
+              <span class="font-medium">Standard {qualityLabel}<span class="block text-xs text-base-content/75 font-normal">Quality for standard content ({qualityRangeHint}, lower = better)</span></span>
               {#key liveQualityField}
               <input
                 type="number"
@@ -487,21 +487,21 @@ $effect(() => {
               {/key}
             </div>
             {#if effectiveMethod !== 'none'}
-              <p class="text-xs text-base-content/30 -mt-1">Using {effectiveMethod.toUpperCase()} hardware encoder</p>
+              <p class="text-xs text-base-content/75 -mt-1">Using {effectiveMethod.toUpperCase()} hardware encoder</p>
             {/if}
             <!-- Advanced -->
             <details class="border-t border-base-content/10 pt-2 mt-3">
-              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
+              <summary class="text-xs text-base-content/85 cursor-pointer hover:text-base-content/95 select-none">Advanced</summary>
               <div class="space-y-2 mt-2">
                 <label class="flex items-center justify-between cursor-pointer" title="Use path patterns and metadata to identify anime content">
-                  <span class="text-xs">Auto-Detect Anime<span class="block text-xs text-base-content/30 font-normal">Use path patterns and metadata to identify anime</span></span>
+                  <span class="text-xs font-medium">Auto-Detect Anime<span class="block text-xs text-base-content/75 font-normal">Use path patterns and metadata to identify anime</span></span>
                   <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.video.anime_auto_detect} onchange={() => toggleBool('video', 'anime_auto_detect')} />
                 </label>
                 <!-- HW Encoder Settings -->
                 {#if effectiveMethod === 'qsv'}
-                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/60 pt-2">QSV Encoder</h3>
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/85 pt-2">QSV Encoder</h3>
                   <div class="flex items-center justify-between">
-                    <span class="text-xs">Preset<span class="block text-xs text-base-content/30 font-normal">QSV encoding speed (medium recommended)</span></span>
+                    <span class="text-xs font-medium">Preset<span class="block text-xs text-base-content/75 font-normal">QSV encoding speed (medium recommended)</span></span>
                     <select
                       class="select select-xs select-bordered w-28 font-mono"
                       value={config.video.qsv_preset}
@@ -513,9 +513,9 @@ $effect(() => {
                     </select>
                   </div>
                 {:else if effectiveMethod === 'nvenc'}
-                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/60 pt-2">NVENC Encoder</h3>
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/85 pt-2">NVENC Encoder</h3>
                   <div class="flex items-center justify-between">
-                    <span class="text-xs">Preset<span class="block text-xs text-base-content/30 font-normal">NVENC quality preset (p1=fastest, p7=best)</span></span>
+                    <span class="text-xs font-medium">Preset<span class="block text-xs text-base-content/75 font-normal">NVENC quality preset (p1=fastest, p7=best)</span></span>
                     <select
                       class="select select-xs select-bordered w-28 font-mono"
                       value={config.video.nvenc_preset}
@@ -527,18 +527,18 @@ $effect(() => {
                     </select>
                   </div>
                 {:else if effectiveMethod === 'vaapi'}
-                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/60 pt-2">VAAPI Encoder</h3>
-                  <p class="text-xs text-base-content/30">Quality (QP) is configured above. VAAPI has no additional encoder settings.</p>
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-accent/85 pt-2">VAAPI Encoder</h3>
+                  <p class="text-xs text-base-content/75">Quality (QP) is configured above. VAAPI has no additional encoder settings.</p>
                 {/if}
                 <!-- Software Encoding Settings (snippet to avoid conditional tag nesting) -->
                 {#snippet swSettings()}
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">{effectiveMethod !== 'none' ? 'HEVC (x265)' : 'HEVC Encoding'}</h3>
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/95 pt-2">{effectiveMethod !== 'none' ? 'HEVC (x265)' : 'HEVC Encoding'}</h3>
                 {#each [
                   { field: 'anime_crf', label: 'Anime CRF', type: 'number', hint: 'Quality for anime (0–51, lower = better)', min: 0, max: 51 },
                   { field: 'live_action_crf', label: 'Standard CRF', type: 'number', hint: 'Quality for standard content (0–51)', min: 0, max: 51 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="number"
                       class="input input-xs input-bordered w-16 text-center font-mono"
@@ -558,7 +558,7 @@ $effect(() => {
                   { field: 'live_action_framerate', label: 'Standard Framerate', type: 'text', hint: 'Framerate override (empty = auto-detect)' },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     {#if item.type === 'select'}
                       <select
                         class="select select-xs select-bordered w-28 font-mono"
@@ -585,7 +585,7 @@ $effect(() => {
                   { field: 'vbv_bufsize', label: 'VBV Buffer Size', hint: 'Buffer size in kbps for rate control', min: 0, max: 200000 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="number"
                       class="input input-xs input-bordered w-20 text-center font-mono"
@@ -597,12 +597,11 @@ $effect(() => {
                   </div>
                 {/each}
                 {#each [
-                  { field: 'level', label: 'Level', hint: 'H.265 level (e.g. 4.1)' },
                   { field: 'profile', label: 'Profile', hint: 'H.265 profile (e.g. main10)' },
                   { field: 'pix_fmt', label: 'Pixel Format', hint: 'Output pixel format (e.g. yuv420p10le)' },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="text"
                       class="input input-xs input-bordered w-28 font-mono text-xs"
@@ -612,7 +611,7 @@ $effect(() => {
                   </div>
                 {/each}
                 <!-- AV1 -->
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/30 pt-2">{effectiveMethod !== 'none' ? 'AV1 (SVT-AV1)' : 'AV1 Encoding (SVT-AV1)'}</h3>
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/95 pt-2">{effectiveMethod !== 'none' ? 'AV1 (SVT-AV1)' : 'AV1 Encoding (SVT-AV1)'}</h3>
                 {#each [
                   { field: 'av1_anime_crf', label: 'Anime CRF', hint: 'Quality for anime (0–63, lower = better)', min: 0, max: 63 },
                   { field: 'av1_anime_preset', label: 'Anime Preset', hint: 'Speed 0–13 (lower = slower/better)', min: 0, max: 13 },
@@ -622,7 +621,7 @@ $effect(() => {
                   { field: 'av1_live_action_film_grain', label: 'Standard Film Grain', hint: 'Synthetic grain 0–50; 4–8 helps cinematic/noisy sources, 0 for clean digital', min: 0, max: 50 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="number"
                       class="input input-xs input-bordered w-16 text-center font-mono"
@@ -638,7 +637,7 @@ $effect(() => {
                   { field: 'av1_live_action_framerate', label: 'Standard Framerate', hint: 'Framerate override (empty = auto)' },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="text"
                       class="input input-xs input-bordered w-28 font-mono text-xs"
@@ -650,8 +649,8 @@ $effect(() => {
                 {/snippet}
                 {#if effectiveMethod !== 'none'}
                 <details class="border border-base-content/5 rounded-lg px-2 py-1 mt-2">
-                  <summary class="text-xs text-base-content/30 cursor-pointer hover:text-base-content/50 select-none">Software Fallback Settings</summary>
-                  <p class="text-xs text-base-content/25 mt-1 mb-2">These only apply when falling back to software encoding (libx265 / SVT-AV1).</p>
+                  <summary class="text-xs text-base-content/75 cursor-pointer hover:text-base-content/85 select-none">Software Fallback Settings</summary>
+                  <p class="text-xs text-base-content/75 mt-1 mb-2">These only apply when falling back to software encoding (libx265 / SVT-AV1).</p>
                   <div class="space-y-2">
                     {@render swSettings()}
                   </div>
@@ -669,26 +668,26 @@ $effect(() => {
       <!-- Cleanup -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">Stream Cleanup</h2>
-          <p class="text-xs text-base-content/40 mb-3">Remove unwanted audio tracks and subtitles based on language preferences.</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">Stream Cleanup</h2>
+          <p class="text-xs text-base-content/85 mb-3">Remove unwanted audio tracks and subtitles based on language preferences.</p>
           <div class="space-y-2 text-sm">
             <label class="flex items-center justify-between cursor-pointer" title="Enable automatic removal of unwanted streams">
-              <span>Enabled<span class="block text-xs text-base-content/30 font-normal">Enable automatic removal of unwanted streams</span></span>
+              <span class="font-medium">Enabled<span class="block text-xs text-base-content/75 font-normal">Enable automatic removal of unwanted streams</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.enabled} onchange={() => toggleBool('cleanup', 'enabled')} />
             </label>
             <div class="{config.cleanup.enabled ? '' : 'opacity-40 pointer-events-none'} space-y-2 transition-opacity">
             <!-- Process Anime -->
             <label class="flex items-center justify-between cursor-pointer" title="Apply stream cleanup to anime content">
-              <span>Process Anime<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to anime content</span></span>
+              <span class="font-medium">Process Anime<span class="block text-xs text-base-content/75 font-normal">Apply stream cleanup to anime content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.process_anime} onchange={() => toggleBool('cleanup', 'process_anime')} />
             </label>
             <!-- Process Standard -->
             <label class="flex items-center justify-between cursor-pointer" title="Apply stream cleanup to standard (non-anime) content">
-              <span>Process Standard<span class="block text-xs text-base-content/30 font-normal">Apply stream cleanup to standard (non-anime) content</span></span>
+              <span class="font-medium">Process Standard<span class="block text-xs text-base-content/75 font-normal">Apply stream cleanup to standard (non-anime) content</span></span>
               <input type="checkbox" class="toggle toggle-sm toggle-primary shrink-0 ml-3" checked={config.cleanup.process_live_action} onchange={() => toggleBool('cleanup', 'process_live_action')} />
             </label>
             <div class="flex items-center justify-between">
-              <span>Languages<span class="block text-xs text-base-content/30 font-normal">Audio and subtitle languages to keep</span></span>
+              <span class="font-medium">Languages<span class="block text-xs text-base-content/75 font-normal">Audio and subtitle languages to keep</span></span>
               <LanguageSelect
                 selected={config.cleanup.keep_languages}
                 onchange={(codes) => {
@@ -706,7 +705,7 @@ $effect(() => {
               { field: 'keep_original_audio', label: 'Keep Original Audio', hint: 'Always keep the original-language audio in non-anime content' },
             ] as item}
               <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
-                <span>{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                <span class="font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                 <input
                   type="checkbox"
                   class="toggle toggle-sm toggle-primary shrink-0 ml-3"
@@ -717,7 +716,7 @@ $effect(() => {
             {/each}
             <!-- Advanced -->
             <details class="border-t border-base-content/10 pt-2 mt-3">
-              <summary class="text-xs text-base-content/40 cursor-pointer hover:text-base-content/60 select-none">Advanced</summary>
+              <summary class="text-xs text-base-content/85 cursor-pointer hover:text-base-content/95 select-none">Advanced</summary>
               <div class="space-y-2 mt-2">
                 {#each [
                   { field: 'keep_undefined', label: 'Keep Undefined Language', hint: 'Keep tracks with no language tag instead of removing them' },
@@ -725,7 +724,7 @@ $effect(() => {
                   { field: 'keep_sdh', label: 'Keep SDH Subtitles', hint: 'Preserve subtitles for the deaf and hard of hearing' },
                 ] as item}
                   <label class="flex items-center justify-between cursor-pointer" title={item.hint}>
-                    <span class="text-xs">{item.label}<span class="block text-xs text-base-content/30 font-normal">{item.hint}</span></span>
+                    <span class="text-xs font-medium">{item.label}<span class="block text-xs text-base-content/75 font-normal">{item.hint}</span></span>
                     <input
                       type="checkbox"
                       class="toggle toggle-sm toggle-primary shrink-0 ml-3"
@@ -744,11 +743,11 @@ $effect(() => {
       <!-- System -->
       <div class="card-glass rounded-box">
         <div class="p-5">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/40 mb-1">System</h2>
-          <p class="text-xs text-base-content/40 mb-3">Worker concurrency, resource limits, and job retention.</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content mb-1">System</h2>
+          <p class="text-xs text-base-content/85 mb-3">Worker concurrency, resource limits, and job retention.</p>
           <div class="space-y-3 text-sm">
             <div class="flex items-center justify-between" title="Number of files that can be processed simultaneously">
-              <span class="text-xs">Workers<span class="block text-xs text-base-content/30 font-normal">Concurrent processing threads (1–16)</span></span>
+              <span class="text-xs font-medium">Workers<span class="block text-xs text-base-content/75 font-normal">Concurrent processing threads (1–16)</span></span>
               <input
                 type="number"
                 class="input input-xs input-bordered w-16 text-center font-mono"
@@ -760,7 +759,7 @@ $effect(() => {
             </div>
             <div title="Limit CPU threads ffmpeg uses for encoding. 0 = auto. Lower values leave more CPU for other tasks.">
               <div class="flex items-center justify-between">
-                <span class="text-xs">FFmpeg Threads<span class="block text-xs text-base-content/30 font-normal">{config.ffmpeg_threads === 0 ? `Auto (${config.effective_ffmpeg_threads} of ${isHybridCpu ? pCoreCount + ' P-cores' : cpuCount + ' CPUs'})` : `${config.ffmpeg_threads} of ${cpuCount} CPUs`}</span></span>
+                <span class="text-xs font-medium">FFmpeg Threads<span class="block text-xs text-base-content/75 font-normal">{config.ffmpeg_threads === 0 ? `Auto (${config.effective_ffmpeg_threads} of ${isHybridCpu ? pCoreCount + ' P-cores' : cpuCount + ' CPUs'})` : `${config.ffmpeg_threads} of ${cpuCount} CPUs`}</span></span>
                 <input
                   type="number"
                   class="input input-xs input-bordered w-16 text-center font-mono"
@@ -780,15 +779,15 @@ $effect(() => {
                   oninput={(e) => { const v = parseInt(e.currentTarget.value, 10); config!.ffmpeg_threads = v; }}
                   onchange={(e) => { const v = parseInt(e.currentTarget.value, 10); config!.ffmpeg_threads = v; saveTop('ffmpeg_threads', v); }}
                 />
-                <div class="flex justify-between text-[0.6rem] text-base-content/25 px-0.5">
+                <div class="flex justify-between text-[0.6rem] text-base-content/75 px-0.5">
                   <span>Auto</span>
                   <span>{cpuCount}</span>
                 </div>
               {/if}
             </div>
             <label class="flex items-center justify-between cursor-pointer" title="Pin ffmpeg to high-performance (P) cores on hybrid CPUs. No-op on AMD / homogeneous Intel CPUs.">
-              <span class="text-xs">Pin to P-cores
-                <span class="block text-xs text-base-content/30 font-normal">
+              <span class="text-xs font-medium">Pin to P-cores
+                <span class="block text-xs text-base-content/75 font-normal">
                   {#if isHybridCpu}
                     Restrict encode to {pCoreCount} P-core threads; E-cores stay free
                   {:else}
@@ -804,8 +803,8 @@ $effect(() => {
               />
             </label>
             <label class="flex items-center justify-between cursor-pointer" title="Remove embedded poster images from outputs. Prevents rare ffmpeg failures on malformed cover art.">
-              <span class="text-xs">Strip Cover Art
-                <span class="block text-xs text-base-content/30 font-normal">Remove embedded poster images from outputs</span>
+              <span class="text-xs font-medium">Strip Cover Art
+                <span class="block text-xs text-base-content/75 font-normal">Remove embedded poster images from outputs</span>
               </span>
               <input
                 type="checkbox"
@@ -815,7 +814,7 @@ $effect(() => {
               />
             </label>
             <div class="flex items-center justify-between" title="Completed and failed jobs are removed after this many days">
-              <span class="text-xs">Job History<span class="block text-xs text-base-content/30 font-normal">Days to retain completed job records (1–365)</span></span>
+              <span class="text-xs font-medium">Job History<span class="block text-xs text-base-content/75 font-normal">Days to retain completed job records (1–365)</span></span>
               <input
                 type="number"
                 class="input input-xs input-bordered w-16 text-center font-mono"
@@ -826,7 +825,7 @@ $effect(() => {
               />
             </div>
             <div class="flex items-center justify-between" title="Remove leftover .remuxcode-temp-* and .remuxcode-chain-* directories from failed or interrupted jobs">
-              <span class="text-xs">Temp Files<span class="block text-xs text-base-content/30 font-normal">Remove orphaned temp dirs from failed encodes</span></span>
+              <span class="text-xs font-medium">Temp Files<span class="block text-xs text-base-content/75 font-normal">Remove orphaned temp dirs from failed encodes</span></span>
               <button
                 class="btn btn-xs btn-outline"
                 disabled={cleaningTemp}
@@ -851,7 +850,7 @@ $effect(() => {
               </button>
             </div>
             {#if cleanTempMsg}
-              <p class="text-xs text-base-content/50">{cleanTempMsg}</p>
+              <p class="text-xs text-base-content/85">{cleanTempMsg}</p>
             {/if}
           </div>
         </div>

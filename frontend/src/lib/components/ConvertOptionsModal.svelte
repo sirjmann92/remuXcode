@@ -76,9 +76,9 @@ async function handleQueue() {
 
     <h3 class="text-lg font-semibold mb-1">Custom Encode</h3>
     {#if isBulk}
-      <p class="text-xs text-base-content/40 mb-4">{label ?? `${pathArray.length} files`} &middot; {pathArray.length} episode{pathArray.length !== 1 ? 's' : ''}</p>
+      <p class="text-xs text-base-content/85 mb-4">{label ?? `${pathArray.length} files`} &middot; {pathArray.length} episode{pathArray.length !== 1 ? 's' : ''}</p>
     {:else}
-      <p class="text-xs text-base-content/40 truncate mb-4" title={pathArray[0]}>{fileName(pathArray[0])}</p>
+      <p class="text-xs text-base-content/85 truncate mb-4" title={pathArray[0]}>{fileName(pathArray[0])}</p>
     {/if}
 
     <!-- Resolution -->
@@ -95,7 +95,7 @@ async function handleQueue() {
         {/each}
       </div>
       {#if targetResolution !== 'original'}
-        <p class="text-xs text-base-content/40 mt-1">Source files already at or below {targetResolution} will not be upscaled.</p>
+        <p class="text-xs text-base-content/85 mt-1">Source files already at or below {targetResolution} will not be upscaled.</p>
       {/if}
     </div>
 
@@ -117,16 +117,16 @@ async function handleQueue() {
         </button>
       </div>
       {#if stripHdr}
-        <p class="text-xs text-base-content/40 mt-1">HDR (including Dolby Vision) will be tone-mapped to BT.709 SDR.</p>
+        <p class="text-xs text-base-content/85 mt-1">HDR (including Dolby Vision) will be tone-mapped to BT.709 SDR.</p>
       {:else}
-        <p class="text-xs text-base-content/40 mt-1">HDR10 metadata is preserved. Dolby Vision RPU is stripped (HDR10 base layer kept).</p>
+        <p class="text-xs text-base-content/85 mt-1">HDR10 metadata is preserved. Dolby Vision RPU is stripped (HDR10 base layer kept).</p>
       {/if}
     </div>
 
     <!-- Summary -->
     <div class="bg-base-200 rounded-box p-3 mb-4">
-      <p class="text-xs font-medium text-base-content/60 mb-1">This job will:</p>
-      <ul class="text-xs text-base-content/80 space-y-0.5">
+      <p class="text-xs font-medium text-base-content/95 mb-1">This job will:</p>
+      <ul class="text-xs text-base-content/95 space-y-0.5">
         {#each summaryLines as line}
           <li class="flex items-start gap-1.5"><span class="text-primary mt-0.5">›</span>{line}</li>
         {/each}

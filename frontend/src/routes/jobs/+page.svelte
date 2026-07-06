@@ -293,7 +293,7 @@ function handleDragEnd() {
       {/each}
     </div>
     <div class="relative flex-1">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/75" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
       </svg>
       <input
@@ -304,7 +304,7 @@ function handleDragEnd() {
       />
       {#if search}
         <button
-          class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/40"
+          class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/85"
           onclick={() => (search = '')}
           title="Clear search"
           aria-label="Clear search"
@@ -316,7 +316,7 @@ function handleDragEnd() {
       {/if}
     </div>
     <button
-      class="btn btn-sm btn-ghost gap-1 {showFilters || hasActiveFilters ? 'text-primary' : 'text-base-content/40'}"
+      class="btn btn-sm btn-ghost gap-1 {showFilters || hasActiveFilters ? 'text-primary' : 'text-base-content/85'}"
       onclick={() => (showFilters = !showFilters)}
       title="Toggle filters"
     >
@@ -334,7 +334,7 @@ function handleDragEnd() {
   {#if showFilters}
     <div class="flex flex-wrap items-end gap-3 px-1">
       <label class="form-control w-auto">
-        <span class="label-text text-xs text-base-content/40 pb-0.5">Worker</span>
+        <span class="label-text text-xs text-base-content/85 pb-0.5">Worker</span>
         <select class="select select-xs select-bordered font-mono w-28" bind:value={jobTypeFilter}>
           <option value="all">All</option>
           <option value="video">Video</option>
@@ -343,7 +343,7 @@ function handleDragEnd() {
         </select>
       </label>
       <label class="form-control w-auto">
-        <span class="label-text text-xs text-base-content/40 pb-0.5">Media</span>
+        <span class="label-text text-xs text-base-content/85 pb-0.5">Media</span>
         <select class="select select-xs select-bordered font-mono w-28" bind:value={mediaTypeFilter}>
           <option value="all">All</option>
           <option value="movie">Movies</option>
@@ -351,7 +351,7 @@ function handleDragEnd() {
         </select>
       </label>
       <label class="form-control w-auto">
-        <span class="label-text text-xs text-base-content/40 pb-0.5">Source</span>
+        <span class="label-text text-xs text-base-content/85 pb-0.5">Source</span>
         <select class="select select-xs select-bordered font-mono w-28" bind:value={sourceFilter}>
           <option value="all">All</option>
           <option value="webhook">Webhook</option>
@@ -360,21 +360,21 @@ function handleDragEnd() {
         </select>
       </label>
       <label class="form-control w-auto">
-        <span class="label-text text-xs text-base-content/40 pb-0.5">From</span>
+        <span class="label-text text-xs text-base-content/85 pb-0.5">From</span>
         <input type="date" class="input input-xs input-bordered font-mono w-36" bind:value={dateFrom} />
       </label>
       <label class="form-control w-auto">
-        <span class="label-text text-xs text-base-content/40 pb-0.5">To</span>
+        <span class="label-text text-xs text-base-content/85 pb-0.5">To</span>
         <input type="date" class="input input-xs input-bordered font-mono w-36" bind:value={dateTo} />
       </label>
       {#if hasActiveFilters}
-        <button class="btn btn-xs btn-ghost text-base-content/40" onclick={clearFilters}>Clear</button>
+        <button class="btn btn-xs btn-ghost text-base-content/85" onclick={clearFilters}>Clear</button>
       {/if}
     </div>
   {/if}
 
   <div class="flex items-center justify-between">
-    <div class="text-sm text-base-content/50">
+    <div class="text-sm text-base-content/85">
       Showing {jobs.length} of {total} job{total !== 1 ? 's' : ''}
     </div>
     <div class="flex items-center gap-2">
@@ -416,15 +416,15 @@ function handleDragEnd() {
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9Z" />
       </svg>
       <p class="text-base text-error/80">Failed to load jobs</p>
-      <p class="text-sm text-base-content/40 mt-1">Check backend logs or try again later.</p>
+      <p class="text-sm text-base-content/85 mt-1">Check backend logs or try again later.</p>
     </div>
   {:else if jobs.length === 0}
     <div class="card-glass rounded-box p-12 text-center">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-4 text-base-content/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-4 text-base-content/75" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
       </svg>
-      <p class="text-base text-base-content/40">{emptyState.title}</p>
-      <p class="text-sm text-base-content/25 mt-1">{emptyState.subtitle}</p>
+      <p class="text-base text-base-content/85">{emptyState.title}</p>
+      <p class="text-sm text-base-content/75 mt-1">{emptyState.subtitle}</p>
     </div>
   {:else}
     <div class="space-y-2">
@@ -487,7 +487,7 @@ function handleDragEnd() {
           </svg>
           Delete Completed Jobs
         </h3>
-        <p class="text-sm text-base-content/70">
+        <p class="text-sm text-base-content/95">
           This will permanently delete <strong>{counts.completed + counts.failed + counts.cancelled}</strong> finished job{counts.completed + counts.failed + counts.cancelled !== 1 ? 's' : ''} from the database. This cannot be undone.
         </p>
         <div class="card-actions justify-end gap-2">

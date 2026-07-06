@@ -835,8 +835,6 @@ class VideoConverter:
                 "libx265",
                 "-profile:v",
                 self.config.profile,
-                "-level:v",
-                self.config.level,
                 "-preset",
                 preset,
             ]

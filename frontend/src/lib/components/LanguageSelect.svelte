@@ -127,11 +127,11 @@ $effect(() => {
 							onchange={() => toggle(entry.code)}
 						/>
 						<span class="flex-1">{entry.name}</span>
-						<span class="font-mono text-base-content/40">{entry.code}</span>
+						<span class="font-mono text-base-content/85">{entry.code}</span>
 					</label>
 				{/each}
 				{#if filtered.length === 0}
-					<p class="text-xs text-center opacity-40 py-2">No matches</p>
+					<p class="text-xs text-center text-base-content/85 py-2">No matches</p>
 				{/if}
 			</div>
 		</div>

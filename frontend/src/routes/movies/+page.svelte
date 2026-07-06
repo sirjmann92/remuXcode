@@ -446,7 +446,7 @@ const sortOptions: { value: string; label: string }[] = [
       </select>
     </div>
     <div class="relative">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/75" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
       </svg>
       <input
@@ -457,7 +457,7 @@ const sortOptions: { value: string; label: string }[] = [
       />
       {#if search}
         <button
-          class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/40"
+          class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle text-base-content/85"
           onclick={() => (search = '')}
           title="Clear search"
           aria-label="Clear search"
@@ -472,7 +472,7 @@ const sortOptions: { value: string; label: string }[] = [
 
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-2">
-      <div class="text-sm text-base-content/50">
+      <div class="text-sm text-base-content/85">
         {summary.total} movie{summary.total !== 1 ? 's' : ''}
         {#if summary.needsWork > 0}
           <span class="text-warning">· {summary.needsWork} need{summary.needsWork !== 1 ? '' : 's'} work</span>
@@ -482,7 +482,7 @@ const sortOptions: { value: string; label: string }[] = [
         <span class="text-xs text-success">{refreshMsg}</span>
       {/if}
       <button
-        class="btn btn-ghost btn-xs text-base-content/40"
+        class="btn btn-ghost btn-xs text-base-content/85"
         onclick={reloadMovies}
         disabled={reloading}
         title="Clear cache and reload movie data from Radarr"
@@ -495,7 +495,7 @@ const sortOptions: { value: string; label: string }[] = [
         Reload
       </button>
       <button
-        class="btn btn-ghost btn-xs text-base-content/40"
+        class="btn btn-ghost btn-xs text-base-content/85"
         onclick={() => (showRefreshConfirm = true)}
         disabled={refreshingLibrary || !config?.radarr?.configured}
         title="Force Radarr to re-read all movie files from disk"
@@ -518,7 +518,7 @@ const sortOptions: { value: string; label: string }[] = [
         </button>
       {:else}
         <button
-          class="btn btn-ghost btn-xs text-base-content/40"
+          class="btn btn-ghost btn-xs text-base-content/85"
           onclick={handleStartScan}
           disabled={!config?.radarr?.configured}
           title="Analyze all movie files with ffprobe for detailed codec info"
@@ -566,7 +566,7 @@ const sortOptions: { value: string; label: string }[] = [
   <!-- Scan progress bar -->
   {#if scanProgress?.running && scanProgress.type === 'movies' && scanProgress.total > 0}
     <div class="card-glass rounded-box p-3">
-      <div class="flex items-center justify-between text-xs text-base-content/50 mb-1">
+      <div class="flex items-center justify-between text-xs text-base-content/85 mb-1">
         <span>Analyzing library… {scanProgress.analyzed + scanProgress.skipped}/{scanProgress.total}</span>
         <span class="truncate ml-2 max-w-[200px]">{scanProgress.current_file ?? ''}</span>
       </div>
@@ -582,39 +582,39 @@ const sortOptions: { value: string; label: string }[] = [
   {:else if loadError}
     <div class="card-glass rounded-box p-12 text-center">
       <p class="text-base text-error/80">Failed to load movies</p>
-      <p class="text-sm text-base-content/40 mt-1">Check that Radarr is configured and reachable.</p>
+      <p class="text-sm text-base-content/85 mt-1">Check that Radarr is configured and reachable.</p>
     </div>
   {:else if filtered.length === 0}
     <div class="card-glass rounded-box p-12 text-center">
       {#if analysisFiltersActive}
-        <p class="text-base text-base-content/40">No movies match this filter</p>
-        <p class="text-sm text-base-content/30 mt-1">Some filters (DTS:X, Atmos, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
+        <p class="text-base text-base-content/85">No movies match this filter</p>
+        <p class="text-sm text-base-content/75 mt-1">Some filters (DTS:X, Atmos, etc.) require library analysis. Click <strong>Analyze Library</strong> above to scan files with ffprobe.</p>
       {:else if search}
-        <p class="text-base text-base-content/40">No movies match your search</p>
-        <p class="text-sm text-base-content/30 mt-1">Try a different spelling or clear the search.</p>
+        <p class="text-base text-base-content/85">No movies match your search</p>
+        <p class="text-sm text-base-content/75 mt-1">Try a different spelling or clear the search.</p>
       {:else if filter === 'needs_conversion'}
         <p class="text-2xl mb-1">&#127881;</p>
-        <p class="text-base text-base-content/60">Your movie library is flawless.</p>
-        <p class="text-sm text-base-content/30 mt-1">Nothing to convert — go watch something instead.</p>
+        <p class="text-base text-base-content/95">Your movie library is flawless.</p>
+        <p class="text-sm text-base-content/75 mt-1">Nothing to convert — go watch something instead.</p>
       {:else if filter === 'video'}
         <p class="text-2xl mb-1">&#127916;</p>
-        <p class="text-base text-base-content/60">All video tracks look great.</p>
-        <p class="text-sm text-base-content/30 mt-1">Not a single re-encode needed. You love to see it.</p>
+        <p class="text-base text-base-content/95">All video tracks look great.</p>
+        <p class="text-sm text-base-content/75 mt-1">Not a single re-encode needed. You love to see it.</p>
       {:else if filter === 'audio'}
         <p class="text-2xl mb-1">&#127911;</p>
-        <p class="text-base text-base-content/60">Audio is already perfect across the board.</p>
-        <p class="text-sm text-base-content/30 mt-1">Every track is exactly where it should be.</p>
+        <p class="text-base text-base-content/95">Audio is already perfect across the board.</p>
+        <p class="text-sm text-base-content/75 mt-1">Every track is exactly where it should be.</p>
       {:else if filter === 'cleanup'}
         <p class="text-2xl mb-1">&#10024;</p>
-        <p class="text-base text-base-content/60">Squeaky clean — nothing to tidy up.</p>
-        <p class="text-sm text-base-content/30 mt-1">Your library is more organized than your sock drawer.</p>
+        <p class="text-base text-base-content/95">Squeaky clean — nothing to tidy up.</p>
+        <p class="text-sm text-base-content/75 mt-1">Your library is more organized than your sock drawer.</p>
       {:else if filter === 'anime'}
         <p class="text-2xl mb-1">&#128517;</p>
-        <p class="text-base text-base-content/60">No anime movies found.</p>
-        <p class="text-sm text-base-content/30 mt-1">Your Radarr doesn't seem to have any anime tagged. Or you just haven't discovered the genre yet.</p>
+        <p class="text-base text-base-content/95">No anime movies found.</p>
+        <p class="text-sm text-base-content/75 mt-1">Your Radarr doesn't seem to have any anime tagged. Or you just haven't discovered the genre yet.</p>
       {:else}
-        <p class="text-base text-base-content/40">No movies found</p>
-        <p class="text-sm text-base-content/30 mt-1">Make sure Radarr has movies in your library.</p>
+        <p class="text-base text-base-content/85">No movies found</p>
+        <p class="text-sm text-base-content/75 mt-1">Make sure Radarr has movies in your library.</p>
       {/if}
     </div>
   {:else}
@@ -668,7 +668,7 @@ const sortOptions: { value: string; label: string }[] = [
                 <span class="loading loading-spinner loading-md text-primary"></span>
                 <span class="text-xs font-medium mt-2 capitalize">{job.status}</span>
                 {#if job.status === 'running' && job.progress > 0}
-                  <span class="text-xs text-base-content/60 mt-0.5">{Math.round(job.progress)}%</span>
+                  <span class="text-xs text-base-content/95 mt-0.5">{Math.round(job.progress)}%</span>
                 {/if}
               </div>
             {/if}
@@ -717,7 +717,7 @@ const sortOptions: { value: string; label: string }[] = [
           <!-- Info -->
           <div class="p-2.5 space-y-0.5">
             <h3 class="text-sm font-medium truncate" title={movie.title}>{movie.title}</h3>
-            <div class="flex items-center justify-between text-xs text-base-content/40">
+            <div class="flex items-center justify-between text-xs text-base-content/85">
               <span>{movie.year}</span>
               <span>{formatSize(movie.size)}</span>
             </div>
@@ -751,7 +751,7 @@ const sortOptions: { value: string; label: string }[] = [
         </div>
         <div class="flex-1 min-w-0 space-y-2">
           <h3 class="text-lg font-semibold">{detailMovie.title}</h3>
-          <div class="text-sm text-base-content/50">{detailMovie.year}{detailMovie.resolution ? ` · ${detailMovie.resolution}` : ''}</div>
+          <div class="text-sm text-base-content/85">{detailMovie.year}{detailMovie.resolution ? ` · ${detailMovie.resolution}` : ''}</div>
           <div class="flex flex-wrap gap-1">
             {#if detailMovie.video_codec}<span class="badge badge-ghost badge-sm">{detailMovie.video_codec}</span>{/if}
             {#if detailMovie.is_dolby_vision}<span class="badge badge-secondary badge-sm">DV</span>{/if}
@@ -763,13 +763,13 @@ const sortOptions: { value: string; label: string }[] = [
             <span class="badge badge-ghost badge-sm">{formatSize(detailMovie.size)}</span>
           </div>
           {#if detailMovie.genres.length > 0}
-            <div class="text-xs text-base-content/40">{detailMovie.genres.slice(0, 4).join(', ')}</div>
+            <div class="text-xs text-base-content/85">{detailMovie.genres.slice(0, 4).join(', ')}</div>
           {/if}
         </div>
       </div>
 
       {#if needsWork(detailMovie)}
-        <div class="divider text-xs text-base-content/30">Processing Details</div>
+        <div class="divider text-xs text-base-content/75">Processing Details</div>
 
         <div class="space-y-3">
           {#if detailMovie.needs_audio_conversion}
@@ -780,7 +780,7 @@ const sortOptions: { value: string; label: string }[] = [
                   {detailMovie.audio_codecs_to_convert.join(', ')} will be converted
                 {/if}
                 {#if detailMovie.audio_codecs_to_convert?.length && detailMovie.audio_codecs_to_drop?.length}
-                  <span class="text-base-content/30"> · </span>
+                  <span class="text-base-content/75"> · </span>
                 {/if}
                 {#if detailMovie.audio_codecs_to_drop?.length}
                   {detailMovie.audio_codecs_to_drop.join(', ')} will be removed
@@ -803,9 +803,9 @@ const sortOptions: { value: string; label: string }[] = [
                 <span class="badge badge-info badge-sm shrink-0">Subs</span>
                 <div class="text-sm">
                   <span class="text-error/80">{trackSummary(removeSubs)}</span>
-                  <span class="text-base-content/40"> to remove</span>
+                  <span class="text-base-content/85"> to remove</span>
                   {#if keepSubs.length > 0}
-                    <span class="text-base-content/40"> · keeping </span>
+                    <span class="text-base-content/85"> · keeping </span>
                     <span class="text-success/80">{trackSummary(keepSubs)}</span>
                   {/if}
                 </div>
@@ -817,9 +817,9 @@ const sortOptions: { value: string; label: string }[] = [
                 <span class="badge badge-info badge-sm shrink-0">Audio</span>
                 <div class="text-sm">
                   <span class="text-error/80">{trackSummary(removeAudio)}</span>
-                  <span class="text-base-content/40"> to remove</span>
+                  <span class="text-base-content/85"> to remove</span>
                   {#if keepAudio.length > 0}
-                    <span class="text-base-content/40"> · keeping </span>
+                    <span class="text-base-content/85"> · keeping </span>
                     <span class="text-success/80">{trackSummary(keepAudio)}</span>
                   {/if}
                 </div>
@@ -828,7 +828,7 @@ const sortOptions: { value: string; label: string }[] = [
           {:else if detailMovie.needs_cleanup}
             <div class="flex items-start gap-2">
               <span class="badge badge-info badge-sm shrink-0">Cleanup</span>
-              <p class="text-sm text-base-content/50">Subtitle/audio cleanup needed</p>
+              <p class="text-sm text-base-content/85">Subtitle/audio cleanup needed</p>
             </div>
           {/if}
 
@@ -879,17 +879,17 @@ const sortOptions: { value: string; label: string }[] = [
           </button>
         </div>
       {:else}
-        <div class="divider text-xs text-base-content/30">Details</div>
+        <div class="divider text-xs text-base-content/75">Details</div>
         <div class="space-y-2 text-sm">
           <div class="flex items-center gap-2">
             <span class="text-success">✓</span>
-            <span class="text-base-content/50">No processing needed</span>
+            <span class="text-base-content/85">No processing needed</span>
           </div>
           {#if detailMovie.audio_languages.length > 0}
-            <div class="text-base-content/40">Audio: {trackSummary(detailMovie.audio_languages)}</div>
+            <div class="text-base-content/85">Audio: {trackSummary(detailMovie.audio_languages)}</div>
           {/if}
           {#if detailMovie.subtitles.length > 0}
-            <div class="text-base-content/40">Subtitles: {trackSummary(detailMovie.subtitles)}</div>
+            <div class="text-base-content/85">Subtitles: {trackSummary(detailMovie.subtitles)}</div>
           {/if}
         </div>
         <div class="modal-action">
@@ -952,7 +952,7 @@ const sortOptions: { value: string; label: string }[] = [
   <div class="modal modal-open">
     <div class="modal-box max-w-sm">
       <h3 class="font-bold text-lg">Refresh Radarr Library</h3>
-      <p class="py-4 text-sm text-base-content/70">This will force Radarr to re-read metadata for <strong>every movie</strong> in your library from disk. Depending on library size, this could take a long time.</p>
+      <p class="py-4 text-sm text-base-content/95">This will force Radarr to re-read metadata for <strong>every movie</strong> in your library from disk. Depending on library size, this could take a long time.</p>
       <div class="modal-action">
         <button class="btn btn-ghost btn-sm" onclick={() => (showRefreshConfirm = false)}>Cancel</button>
         <button class="btn btn-warning btn-sm" onclick={handleRefreshLibrary}>Refresh Library</button>

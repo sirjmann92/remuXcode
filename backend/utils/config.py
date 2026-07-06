@@ -166,7 +166,6 @@ class VideoConfig:
     # Common encoding settings (HEVC-specific, not used for AV1)
     vbv_maxrate: int = 5000
     vbv_bufsize: int = 10000
-    level: str = "4.1"
     profile: str = "main10"
     pix_fmt: str = "yuv420p10le"
     hw_accel: str = "none"  # none, auto, qsv, vaapi, nvenc
@@ -286,6 +285,14 @@ class Config:
 
             self._raw_config = yaml.safe_load(content) or {}
             logger.info("Loaded configuration from %s", self.config_path)
+
+            # TODO(cleanup): "video.level" was removed 2026-07-04 — it set
+            # ffmpeg's -level:v flag, which the libx265 wrapper silently
+            # ignores, so the field never actually did anything. Purge the
+            # stale key from old configs on load. Safe to delete this block
+            # once existing configs have been resaved, ~2026-07-18.
+            if isinstance(self._raw_config.get("video"), dict):
+                self._raw_config["video"].pop("level", None)
 
         except Exception as e:
             logger.error("Failed to load config: %s", e)
@@ -411,7 +418,6 @@ class Config:
             nvenc_preset=self._get("video.nvenc_preset", "p5"),
             vbv_maxrate=self._get("video.vbv_maxrate", 5000),
             vbv_bufsize=self._get("video.vbv_bufsize", 10000),
-            level=self._get("video.level", "4.1"),
             profile=self._get("video.profile", "main10"),
             pix_fmt=self._get("video.pix_fmt", "yuv420p10le"),
             hw_accel=self._get("video.hw_accel", "none"),
@@ -507,7 +513,6 @@ class Config:
             "nvenc_preset",
             "vbv_maxrate",
             "vbv_bufsize",
-            "level",
             "profile",
             "pix_fmt",
             "hw_accel",

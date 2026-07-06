@@ -54,7 +54,6 @@ async def get_config_summary() -> dict[str, Any]:
             "av1_live_action_film_grain": cfg.video.av1_live_action_film_grain,
             "vbv_maxrate": cfg.video.vbv_maxrate,
             "vbv_bufsize": cfg.video.vbv_bufsize,
-            "level": cfg.video.level,
             "profile": cfg.video.profile,
             "pix_fmt": cfg.video.pix_fmt,
             "hw_accel": cfg.video.hw_accel,
@@ -251,7 +250,6 @@ class VideoUpdate(BaseModel):
     av1_live_action_film_grain: int | None = Field(None, ge=0, le=50)
     vbv_maxrate: int | None = Field(None, ge=0, le=100000)
     vbv_bufsize: int | None = Field(None, ge=0, le=200000)
-    level: str | None = None
     profile: str | None = None
     pix_fmt: str | None = None
     hw_accel: Literal["none", "auto", "qsv", "vaapi", "nvenc"] | None = None

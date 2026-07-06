@@ -96,7 +96,7 @@ const levelClass: Record<LogLevel, string> = {
   info: 'text-info/70',
   warning: 'text-warning/80',
   error: 'text-error/80',
-  stats: 'text-base-content/30',
+  stats: 'text-base-content/75',
 };
 const sourceClass: Record<LogSource, string> = {
   app: 'text-primary/60',
@@ -260,8 +260,8 @@ async function handleRetry() {
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
         <StatusBadge status={job.status} />
-        <span class="badge badge-outline badge-xs text-base-content/40">{job.job_type}</span>
-        <span class="badge badge-outline badge-xs text-base-content/40">{job.source}</span>
+        <span class="badge badge-outline badge-xs text-base-content/85">{job.job_type}</span>
+        <span class="badge badge-outline badge-xs text-base-content/85">{job.source}</span>
         {#if job.encode_options}
           <span
             class="badge badge-accent badge-xs gap-0.5"
@@ -272,25 +272,25 @@ async function handleRetry() {
           </span>
         {/if}
         {#if noWorkNeeded}
-          <span class="badge badge-ghost badge-xs text-base-content/40 gap-0.5">
+          <span class="badge badge-ghost badge-xs text-base-content/85 gap-0.5">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
             No work needed
           </span>
         {/if}
         {#if elapsed && job.status !== 'running'}
-          <span class="text-xs text-base-content/30">{elapsed}</span>
+          <span class="text-xs text-base-content/75">{elapsed}</span>
         {/if}
         {#if formatTimestamp(job.started_at) && job.status !== 'pending'}
-          <span class="text-xs text-base-content/25" title="Started">{formatTimestamp(job.started_at)}</span>
+          <span class="text-xs text-base-content/75" title="Started">{formatTimestamp(job.started_at)}</span>
         {/if}
         {#if formatTimestamp(job.completed_at)}
-          <span class="text-xs text-base-content/25">→ {formatTimestamp(job.completed_at)}</span>
+          <span class="text-xs text-base-content/75">→ {formatTimestamp(job.completed_at)}</span>
         {/if}
       </div>
       <div class="flex items-center gap-0.5">
         <a
           href={libraryLink}
-          class="btn btn-ghost btn-xs text-primary/60 hover:text-primary transition-opacity"
+          class="btn btn-ghost btn-xs text-primary/80 hover:text-primary transition-opacity"
           title="View in library"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -299,7 +299,7 @@ async function handleRetry() {
         </a>
         {#if job.status !== 'pending'}
           <button
-            class="btn btn-ghost btn-xs transition-opacity {showLogs ? 'text-accent opacity-100' : 'opacity-30 hover:opacity-70'}"
+            class="btn btn-ghost btn-xs transition-opacity {showLogs ? 'text-accent opacity-100' : 'opacity-70 hover:opacity-100'}"
             onclick={() => { showLogs = !showLogs; autoScroll = true; }}
             title="Toggle log"
           >
@@ -310,7 +310,7 @@ async function handleRetry() {
         {/if}
         {#if job.status === 'running' || job.status === 'pending'}
           <button
-            class="btn btn-ghost btn-xs text-warning opacity-60 hover:opacity-100 transition-opacity"
+            class="btn btn-ghost btn-xs text-warning opacity-80 hover:opacity-100 transition-opacity"
             onclick={handleCancel}
             disabled={cancelling}
             title="Cancel"
@@ -325,7 +325,7 @@ async function handleRetry() {
           </button>
         {:else if job.status === 'failed'}
           <button
-            class="btn btn-ghost btn-xs text-success opacity-50 hover:opacity-100 transition-opacity"
+            class="btn btn-ghost btn-xs text-success opacity-80 hover:opacity-100 transition-opacity"
             onclick={handleRetry}
             disabled={retrying}
             title="Retry"
@@ -339,7 +339,7 @@ async function handleRetry() {
             {/if}
           </button>
           <button
-            class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
+            class="btn btn-ghost btn-xs opacity-70 hover:opacity-100 transition-opacity"
             onclick={handleDelete}
             disabled={deleting}
             title="Remove"
@@ -350,7 +350,7 @@ async function handleRetry() {
           </button>
         {:else if job.status === 'completed' || job.status === 'cancelled'}
           <button
-            class="btn btn-ghost btn-xs opacity-30 hover:opacity-100 transition-opacity"
+            class="btn btn-ghost btn-xs opacity-70 hover:opacity-100 transition-opacity"
             onclick={handleDelete}
             disabled={deleting}
             title="Remove"
@@ -363,7 +363,7 @@ async function handleRetry() {
       </div>
     </div>
 
-    <p class="text-sm font-mono truncate text-base-content/80" title={job.file_path}>{fileName}</p>
+    <p class="text-sm font-mono truncate text-base-content/95" title={job.file_path}>{fileName}</p>
 
     {#if retryError}
       <p class="text-xs text-error/70">{retryError}</p>
@@ -390,51 +390,51 @@ async function handleRetry() {
                 {phaseLabels[phase]}
               </span>
               {#if phaseSucceeded && phase === 'audio' && job.result?.audio}
-                <div class="text-xs text-base-content/60">
+                <div class="text-xs text-base-content/95">
                   {#if job.result.audio.converted_streams?.length}
                     {#each job.result.audio.converted_streams as stream, i}
                       <span>{codecLabel(stream.from_codec)} {channelLabel(stream.channels)} → {codecLabel(stream.to_codec)} {channelLabel(stream.channels)}</span>
-                      {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/30"> · </span>{/if}
+                      {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/75"> · </span>{/if}
                     {/each}
                   {:else}
                     {job.result.audio.streams_converted} stream{(job.result.audio.streams_converted ?? 0) !== 1 ? 's' : ''} converted
                   {/if}
                   {#if (job.result.audio.streams_dropped ?? 0) > 0}
-                    <span class="text-base-content/30"> · </span>Dropped {job.result.audio.streams_dropped} redundant
+                    <span class="text-base-content/75"> · </span>Dropped {job.result.audio.streams_dropped} redundant
                   {/if}
                   {#if sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}
-                    <span class="text-base-content/30"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
+                    <span class="text-base-content/75"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
                   {/if}
                 </div>
               {:else if phaseSucceeded && phase === 'video' && job.result?.video}
-                <span class="text-xs text-base-content/60">
+                <span class="text-xs text-base-content/95">
                   {job.result.video.codec_from} → {job.result.video.codec_to}
                   {#if job.result.video.content_type}
-                    <span class="text-base-content/30">({job.result.video.content_type})</span>
+                    <span class="text-base-content/75">({job.result.video.content_type})</span>
                   {/if}
                   {#if sizeDetail(job.result.video.original_size, job.result.video.new_size)}
-                    <span class="text-base-content/30"> · {sizeDetail(job.result.video.original_size, job.result.video.new_size)}</span>
+                    <span class="text-base-content/75"> · {sizeDetail(job.result.video.original_size, job.result.video.new_size)}</span>
                   {/if}
                 </span>
               {:else if phaseSucceeded && phase === 'cleanup' && job.result?.cleanup}
-                <span class="text-xs text-base-content/60">
+                <span class="text-xs text-base-content/95">
                   {#if job.result.cleanup.subtitle_removed > 0 || job.result.cleanup.audio_removed > 0}
                     {#if job.result.cleanup.subtitle_removed > 0}
                       Removed {job.result.cleanup.subtitle_removed} sub{job.result.cleanup.subtitle_removed !== 1 ? 's' : ''}
-                      {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/30">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
+                      {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/75">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
                     {/if}
                     {#if job.result.cleanup.subtitle_removed > 0 && job.result.cleanup.audio_removed > 0}
-                      <span class="text-base-content/30"> · </span>
+                      <span class="text-base-content/75"> · </span>
                     {/if}
                     {#if job.result.cleanup.audio_removed > 0}
                       Removed {job.result.cleanup.audio_removed} audio
-                      {#if job.result.cleanup.audio_kept}<span class="text-base-content/30">(kept {job.result.cleanup.audio_kept})</span>{/if}
+                      {#if job.result.cleanup.audio_kept}<span class="text-base-content/75">(kept {job.result.cleanup.audio_kept})</span>{/if}
                     {/if}
                   {:else}
                     No streams removed
                   {/if}
                   {#if sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}
-                    <span class="text-base-content/30"> · {sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}</span>
+                    <span class="text-base-content/75"> · {sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}</span>
                   {/if}
                 </span>
               {/if}
@@ -446,12 +446,12 @@ async function handleRetry() {
                   <div class="flex-1 min-w-0">
                     <p class="text-xs text-error/70 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-3' : ''}">{phaseResult.error}</p>
                     {#if isLong}
-                      <button onclick={() => toggleError(errorKey)} class="text-xs text-error/40 hover:text-error px-1.5 pt-0.5">
+                      <button onclick={() => toggleError(errorKey)} class="text-xs text-error/75 hover:text-error px-1.5 pt-0.5">
                         {isExpanded ? '▲ Show less' : '▼ Show more'}
                       </button>
                     {/if}
                   </div>
-                  <button onclick={() => copyError(phaseResult!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                  <button onclick={() => copyError(phaseResult!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/75 hover:text-error px-1" title="Copy error">
                     {#if copiedError === phaseResult.error}✓{:else}
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     {/if}
@@ -492,17 +492,17 @@ async function handleRetry() {
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                 Audio
               </span>
-              <div class="text-xs text-base-content/60">
+              <div class="text-xs text-base-content/95">
                 {#if job.result.audio.converted_streams?.length}
                   {#each job.result.audio.converted_streams as stream, i}
                     <span>{codecLabel(stream.from_codec)} {channelLabel(stream.channels)} → {codecLabel(stream.to_codec)} {channelLabel(stream.channels)}</span>
-                    {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/30"> · </span>{/if}
+                    {#if i < (job.result.audio.converted_streams?.length ?? 0) - 1}<span class="text-base-content/75"> · </span>{/if}
                   {/each}
                 {:else}
                   {job.result.audio.streams_converted} stream{(job.result.audio.streams_converted ?? 0) !== 1 ? 's' : ''} converted
                 {/if}
                 {#if sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}
-                  <span class="text-base-content/30"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
+                  <span class="text-base-content/75"> · {sizeDetail(job.result.audio.original_size, job.result.audio.new_size)}</span>
                 {/if}
               </div>
             </div>
@@ -513,13 +513,13 @@ async function handleRetry() {
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                 Video
               </span>
-              <span class="text-xs text-base-content/60">
+              <span class="text-xs text-base-content/95">
                 {job.result.video.codec_from} → {job.result.video.codec_to}
                 {#if job.result.video.content_type}
-                  <span class="text-base-content/30">({job.result.video.content_type})</span>
+                  <span class="text-base-content/75">({job.result.video.content_type})</span>
                 {/if}
                 {#if sizeDetail(job.result.video.original_size, job.result.video.new_size)}
-                  <span class="text-base-content/30"> · {sizeDetail(job.result.video.original_size, job.result.video.new_size)}</span>
+                  <span class="text-base-content/75"> · {sizeDetail(job.result.video.original_size, job.result.video.new_size)}</span>
                 {/if}
               </span>
             </div>
@@ -530,24 +530,24 @@ async function handleRetry() {
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                 Cleanup
               </span>
-              <span class="text-xs text-base-content/60">
+              <span class="text-xs text-base-content/95">
                 {#if job.result.cleanup.subtitle_removed > 0 || job.result.cleanup.audio_removed > 0}
                   {#if job.result.cleanup.subtitle_removed > 0}
                     Removed {job.result.cleanup.subtitle_removed} sub{job.result.cleanup.subtitle_removed !== 1 ? 's' : ''}
-                    {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/30">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
+                    {#if job.result.cleanup.subtitle_kept}<span class="text-base-content/75">(kept {job.result.cleanup.subtitle_kept})</span>{/if}
                   {/if}
                   {#if job.result.cleanup.subtitle_removed > 0 && job.result.cleanup.audio_removed > 0}
-                    <span class="text-base-content/30"> · </span>
+                    <span class="text-base-content/75"> · </span>
                   {/if}
                   {#if job.result.cleanup.audio_removed > 0}
                     Removed {job.result.cleanup.audio_removed} audio
-                    {#if job.result.cleanup.audio_kept}<span class="text-base-content/30">(kept {job.result.cleanup.audio_kept})</span>{/if}
+                    {#if job.result.cleanup.audio_kept}<span class="text-base-content/75">(kept {job.result.cleanup.audio_kept})</span>{/if}
                   {/if}
                 {:else}
                   No streams removed
                 {/if}
                 {#if sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}
-                  <span class="text-base-content/30"> · {sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}</span>
+                  <span class="text-base-content/75"> · {sizeDetail(job.result.cleanup.original_size, job.result.cleanup.new_size)}</span>
                 {/if}
               </span>
             </div>
@@ -561,7 +561,7 @@ async function handleRetry() {
               {#if job.result.audio.error}
                 <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
                   <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.result.audio.error}</p>
-                  <button onclick={() => copyError(job.result!.audio!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                  <button onclick={() => copyError(job.result!.audio!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/75 hover:text-error px-1" title="Copy error">
                     {#if copiedError === job.result.audio.error}✓{:else}
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     {/if}
@@ -579,7 +579,7 @@ async function handleRetry() {
               {#if job.result.video.error}
                 <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
                   <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.result.video.error}</p>
-                  <button onclick={() => copyError(job.result!.video!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                  <button onclick={() => copyError(job.result!.video!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/75 hover:text-error px-1" title="Copy error">
                     {#if copiedError === job.result.video.error}✓{:else}
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     {/if}
@@ -597,7 +597,7 @@ async function handleRetry() {
               {#if job.result.cleanup.error}
                 <div class="flex items-start gap-1 min-w-0 flex-1 mt-0.5">
                   <p class="text-xs text-error/70 whitespace-pre-wrap break-all flex-1 font-mono bg-error/5 rounded px-1.5 py-1">{job.result.cleanup.error}</p>
-                  <button onclick={() => copyError(job.result!.cleanup!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+                  <button onclick={() => copyError(job.result!.cleanup!.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/75 hover:text-error px-1" title="Copy error">
                     {#if copiedError === job.result.cleanup.error}✓{:else}
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     {/if}
@@ -649,12 +649,12 @@ async function handleRetry() {
     {#if job.status === 'running'}
       <div class="space-y-1.5">
         {#if job.status_detail && detailed}
-          <p class="text-xs text-base-content/50 italic truncate" title={job.status_detail}>{job.status_detail}</p>
+          <p class="text-xs text-base-content/85 italic truncate" title={job.status_detail}>{job.status_detail}</p>
         {/if}
         <div class="flex justify-between items-center">
-          <span class="text-xs text-base-content/40">{job.progress > 0 && job.progress < 0.05 ? '<0.1' : job.progress.toFixed(1)}%</span>
+          <span class="text-xs text-base-content/85">{job.progress > 0 && job.progress < 0.05 ? '<0.1' : job.progress.toFixed(1)}%</span>
           {#if elapsed}
-            <span class="text-xs text-base-content/30">{elapsed}</span>
+            <span class="text-xs text-base-content/75">{elapsed}</span>
           {/if}
         </div>
         <progress class="progress progress-info w-full h-1.5" value={job.progress} max="100"></progress>
@@ -687,12 +687,12 @@ async function handleRetry() {
           <div class="flex-1 min-w-0">
             <p class="text-xs text-error/80 whitespace-pre-wrap break-all font-mono bg-error/5 rounded px-1.5 py-1 {isLong && !isExpanded ? 'line-clamp-3' : ''}">{job.error}</p>
             {#if isLong}
-              <button onclick={() => toggleError('job')} class="text-xs text-error/40 hover:text-error px-1.5 pt-0.5">
+              <button onclick={() => toggleError('job')} class="text-xs text-error/75 hover:text-error px-1.5 pt-0.5">
                 {isExpanded ? '▲ Show less' : '▼ Show more'}
               </button>
             {/if}
           </div>
-          <button onclick={() => copyError(job.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/40 hover:text-error px-1" title="Copy error">
+          <button onclick={() => copyError(job.error!)} class="btn btn-ghost btn-xs shrink-0 text-error/75 hover:text-error px-1" title="Copy error">
             {#if copiedError === job.error}✓{:else}
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             {/if}
@@ -703,8 +703,8 @@ async function handleRetry() {
 
     {#if overallSize}
       <div class="flex items-center gap-1.5 pt-1 border-t border-base-content/5">
-        <span class="text-xs font-medium text-base-content/50">Total</span>
-        <span class="text-xs text-base-content/40">{overallSize}</span>
+        <span class="text-xs font-medium text-base-content/85">Total</span>
+        <span class="text-xs text-base-content/85">{overallSize}</span>
       </div>
     {/if}
 
@@ -712,7 +712,7 @@ async function handleRetry() {
       <div class="mt-1 border-t border-base-content/10 pt-2 space-y-2">
         <!-- Filter bar -->
         <div class="flex items-center gap-1 flex-wrap">
-          <span class="text-xs text-base-content/30 mr-0.5">Source</span>
+          <span class="text-xs text-base-content/75 mr-0.5">Source</span>
           <button
             class="btn btn-xs {filterSource.has('app') ? 'btn-primary' : 'btn-ghost opacity-40'}"
             onclick={() => toggleSource('app')}
@@ -721,7 +721,7 @@ async function handleRetry() {
             class="btn btn-xs {filterSource.has('ffmpeg') ? 'btn-primary' : 'btn-ghost opacity-40'}"
             onclick={() => toggleSource('ffmpeg')}
           >ffmpeg</button>
-          <span class="text-xs text-base-content/30 ml-2 mr-0.5">Level</span>
+          <span class="text-xs text-base-content/75 ml-2 mr-0.5">Level</span>
           <button
             class="btn btn-xs {filterLevel.has('info') ? 'btn-success' : 'btn-ghost opacity-40'}"
             onclick={() => toggleLevel('info')}
@@ -755,14 +755,14 @@ async function handleRetry() {
           class="h-48 overflow-y-auto font-mono text-xs bg-base-300/40 rounded p-2 space-y-0.5"
         >
           {#if filteredEntries.length === 0}
-            <p class="text-base-content/25 text-center py-6">No log entries</p>
+            <p class="text-base-content/75 text-center py-6">No log entries</p>
           {:else}
             {#each filteredEntries as entry (entry.ts + entry.message)}
               <div class="flex gap-2 leading-relaxed">
-                <span class="shrink-0 text-base-content/25">{formatLogTs(entry.ts)}</span>
+                <span class="shrink-0 text-base-content/75">{formatLogTs(entry.ts)}</span>
                 <span class="shrink-0 w-10 {sourceClass[entry.source]}">{entry.source}</span>
                 <span class="shrink-0 w-12 {levelClass[entry.level]}">{entry.level}</span>
-                <span class="text-base-content/70 break-all whitespace-pre-wrap">{entry.message}</span>
+                <span class="text-base-content/95 break-all whitespace-pre-wrap">{entry.message}</span>
               </div>
             {/each}
           {/if}

@@ -76,7 +76,7 @@ function closeMobileDrawer() {
         <span class="text-lg font-bold text-primary tracking-tight">
           remu<span class="text-secondary">X</span>code
         </span>
-        <p class="text-[10px] uppercase tracking-widest text-base-content/40 -mt-0.5">media pipeline</p>
+        <p class="text-[10px] uppercase tracking-widest text-base-content/75 -mt-0.5">media pipeline</p>
       </div>
     </a>
   </div>
@@ -88,7 +88,7 @@ function closeMobileDrawer() {
 
   <!-- Nav links -->
   <ul class="menu menu-md flex-1 px-2 gap-0.5">
-    <li class="menu-title text-[10px] uppercase tracking-wider text-base-content/30 px-3 pt-2 pb-1">Navigation</li>
+    <li class="menu-title text-[10px] uppercase tracking-wider text-base-content/75 px-3 pt-2 pb-1">Navigation</li>
     {#each nav as item}
       {@const active = $page.url.pathname === item.href}
       <li>
@@ -114,7 +114,7 @@ function closeMobileDrawer() {
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
         </span>
-        <span class="text-xs text-base-content/50">{health.version.match(/^\d/) ? `v${health.version}` : health.version}</span>
+        <span class="text-xs text-base-content/85">{health.version.match(/^\d/) ? `v${health.version}` : health.version}</span>
       </div>
     {:else if healthError}
       <div class="flex items-center gap-2">
