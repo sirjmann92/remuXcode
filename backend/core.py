@@ -884,6 +884,15 @@ def process_file(
             return file_path  # last phase: overwrite original
         return str(chain_temps[idx])
 
+    def _is_final_write(out: str | None) -> bool:
+        """Whether a phase's output target is the real source file.
+
+        True for single-phase jobs (out is None, in-place replacement) and for
+        the last phase of a multi-phase job (out == file_path). False for an
+        intermediate chain-temp handoff to the next phase.
+        """
+        return out is None or out == file_path
+
     def _cleanup_chain_temps() -> None:
         for _t in chain_temps:
             _t.unlink(missing_ok=True)
@@ -911,6 +920,7 @@ def process_file(
             cancel_event=cancel_event,
             detail_callback=lambda detail: _set_phase("audio", detail),
             log_cb=_log_cb,
+            is_final_write=_is_final_write(_out),
         )
         _complete_phase("audio")
         phase_idx += 1
@@ -957,6 +967,7 @@ def process_file(
             log_cb=_log_cb,
             encode_options=_encode_opts,
             title=Path(file_path).parent.name,
+            is_final_write=_is_final_write(_out),
         )
         _complete_phase("video")
         phase_idx += 1
@@ -1001,6 +1012,7 @@ def process_file(
             cancel_event=cancel_event,
             detail_callback=lambda detail: _set_phase("cleanup", detail),
             log_cb=_log_cb,
+            is_final_write=_is_final_write(_out),
         )
         _complete_phase("cleanup")
         results["cleanup"] = {

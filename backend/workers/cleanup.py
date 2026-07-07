@@ -175,6 +175,7 @@ class StreamCleanup:
         cancel_event: threading.Event | None = None,
         detail_callback: Callable[[str], None] | None = None,
         log_cb: Callable[[str, str, str], None] | None = None,
+        is_final_write: bool | None = None,
     ) -> CleanupResult:
         """Remove unwanted streams from a media file.
 
@@ -188,6 +189,10 @@ class StreamCleanup:
             cancel_event: Event to signal cancellation (kills ffmpeg).
             detail_callback: Optional callback receiving status detail strings.
             log_cb: Optional callback receiving (source, level, message) log entries.
+            is_final_write: Whether this call's output is the real tracked media
+                file (vs. an intermediate chain-temp handoff to the next phase
+                in a multi-phase job). Defaults to matching ``output_file is
+                None`` (in-place replacement) when not given explicitly.
 
         Returns:
             CleanupResult with details of streams removed
@@ -427,6 +432,8 @@ class StreamCleanup:
 
         # Prepare paths
         replace_input = output_file is None
+        if is_final_write is None:
+            is_final_write = replace_input
         if output_file is None:
             output_file = input_file
 
@@ -538,7 +545,7 @@ class StreamCleanup:
                 original_exists = output_path.exists()
 
                 # Detect mid-job file replacement
-                if replace_input and original_exists and _src_mtime is not None:
+                if is_final_write and original_exists and _src_mtime is not None:
                     try:
                         cur_stat = output_path.stat()
                         if cur_stat.st_mtime != _src_mtime or cur_stat.st_size != _src_size:
@@ -566,7 +573,7 @@ class StreamCleanup:
                     except OSError:
                         pass
 
-                if not original_exists and replace_input:
+                if not original_exists and is_final_write:
                     # Original was deleted during conversion (e.g., Radarr upgrade)
                     # Ensure parent directory exists
                     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -574,11 +581,15 @@ class StreamCleanup:
                         "Original file deleted during conversion, placing converted file at: %s",
                         output_path,
                     )
-                elif replace_input:
+                elif is_final_write:
                     pass  # safe_replace handles backup + move atomically
 
                 if detail_callback:
-                    detail_callback("Replacing file safely...")
+                    detail_callback(
+                        "Replacing file safely..."
+                        if is_final_write
+                        else "Saving intermediate output..."
+                    )
                 safe_replace(temp_output, output_path)
 
                 # Clean up temp directory after successful move

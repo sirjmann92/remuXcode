@@ -219,6 +219,7 @@ class VideoConverter:
         log_cb: Callable[[str, str, str], None] | None = None,
         encode_options: dict | None = None,
         title: str | None = None,
+        is_final_write: bool | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -233,6 +234,10 @@ class VideoConverter:
             log_cb: Optional callback receiving (source, level, message) log entries.
             encode_options: Optional custom encode overrides (resolution, HDR strip, force).
             title: Clean container title to write into output MKV global metadata.
+            is_final_write: Whether this call's output is the real tracked media
+                file (vs. an intermediate chain-temp handoff to the next phase
+                in a multi-phase job). Defaults to matching ``output_file is
+                None`` (in-place replacement) when not given explicitly.
 
         Returns:
             VideoConversionResult with conversion details
@@ -313,6 +318,8 @@ class VideoConverter:
 
         # Prepare output path
         replace_input = output_file is None
+        if is_final_write is None:
+            is_final_write = replace_input
         if output_file is None:
             output_file = input_file
 
@@ -430,7 +437,7 @@ class VideoConverter:
                 original_exists = output_path.exists()
 
                 # Detect mid-job file replacement
-                if replace_input and original_exists and _src_mtime is not None:
+                if is_final_write and original_exists and _src_mtime is not None:
                     try:
                         cur_stat = output_path.stat()
                         if cur_stat.st_mtime != _src_mtime or cur_stat.st_size != _src_size:
@@ -456,7 +463,7 @@ class VideoConverter:
                     except OSError:
                         pass
 
-                if not original_exists and replace_input:
+                if not original_exists and is_final_write:
                     # Original was deleted during conversion (e.g., Radarr upgrade)
                     # Ensure parent directory exists
                     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -464,11 +471,15 @@ class VideoConverter:
                         "Original file deleted during conversion, placing converted file at: %s",
                         output_path,
                     )
-                elif replace_input:
+                elif is_final_write:
                     pass  # safe_replace handles backup + move atomically
 
                 if detail_callback:
-                    detail_callback("Replacing file safely...")
+                    detail_callback(
+                        "Replacing file safely..."
+                        if is_final_write
+                        else "Saving intermediate output..."
+                    )
                 safe_replace(temp_file, output_path)
 
                 # Clean up temp directory after successful move
