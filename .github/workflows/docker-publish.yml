@@ -27,6 +27,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Auto-bumps the patch version on every publish (2.2.65 → 2.2.66).
+      # To cut a minor or major release instead, include "#minor" or
+      # "#major" anywhere in a commit message being pushed:
+      #   #minor → 2.2.65 becomes 2.3.0   (new feature)
+      #   #major → 2.2.65 becomes 3.0.0   (breaking change)
       - name: Determine next version from tags
         id: version
         run: |
@@ -35,7 +40,16 @@ jobs:
           if [ -n "$LATEST_TAG" ]; then
             CURRENT="${LATEST_TAG#v}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-            PATCH=$((PATCH + 1))
+
+            # Scan commit messages since the last release for a bump keyword
+            COMMITS=$(git log "${LATEST_TAG}..HEAD" --pretty=%B)
+            if echo "$COMMITS" | grep -qi '#major'; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+            elif echo "$COMMITS" | grep -qi '#minor'; then
+              MINOR=$((MINOR + 1)); PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           else
             NEW_VERSION="2.0.0"
