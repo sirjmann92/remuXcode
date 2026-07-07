@@ -19,8 +19,8 @@ compose.yaml
 # Database
 jobs.db
 
-# Logs
-logs/
+# Logs (root-anchored: the app's log-file volume, not e.g. frontend/src/routes/logs)
+/logs/
 
 # Tool caches
 .mypy_cache/

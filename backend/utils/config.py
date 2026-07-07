@@ -231,6 +231,12 @@ class Config:
         # metadata and cause ffmpeg "dimensions not set" header failures.
         # Set to False to preserve cover art (may fail on malformed images).
         self.strip_cover_art: bool = bool(self._get("general.strip_cover_art", True))
+        # Effective app log level. Falls back to the LOG_LEVEL/LOGLEVEL env var
+        # (set at container startup, before config is loaded) so existing
+        # deployments keep working; once set here it persists across restarts.
+        self.log_level: str = str(
+            self._get("general.log_level", os.getenv("LOG_LEVEL", os.getenv("LOGLEVEL", "INFO")))
+        ).upper()
 
     @property
     def effective_ffmpeg_threads(self) -> int:
@@ -552,6 +558,7 @@ class Config:
 
         self._raw_config.setdefault("general", {})
         self._raw_config["general"]["job_history_days"] = self.job_history_days
+        self._raw_config["general"]["log_level"] = self.log_level
 
         with self.config_path.open("w") as f:
             yaml.dump(self._raw_config, f, default_flow_style=False, sort_keys=False)

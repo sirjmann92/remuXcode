@@ -27,6 +27,19 @@ export interface JobLogsResponse {
   entries: JobLogEntry[];
 }
 
+export type AppLogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+
+export interface AppLogEntry {
+  ts: number;
+  level: AppLogLevel;
+  logger: string;
+  message: string;
+}
+
+export interface AppLogsResponse {
+  entries: AppLogEntry[];
+}
+
 export interface Job {
   id: string;
   job_type: JobType;
@@ -232,6 +245,7 @@ export interface ConfigSummary {
   ffmpeg_pin_to_p_cores: boolean;
   strip_cover_art: boolean;
   job_history_days: number;
+  log_level: AppLogLevel;
   api_key: string;
 }
 

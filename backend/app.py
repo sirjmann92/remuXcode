@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("  remuXcode %s Starting", __version__)
     logger.info("=" * 60)
     initialize_components()
+    from backend import core
+
+    if core.config:
+        logging.getLogger().setLevel(getattr(logging, core.config.log_level, logging.INFO))
     yield
     shutdown_components()
     logger.info("remuXcode shut down")
@@ -81,7 +85,8 @@ def setup_logging() -> None:
 
     logging.basicConfig(
         level=log_level,
-        format="%(levelname)s [%(name)s] %(message)s",
+        format="%(asctime)s.%(msecs)03d %(levelname)s [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
         handlers=handlers,
     )
 
@@ -110,6 +115,7 @@ def create_app() -> FastAPI:
     from backend.api_config import router as config_router
     from backend.api_convert import router as convert_router
     from backend.api_jobs import router as jobs_router
+    from backend.api_logs import router as logs_router
     from backend.api_retag import router as retag_router
     from backend.api_webhook import router as webhook_router
 
@@ -118,6 +124,7 @@ def create_app() -> FastAPI:
     app.include_router(config_router, prefix="/api")
     app.include_router(convert_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
+    app.include_router(logs_router, prefix="/api")
     app.include_router(retag_router, prefix="/api")
     app.include_router(webhook_router, prefix="/api")
 

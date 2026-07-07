@@ -64,6 +64,8 @@ The navbar links to all pages:
 | Movies | `/movies` | Browse and process movie library |
 | Shows | `/shows` | Browse and process TV library |
 | Jobs | `/jobs` | Full job history and controls |
+| Integrations | `/integrations` | Sonarr/Radarr connections and webhook testing |
+| Logs | `/logs` | Application log viewer and log level control |
 | Settings | `/config` | All configuration |
 
 A light/dark mode toggle is available in the top bar. Your preference is saved in the browser and persists across visits.

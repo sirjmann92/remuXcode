@@ -20,10 +20,11 @@
 ### Web UI
 
 - **Dashboard** — live job stats (processed, active, queued, storage saved), in-progress jobs with per-phase progress and size delta, pending queue with drag-and-drop reordering, recent activity
-- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, per-file analyze modal with **Fix Metadata** for in-place track language/title correction, **Cover Art** display (thumbnail preview + in-place removal), and scan-type indicator (interlaced/progressive), individual and multi-select batch queue, job status indicators on posters, library refresh
-- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, per-episode analyze modal with **Fix Metadata** for in-place track language/title correction, **Cover Art** display (thumbnail preview + in-place removal), and scan-type indicator (interlaced/progressive), per-episode and per-season Custom Encode (downscale / HDR), individual and multi-select batch queue, **Queue Season** button that context-switches to **Queue N Selected** when season episodes are checked, **Queue All Episodes** and **Queue N Selected** at series level, per-show **Rescan** button, library refresh
+- **Movies** — Radarr-backed poster grid, work-needed badges (Audio/Video/Cleanup/Legacy), filter/sort/search, **resolution filter** (2160p/1080p/720p/SD), **Legacy (Xvid/DivX) codec filter**, per-file analyze modal with **Fix Metadata** for in-place track language/title correction, **Cover Art** display (thumbnail preview + in-place removal), and scan-type indicator (interlaced/progressive), individual and multi-select batch queue, job status indicators on posters, library refresh
+- **Shows** — Sonarr-backed series list, season/episode drill-down, job indicators at series/season/episode level, **resolution filter** (2160p/1080p/720p/SD), **Legacy (Xvid/DivX) codec filter**, per-episode analyze modal with **Fix Metadata** for in-place track language/title correction, **Cover Art** display (thumbnail preview + in-place removal), and scan-type indicator (interlaced/progressive), per-episode and per-season Custom Encode (downscale / HDR), individual and multi-select batch queue, **Queue Season** button that context-switches to **Queue N Selected** when season episodes are checked, **Queue All Episodes** and **Queue N Selected** at series level, per-show **Rescan** button, library refresh
 - **Jobs** — full job history with status/worker/media/source/date-range filters and search, per-phase results (size delta per phase), full-text error display with clipboard copy button, drag-and-drop pending queue reordering, Stop Current / Clear Pending / Delete Completed controls, individual job cancel and delete, **retry failed jobs with one click**, load-more pagination that persists across background refreshes, back-to-top button for long queues, per-job log panel with source/level filters showing the exact `ffmpeg`/`mkvpropedit` command line(s) run for each phase, **Custom Encode** badge on jobs using non-default encode options
 - **Settings** — all settings configurable from the UI: audio, video, cleanup, language detection, Sonarr/Radarr connections, workers, job retention, hardware acceleration, cover art stripping
+- **Logs** — dedicated in-UI viewer tailing the application log (startup/shutdown, job lifecycle, webhook and integration events, errors), level filter chips (Debug/Info/Warning/Error/Critical) and search, download-full-log button, and a **runtime log level control** that changes and persists the effective logging level immediately (no restart or compose-file edit needed)
 - Light/dark mode toggle (persisted per-browser)
 
 ### Infrastructure
@@ -35,6 +36,7 @@
 - File size tracking: before/after displayed per conversion phase in the Jobs UI
 - Automatic job retry on startup for jobs interrupted mid-encode
 - Per-job logs persist across container restarts (SQLite-backed, periodic flush for running jobs)
+- Multi-phase jobs (audio + video + cleanup) chain through temp files instead of writing back to the original between every phase — only the last phase's output path is the real source file, and each worker now knows whether its own write *is* that final replacement (`is_final_write`), so the "Replacing file safely..." status/log message and the external mid-job-modification safety check both correctly apply only to the true final phase instead of firing (or being silently skipped) on every intermediate chain hop
 - **mkvtoolnix** (`mkvpropedit`) — in-place MKV metadata editing without remuxing: track statistics tags (`BPS`/`DURATION`/`NUMBER_OF_FRAMES`) written after every video encode so MediaInfo and media servers report correct bitrate; in-place track language/title correction via the Retag worker; in-place title normalisation during the Cleanup pass
 
 ---
@@ -59,10 +61,6 @@
 - **Per-job preset override** — override the configured encoder preset (e.g. `slow`, `medium`) for a single Custom Encode job
 - **Resolution-aware Custom Encode defaults** — optionally define default CRF/preset/VBV per target resolution in Settings, which the Custom Encode modal inherits by default but can still override per job
 
-### UI / UX
-
-- **Resolution filter** — filter the Movies/Shows library grid by source resolution (e.g. 2160p, 1080p, 720p)
-
 ### Phase 3 — Community & Distribution
 
 - **Notification Center** — in-UI event log (info / warning / error) for conversion events, watchdog actions, and worker lifecycle; filterable by severity
@@ -82,8 +80,3 @@
 ### Quality of Life
 
 - **Settings change detection** — surface files in the library that no longer match current conversion settings (e.g. after loosening or tightening a rule)
-- **In-UI log viewer** — tail recent log output from the Settings or Jobs page without needing shell access
-
-### Known Issues
-
-- **Safe file-replace ordering** — the atomic "replace source with output" step currently runs per-worker-phase (audio/video/cleanup each move their own temp file into place independently). Since the pipeline order was changed so stream cleanup runs after video conversion, the final safe-replace should happen once at the very end of the full pipeline instead of mid-pipeline, to avoid an intermediate window where the on-disk file reflects only a partially-processed state

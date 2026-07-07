@@ -144,6 +144,11 @@ export async function getConfig(): Promise<ConfigSummary> {
   return request('/api/config');
 }
 
+// Logs
+export async function getAppLogs(lines = 1000): Promise<import('$lib/types').AppLogsResponse> {
+  return request(`/api/logs?lines=${lines}`);
+}
+
 export async function getSystemInfo(): Promise<import('$lib/types').SystemInfo> {
   return request('/api/system/info');
 }

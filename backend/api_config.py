@@ -116,6 +116,7 @@ async def get_config_summary() -> dict[str, Any]:
         "ffmpeg_pin_to_p_cores": cfg.ffmpeg_pin_to_p_cores,
         "strip_cover_art": cfg.strip_cover_art,
         "job_history_days": cfg.job_history_days,
+        "log_level": cfg.log_level,
         "api_key": get_api_key(),
     }
 
@@ -326,6 +327,7 @@ class ConfigUpdate(BaseModel):
     ffmpeg_pin_to_p_cores: bool | None = None
     strip_cover_art: bool | None = None
     job_history_days: int | None = Field(None, ge=1, le=365)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] | None = None
 
 
 @router.patch("/config")
@@ -390,6 +392,11 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
 
     if body.job_history_days is not None:
         cfg.job_history_days = body.job_history_days
+
+    if body.log_level is not None:
+        cfg.log_level = body.log_level
+        logging.getLogger().setLevel(getattr(logging, body.log_level))
+        logger.info("Log level changed to %s", body.log_level)
 
     if body.strip_cover_art is not None:
         cfg.strip_cover_art = body.strip_cover_art
