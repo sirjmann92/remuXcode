@@ -220,6 +220,7 @@ class VideoConverter:
         encode_options: dict | None = None,
         title: str | None = None,
         is_final_write: bool | None = None,
+        source_snapshot: tuple[float, int] | None = None,
     ) -> VideoConversionResult:
         """Convert video to HEVC or AV1.
 
@@ -238,6 +239,10 @@ class VideoConverter:
                 file (vs. an intermediate chain-temp handoff to the next phase
                 in a multi-phase job). Defaults to matching ``output_file is
                 None`` (in-place replacement) when not given explicitly.
+            source_snapshot: Optional (mtime, size) of the tracked media file,
+                captured by the orchestrator before any phase ran. Used by the
+                final-write replacement guard so it covers the whole job, not
+                just this phase.
 
         Returns:
             VideoConversionResult with conversion details
@@ -349,14 +354,21 @@ class VideoConverter:
                 temp_file.unlink()
 
             # Build and run ffmpeg command
-            # Snapshot source file identity before encoding
-            try:
-                _src_stat = input_path.stat()
-                _src_mtime = _src_stat.st_mtime
-                _src_size = _src_stat.st_size
-            except OSError:
-                _src_mtime = None
-                _src_size = None
+            # Snapshot the identity of the tracked file we may overwrite
+            # (output_path — for chained phases this is NOT the input) so the
+            # pre-replace guard can detect Sonarr/Radarr swapping it mid-job.
+            # For multi-phase jobs core supplies a snapshot taken at job start.
+            _src_mtime: float | None = None
+            _src_size: int | None = None
+            if source_snapshot is not None:
+                _src_mtime, _src_size = source_snapshot
+            elif is_final_write:
+                try:
+                    _src_stat = output_path.stat()
+                    _src_mtime = _src_stat.st_mtime
+                    _src_size = _src_stat.st_size
+                except OSError:
+                    pass
 
             cmd = self._build_ffmpeg_command(
                 str(input_path),

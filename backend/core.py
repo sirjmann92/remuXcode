@@ -853,6 +853,16 @@ def process_file(
     chain_temps: list[Path] = []
     chain_current = file_path  # input for the next phase; advances each iteration
 
+    # Snapshot the original file's identity before any phase runs. The worker
+    # performing the final write compares the file at file_path against this
+    # to detect Sonarr/Radarr replacing it mid-job, so the guard covers the
+    # whole job even when phases chain through temp files.
+    try:
+        _orig_stat = Path(file_path).stat()
+        source_snapshot: tuple[float, int] | None = (_orig_stat.st_mtime, _orig_stat.st_size)
+    except OSError:
+        source_snapshot = None
+
     if len(phases_to_run) > 1:
         _vol = get_volume_root(file_path)
         # Use a distinct prefix so individual worker temp-dir cleanup
@@ -921,6 +931,7 @@ def process_file(
             detail_callback=lambda detail: _set_phase("audio", detail),
             log_cb=_log_cb,
             is_final_write=_is_final_write(_out),
+            source_snapshot=source_snapshot,
         )
         _complete_phase("audio")
         phase_idx += 1
@@ -968,6 +979,7 @@ def process_file(
             encode_options=_encode_opts,
             title=Path(file_path).parent.name,
             is_final_write=_is_final_write(_out),
+            source_snapshot=source_snapshot,
         )
         _complete_phase("video")
         phase_idx += 1
@@ -1013,6 +1025,7 @@ def process_file(
             detail_callback=lambda detail: _set_phase("cleanup", detail),
             log_cb=_log_cb,
             is_final_write=_is_final_write(_out),
+            source_snapshot=source_snapshot,
         )
         _complete_phase("cleanup")
         results["cleanup"] = {

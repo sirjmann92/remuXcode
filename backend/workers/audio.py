@@ -174,6 +174,7 @@ class AudioConverter:
         detail_callback: Callable[[str], None] | None = None,
         log_cb: Callable[[str, str, str], None] | None = None,
         is_final_write: bool | None = None,
+        source_snapshot: tuple[float, int] | None = None,
     ) -> AudioConversionResult:
         """Convert incompatible audio in a media file.
 
@@ -189,6 +190,10 @@ class AudioConverter:
                 file (vs. an intermediate chain-temp handoff to the next phase
                 in a multi-phase job). Defaults to matching ``output_file is
                 None`` (in-place replacement) when not given explicitly.
+            source_snapshot: Optional (mtime, size) of the tracked media file,
+                captured by the orchestrator before any phase ran. Used by the
+                final-write replacement guard so it covers the whole job, not
+                just this phase.
 
         Returns:
             AudioConversionResult with conversion details
@@ -335,15 +340,21 @@ class AudioConverter:
         temp_output = temp_dir / input_path.name
 
         try:
-            # Snapshot source file identity before encoding so we can detect
-            # mid-job replacements (e.g. Sonarr upgrades) before we overwrite.
-            try:
-                _src_stat = input_path.stat()
-                _src_mtime = _src_stat.st_mtime
-                _src_size = _src_stat.st_size
-            except OSError:
-                _src_mtime = None
-                _src_size = None
+            # Snapshot the identity of the tracked file we may overwrite
+            # (output_path — for chained phases this is NOT the input) so the
+            # pre-replace guard can detect Sonarr/Radarr swapping it mid-job.
+            # For multi-phase jobs core supplies a snapshot taken at job start.
+            _src_mtime: float | None = None
+            _src_size: int | None = None
+            if source_snapshot is not None:
+                _src_mtime, _src_size = source_snapshot
+            elif is_final_write:
+                try:
+                    _src_stat = output_path.stat()
+                    _src_mtime = _src_stat.st_mtime
+                    _src_size = _src_stat.st_size
+                except OSError:
+                    pass
 
             # Build and run ffmpeg command
             cmd = self._build_ffmpeg_command(
