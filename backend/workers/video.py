@@ -83,6 +83,10 @@ class VideoConversionResult:
         return (self.size_change / self.original_size) * 100
 
 
+class DVPreparationError(Exception):
+    """Raised when the Dolby Vision base-layer preparation step fails."""
+
+
 class VideoConverter:
     """Converts video to HEVC or AV1 with content-aware encoding settings.
 
@@ -321,6 +325,55 @@ class VideoConverter:
                 f"Encoding {video.codec_name} {video.bit_depth}-bit → {codec_label}{hw_label} ({content_type.value})"
             )
 
+        # --- Dolby Vision retention (custom encode option) ----------------
+        # When requested, carry the DV dynamic metadata through the re-encode
+        # as Profile 8.1 instead of stripping to plain HDR10.  Hard
+        # requirements: DV source, HEVC target via software x265 (hardware
+        # encoders cannot attach per-frame RPUs), no SDR tone-mapping, and no
+        # rescale (RPU L5 active-area offsets are relative to the source
+        # raster).
+        retain_dv = bool(encode_options and encode_options.get("retain_dv"))
+        dv_retain_active = False
+        if retain_dv:
+            if not video.is_dolby_vision:
+                logger.info(
+                    "retain_dv requested but source has no Dolby Vision, encoding normally: %s",
+                    input_file,
+                )
+                if log_cb:
+                    log_cb("app", "info", "Source has no Dolby Vision — retain option ignored")
+            else:
+                _dv_error: str | None = None
+                _target_res = (encode_options or {}).get("target_resolution")
+                _would_downscale = bool(
+                    _target_res
+                    and _target_res != "original"
+                    and video.height
+                    and video.height > int(str(_target_res).rstrip("p"))
+                )
+                if codec_to != "hevc" or encoder != "libx265":
+                    _dv_error = (
+                        "Dolby Vision retention requires software HEVC encoding (libx265); "
+                        f"current target is {encoder}"
+                    )
+                elif encode_options and encode_options.get("strip_hdr"):
+                    _dv_error = "Dolby Vision retention cannot be combined with SDR tone-mapping"
+                elif _would_downscale:
+                    _dv_error = "Dolby Vision retention requires original resolution (no downscale)"
+                if _dv_error:
+                    return VideoConversionResult(
+                        success=False,
+                        input_file=input_file,
+                        output_file=output_file or input_file,
+                        original_size=info.size,
+                        new_size=0,
+                        codec_from=video.codec_name,
+                        codec_to=codec_to,
+                        content_type=content_type.value,
+                        error=_dv_error,
+                    )
+                dv_retain_active = True
+
         # Prepare output path
         replace_input = output_file is None
         if is_final_write is None:
@@ -353,6 +406,41 @@ class VideoConverter:
             if temp_file.exists():
                 temp_file.unlink()
 
+            # --- Dolby Vision base-layer preparation ----------------------
+            # Profile 7 (dual-layer, from UHD BD remuxes) RPUs reference an
+            # enhancement layer that cannot survive a re-encode; dovi_tool
+            # mode 2 rewrites them for single-layer BL+RPU (Profile 8.1)
+            # playback.  Profile 5/8 sources need no conversion — ffmpeg's
+            # decoder→encoder RPU passthrough handles them directly.
+            dv_bl_input: str | None = None
+            if dv_retain_active and video.dv_profile in (None, 7):
+                if detail_callback:
+                    detail_callback("Preparing Dolby Vision base layer (Profile 7 → 8.1)...")
+                try:
+                    dv_bl_input = self._prepare_dv_base_layer(
+                        str(input_path),
+                        temp_dir,
+                        cancel_event=cancel_event,
+                        log_cb=log_cb,
+                    )
+                except DVPreparationError as exc:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return VideoConversionResult(
+                        success=False,
+                        input_file=input_file,
+                        output_file=output_file,
+                        original_size=info.size,
+                        new_size=0,
+                        codec_from=video.codec_name,
+                        codec_to=codec_to,
+                        content_type=content_type.value,
+                        error=f"Dolby Vision preparation failed: {exc}",
+                    )
+                if detail_callback:
+                    detail_callback(
+                        f"Encoding {video.codec_name} {video.bit_depth}-bit → HEVC + DV 8.1 ({content_type.value})"
+                    )
+
             # Build and run ffmpeg command
             # Snapshot the identity of the tracked file we may overwrite
             # (output_path — for chained phases this is NOT the input) so the
@@ -378,6 +466,8 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
                 attachments=info.attachment_streams or None,
+                dv_passthrough=dv_retain_active,
+                dv_bl_input=dv_bl_input,
             )
             logger.debug("Running: %s", " ".join(cmd))
             if log_cb:
@@ -403,6 +493,11 @@ class VideoConverter:
                 log_cb=log_cb,
                 affinity_fn=self.affinity_fn,
             )
+
+            # The converted base layer is nearly source-sized; free it as soon
+            # as the encode is done rather than waiting for temp-dir cleanup.
+            if dv_bl_input:
+                Path(dv_bl_input).unlink(missing_ok=True)
 
             if returncode != 0:
                 temp_file.unlink(missing_ok=True)
@@ -442,6 +537,32 @@ class VideoConverter:
                     content_type=content_type.value,
                     error=f"FFmpeg exited normally but output file is missing: {temp_file.name}",
                 )
+
+            # Confirm the DV metadata actually survived the encode. A missing
+            # record still leaves a valid HDR10 file, so warn rather than fail.
+            if dv_retain_active:
+                _out_info = self.ffprobe.get_file_info(str(temp_file))
+                _out_video = _out_info.primary_video if _out_info else None
+                if _out_video and _out_video.is_dolby_vision:
+                    _msg = (
+                        "Dolby Vision retained: Profile "
+                        f"{_out_video.dv_profile if _out_video.dv_profile is not None else '?'}"
+                    )
+                    logger.info("%s: %s", _msg, temp_file.name)
+                    if log_cb:
+                        log_cb("app", "info", _msg)
+                else:
+                    logger.warning(
+                        "Dolby Vision retention was requested but the encoded output "
+                        "has no DOVI configuration record (HDR10 fallback still intact): %s",
+                        temp_file.name,
+                    )
+                    if log_cb:
+                        log_cb(
+                            "app",
+                            "warning",
+                            "Dolby Vision metadata missing from encoded output — file is HDR10 only",
+                        )
 
             # Move temp file to output location
             if temp_file.exists():
@@ -590,8 +711,17 @@ class VideoConverter:
         encode_options: dict | None = None,
         title: str | None = None,
         attachments: list[AttachmentStream] | None = None,
+        dv_passthrough: bool = False,
+        dv_bl_input: str | None = None,
     ) -> list[str]:
-        """Build ffmpeg command with content-appropriate settings."""
+        """Build ffmpeg command with content-appropriate settings.
+
+        dv_passthrough enables Dolby Vision RPU coding on the encoder
+        (software HEVC only — enforced by the caller).  dv_bl_input, when
+        set, is a raw HEVC base layer whose RPUs were pre-converted to
+        Profile 8.1; video is read from it while audio/subs/chapters come
+        from the original input_file.
+        """
         encoder = resolve_encoder(self.target_codec, self.hw_accel, self.hw_caps)
 
         # HW-accelerated encoders
@@ -673,6 +803,8 @@ class VideoConverter:
                 video=video,
                 encode_options=encode_options,
                 title=title,
+                dv_passthrough=dv_passthrough,
+                dv_bl_input=dv_bl_input,
             )
 
         return self._patch_attachment_mimetypes(cmd, attachments or [])
@@ -766,6 +898,120 @@ class VideoConverter:
 
         return ["-vf", ",".join(parts)]
 
+    def _prepare_dv_base_layer(
+        self,
+        input_file: str,
+        temp_dir: Path,
+        cancel_event: threading.Event | None = None,
+        log_cb: Callable[[str, str, str], None] | None = None,
+    ) -> str:
+        """Extract the HEVC base layer with its RPU converted to DV Profile 8.1.
+
+        Pipes the source video stream through ``dovi_tool -m 2 convert
+        --discard``, which rewrites Profile 7 RPUs for single-layer BL+RPU
+        playback and drops the enhancement layer.  The resulting raw Annex-B
+        bitstream (written into the job temp dir, roughly source-video-sized)
+        is the video input for the subsequent encode.
+
+        Returns the path of the converted bitstream.
+
+        Raises:
+            DVPreparationError: On cancellation or if either pipeline stage
+                fails or produces no output.
+        """
+        bl_path = temp_dir / f"{Path(input_file).name}.dv81-bl.hevc"
+        bl_path.unlink(missing_ok=True)
+
+        extract_cmd = [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-err_detect",
+            "ignore_err",
+            "-analyzeduration",
+            "200M",
+            "-probesize",
+            "200M",
+            "-i",
+            input_file,
+            "-map",
+            "0:v:0",
+            "-c",
+            "copy",
+            "-f",
+            "hevc",
+            "-",
+        ]
+        convert_cmd = ["dovi_tool", "-m", "2", "convert", "--discard", "-", "-o", str(bl_path)]
+
+        logger.info("Preparing DV base layer: %s", bl_path.name)
+        if log_cb:
+            log_cb("app", "info", f"$ {' '.join(extract_cmd)} | {' '.join(convert_cmd)}")
+
+        extract_proc = subprocess.Popen(  # noqa: S603
+            extract_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        convert_proc = subprocess.Popen(  # noqa: S603
+            convert_cmd,
+            stdin=extract_proc.stdout,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+        # Let dovi_tool own the read end so a converter exit propagates
+        # SIGPIPE to ffmpeg instead of deadlocking the pipe.
+        if extract_proc.stdout:
+            extract_proc.stdout.close()
+
+        def _kill_both() -> None:
+            for proc in (extract_proc, convert_proc):
+                if proc.poll() is None:
+                    proc.kill()
+            extract_proc.wait()
+            convert_proc.wait()
+
+        deadline = time.monotonic() + 4 * 3600  # I/O bound; generous cap
+        while True:
+            try:
+                convert_proc.wait(timeout=2)
+                break
+            except subprocess.TimeoutExpired:
+                if cancel_event is not None and cancel_event.is_set():
+                    _kill_both()
+                    raise DVPreparationError("cancelled") from None
+                if time.monotonic() > deadline:
+                    _kill_both()
+                    raise DVPreparationError("timed out extracting base layer") from None
+
+        extract_rc = extract_proc.wait()
+        convert_stderr = (convert_proc.stderr.read() if convert_proc.stderr else b"").decode(
+            errors="replace"
+        )
+        extract_stderr = (extract_proc.stderr.read() if extract_proc.stderr else b"").decode(
+            errors="replace"
+        )
+
+        if convert_proc.returncode != 0:
+            bl_path.unlink(missing_ok=True)
+            raise DVPreparationError(
+                f"dovi_tool failed: {convert_stderr.strip()[-500:] or 'unknown error'}"
+            )
+        if extract_rc != 0:
+            bl_path.unlink(missing_ok=True)
+            raise DVPreparationError(
+                f"base layer extraction failed: {extract_stderr.strip()[-500:] or 'unknown error'}"
+            )
+        try:
+            if bl_path.stat().st_size == 0:
+                raise OSError
+        except OSError:
+            bl_path.unlink(missing_ok=True)
+            raise DVPreparationError("converted base layer is missing or empty") from None
+
+        logger.info("DV base layer ready: %s (%d bytes)", bl_path.name, bl_path.stat().st_size)
+        return str(bl_path)
+
     def _build_hevc_command(
         self,
         input_file: str,
@@ -774,6 +1020,8 @@ class VideoConverter:
         video: VideoStream | None = None,
         encode_options: dict | None = None,
         title: str | None = None,
+        dv_passthrough: bool = False,
+        dv_bl_input: str | None = None,
     ) -> list[str]:
         """Build ffmpeg command for HEVC (libx265) encoding."""
 
@@ -836,24 +1084,61 @@ class VideoConverter:
         is_dv_source = bool(video and video.is_dolby_vision)
         cmd.extend(["-err_detect", "ignore_err"])
 
+        if dv_bl_input:
+            # Video comes from the pre-converted raw HEVC base layer (Annex-B
+            # bitstreams carry no container timing, so declare the source
+            # frame rate); audio/subs/attachments/chapters come from the
+            # original file.
+            if video and video.frame_rate and video.frame_rate != "0/1":
+                cmd.extend(["-framerate", video.frame_rate])
+            cmd.extend(
+                [
+                    "-i",
+                    dv_bl_input,
+                    "-analyzeduration",
+                    "200M",
+                    "-probesize",
+                    "200M",
+                    "-i",
+                    input_file,
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a?",
+                    "-map",
+                    "1:s?",
+                    "-map",
+                    "1:t?",
+                    "-map_chapters",
+                    "1",
+                    "-map_metadata",
+                    "1",
+                ]
+            )
+        else:
+            cmd.extend(
+                [
+                    "-analyzeduration",
+                    "200M",
+                    "-probesize",
+                    "200M",
+                    "-i",
+                    input_file,
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "0:a?",
+                    "-map",
+                    "0:s?",
+                    "-map",
+                    "0:t?",
+                    "-map_chapters",
+                    "0",
+                ]
+            )
+
         cmd.extend(
             [
-                "-analyzeduration",
-                "200M",
-                "-probesize",
-                "200M",
-                "-i",
-                input_file,
-                "-map",
-                "0:v:0",
-                "-map",
-                "0:a?",
-                "-map",
-                "0:s?",
-                "-map",
-                "0:t?",
-                "-map_chapters",
-                "0",
                 "-c:v:0",
                 "libx265",
                 "-profile:v",
@@ -862,6 +1147,10 @@ class VideoConverter:
                 preset,
             ]
         )
+
+        # Re-attach decoded DV RPUs to the encoded frames (Profile 8.1).
+        if dv_passthrough:
+            cmd.extend(["-dolbyvision", "1"])
 
         # Add tune if specified
         if tune:

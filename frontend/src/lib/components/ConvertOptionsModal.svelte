@@ -16,10 +16,22 @@ const { paths, label, poster_url, media_type, onclose, onqueued }: Props = $prop
 const pathArray = $derived(Array.isArray(paths) ? paths : [paths]);
 const isBulk = $derived(pathArray.length > 1);
 
+type HdrMode = 'keep' | 'keep_dv' | 'strip';
+
 let targetResolution: TargetResolution = $state('1080p');
-let stripHdr = $state(false);
+let hdrMode = $state<HdrMode>('keep');
 let queuing = $state(false);
 let error = $state('');
+
+const stripHdr = $derived(hdrMode === 'strip');
+const retainDv = $derived(hdrMode === 'keep_dv');
+
+// DV retention keeps the RPU aligned to the source raster — no downscale.
+$effect(() => {
+  if (retainDv && targetResolution !== 'original') {
+    targetResolution = 'original';
+  }
+});
 
 function fileName(p: string): string {
   return p.split('/').pop() ?? p;
@@ -33,7 +45,14 @@ const summaryLines = $derived.by(() => {
   if (stripHdr) {
     lines.push('Tone-map HDR/DV → SDR (BT.709)');
   }
-  lines.push('Force video re-encode to configured codec (AV1/HEVC)');
+  if (retainDv) {
+    lines.push('Retain Dolby Vision as Profile 8.1 (HDR10 fallback included)');
+  }
+  lines.push(
+    retainDv
+      ? 'Force video re-encode to HEVC (software x265)'
+      : 'Force video re-encode to configured codec (AV1/HEVC)',
+  );
   lines.push('Audio and cleanup run per your configuration settings');
   return lines;
 });
@@ -45,6 +64,7 @@ async function handleQueue() {
     target_resolution: targetResolution,
     strip_hdr: stripHdr,
     force_encode: true,
+    retain_dv: retainDv,
   };
   const errors: string[] = [];
   for (const p of pathArray) {
@@ -88,13 +108,16 @@ async function handleQueue() {
         {#each [['original', 'Original'], ['1080p', '1080p'], ['720p', '720p']] as [val, label]}
           <button
             class="btn btn-sm flex-1 {targetResolution === val ? 'btn-primary' : 'btn-ghost border border-base-300'}"
+            disabled={retainDv && val !== 'original'}
             onclick={() => targetResolution = val as TargetResolution}
           >
             {label}
           </button>
         {/each}
       </div>
-      {#if targetResolution !== 'original'}
+      {#if retainDv}
+        <p class="text-xs text-base-content/85 mt-1">Locked to original resolution while retaining Dolby Vision.</p>
+      {:else if targetResolution !== 'original'}
         <p class="text-xs text-base-content/85 mt-1">Source files already at or below {targetResolution} will not be upscaled.</p>
       {/if}
     </div>
@@ -104,20 +127,28 @@ async function handleQueue() {
       <div class="text-sm font-medium mb-2">HDR Handling</div>
       <div class="flex gap-2">
         <button
-          class="btn btn-sm flex-1 {!stripHdr ? 'btn-primary' : 'btn-ghost border border-base-300'}"
-          onclick={() => stripHdr = false}
+          class="btn btn-sm flex-1 {hdrMode === 'keep' ? 'btn-primary' : 'btn-ghost border border-base-300'}"
+          onclick={() => hdrMode = 'keep'}
         >
           Keep HDR
         </button>
         <button
-          class="btn btn-sm flex-1 {stripHdr ? 'btn-warning' : 'btn-ghost border border-base-300'}"
-          onclick={() => stripHdr = true}
+          class="btn btn-sm flex-1 {hdrMode === 'keep_dv' ? 'btn-primary' : 'btn-ghost border border-base-300'}"
+          onclick={() => hdrMode = 'keep_dv'}
+        >
+          Keep HDR + DV
+        </button>
+        <button
+          class="btn btn-sm flex-1 {hdrMode === 'strip' ? 'btn-warning' : 'btn-ghost border border-base-300'}"
+          onclick={() => hdrMode = 'strip'}
         >
           Strip to SDR
         </button>
       </div>
-      {#if stripHdr}
+      {#if hdrMode === 'strip'}
         <p class="text-xs text-base-content/85 mt-1">HDR (including Dolby Vision) will be tone-mapped to BT.709 SDR.</p>
+      {:else if hdrMode === 'keep_dv'}
+        <p class="text-xs text-base-content/85 mt-1">Dolby Vision is re-encoded as Profile 8.1 (dynamic metadata kept, HDR10 fallback included). Requires a DV source and software HEVC encoding; forces original resolution.</p>
       {:else}
         <p class="text-xs text-base-content/85 mt-1">HDR10 metadata is preserved. Dolby Vision RPU is stripped (HDR10 base layer kept).</p>
       {/if}

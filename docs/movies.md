@@ -73,7 +73,23 @@ Click a poster to open the detail panel for that movie. It shows:
 
 - **Queue** — add this movie to the job queue for full conversion
 - Choose a specific job type: **Full**, **Audio**, **Video**, or **Cleanup**
+- **Custom Encode** — opens the custom encode options for this movie (see below)
 - **Open in Radarr** — opens this movie's Radarr page in a new tab (only shown when Radarr is configured)
+
+---
+
+## Custom Encode
+
+The **Custom Encode** button (in the detail panel and the Analyze modal) queues a forced re-encode with one-off options that override your library-wide settings:
+
+- **Target Resolution** — Original, 1080p, or 720p (downscale only; sources at or below the target are not upscaled)
+- **HDR Handling**:
+  - **Keep HDR** — HDR10 metadata is preserved; Dolby Vision RPU is stripped (HDR10 base layer kept)
+  - **Keep HDR + DV** — re-encodes Dolby Vision sources (including Profile 7 remuxes) while retaining DV as **Profile 8.1** with HDR10 fallback. Profile 7 RPUs are converted with `dovi_tool` before the encode. Requires a DV source and software HEVC (libx265) encoding, and locks resolution to Original
+  - **Strip to SDR** — tone-maps HDR (including DV) to BT.709 SDR
+- The job always force-re-encodes the video; audio and cleanup phases still run per your configuration settings
+
+Jobs queued this way show a **Custom Encode** badge on the Jobs page listing the chosen options.
 
 ---
 

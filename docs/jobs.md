@@ -14,7 +14,7 @@ Each job is displayed as a card showing:
 - **Status badge** — Pending, Running, Completed, Failed, or Cancelled
 - **Job type** — the conversion type: Full, Audio, Video, or Cleanup
 - **Source** — how the job was created: Webhook, API, or Batch
-- **Custom Encode badge** — shown when the job uses non-default encode options (resolution downscale, HDR/DV strip, or forced re-encode), so you can tell at a glance whether a queued or running job will use your library-wide settings or a one-off override
+- **Custom Encode badge** — shown when the job uses non-default encode options (resolution downscale, HDR/DV strip, Dolby Vision retention, or forced re-encode), so you can tell at a glance whether a queued or running job will use your library-wide settings or a one-off override
 - **Media type** — Movie or Episode
 - **Start time** and **completion time** (locale-formatted)
 - **Elapsed time** for completed jobs

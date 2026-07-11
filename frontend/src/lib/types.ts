@@ -14,6 +14,8 @@ export interface EncodeOptions {
   target_resolution: TargetResolution;
   strip_hdr: boolean;
   force_encode: boolean;
+  /** Retain Dolby Vision as Profile 8.1 (DV sources, software HEVC only). */
+  retain_dv?: boolean;
 }
 
 export interface JobLogEntry {

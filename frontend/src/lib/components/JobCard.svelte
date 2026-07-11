@@ -161,6 +161,7 @@ function customEncodeSummary(opts: NonNullable<Job['encode_options']>): string {
     parts.push(`Downscale to ${opts.target_resolution}`);
   }
   if (opts.strip_hdr) parts.push('Strip HDR/DV → SDR');
+  if (opts.retain_dv) parts.push('Retain Dolby Vision (8.1)');
   if (opts.force_encode) parts.push('Force re-encode');
   return parts.length > 0 ? parts.join(' · ') : 'Custom encode options';
 }

@@ -46,7 +46,7 @@ The series header always shows these buttons on the left:
 - **Open in Sonarr** — opens this series in Sonarr in a new tab (only shown when Sonarr is configured)
 - **Select All** — selects every episode that needs work across all seasons
 - **Rescan** — re-reads this show's episodes from disk and refreshes the episode list
-- **Custom Encode All** — opens the custom encode options for all episodes in the series (downscale / HDR tone-map)
+- **Custom Encode All** — opens the custom encode options for all episodes in the series (downscale / HDR tone-map / Dolby Vision retention)
 
 The far-right slot changes based on selection state:
 

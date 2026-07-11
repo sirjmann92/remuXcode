@@ -109,6 +109,9 @@ class VideoStream:
     hdr_max_cll: str | None = None
     # Dolby Vision RPU layer detected (DOVI configuration record side data)
     is_dolby_vision: bool = False
+    # Dolby Vision profile number (5, 7, 8, …) from the DOVI configuration
+    # record.  None when DV was detected only via codec-tag fallback.
+    dv_profile: int | None = None
     # HDR10+ dynamic metadata detected (SMPTE ST 2094-40 side data)
     is_hdr10_plus: bool = False
     # True when this is an embedded cover art / poster image (attached_pic=1).
@@ -448,26 +451,30 @@ class FFProbe:
     @staticmethod
     def _parse_hdr_side_data(
         side_data_list: list[dict],
-    ) -> tuple[str | None, str | None, bool, bool]:
+    ) -> tuple[str | None, str | None, bool, bool, int | None]:
         """Extract HDR metadata from stream side data.
 
         Returns:
-            (master_display, max_cll, is_dolby_vision, is_hdr10_plus)
+            (master_display, max_cll, is_dolby_vision, is_hdr10_plus, dv_profile)
             master_display: x265-format string e.g. "G(...)B(...)R(...)WP(...)L(...)"
             max_cll: "maxCLL,maxFALL" e.g. "1000,400"
             is_dolby_vision: True if DOVI configuration record present
             is_hdr10_plus: True if HDR Dynamic Metadata SMPTE2094-40 present
+            dv_profile: DV profile number from the configuration record, if any
         """
         master_display: str | None = None
         max_cll: str | None = None
         is_dolby_vision = False
         is_hdr10_plus = False
+        dv_profile: int | None = None
 
         for sd in side_data_list:
             sd_type = sd.get("side_data_type", "").lower()
 
             if "dovi configuration" in sd_type or "dolby vision" in sd_type:
                 is_dolby_vision = True
+                with contextlib.suppress(TypeError, ValueError):
+                    dv_profile = int(sd["dv_profile"]) if "dv_profile" in sd else dv_profile
             elif "smpte2094-40" in sd_type or "hdr dynamic metadata" in sd_type:
                 is_hdr10_plus = True
             elif "mastering display" in sd_type and master_display is None:
@@ -497,7 +504,7 @@ class FFProbe:
                 with contextlib.suppress(TypeError, ValueError):
                     max_cll = f"{sd.get('max_content', 0)},{sd.get('max_average', 0)}"
 
-        return master_display, max_cll, is_dolby_vision, is_hdr10_plus
+        return master_display, max_cll, is_dolby_vision, is_hdr10_plus, dv_profile
 
     def _parse_video_stream(self, stream: dict) -> VideoStream:
         """Parse video stream information."""
@@ -516,8 +523,8 @@ class FFProbe:
 
         # Parse HDR side data
         side_data_list = stream.get("side_data_list", [])
-        hdr_master_display, hdr_max_cll, is_dolby_vision, is_hdr10_plus = self._parse_hdr_side_data(
-            side_data_list
+        hdr_master_display, hdr_max_cll, is_dolby_vision, is_hdr10_plus, dv_profile = (
+            self._parse_hdr_side_data(side_data_list)
         )
 
         # Fallback DV detection via codec tag (dvhe / dvh1) — some DV HEVC
@@ -546,6 +553,7 @@ class FFProbe:
             hdr_master_display=hdr_master_display,
             hdr_max_cll=hdr_max_cll,
             is_dolby_vision=is_dolby_vision,
+            dv_profile=dv_profile,
             is_hdr10_plus=is_hdr10_plus,
             field_order=stream.get("field_order") or None,
             is_ebml_attachment=stream.get("disposition", {}).get("attached_pic", 0) == 1,

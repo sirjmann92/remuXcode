@@ -58,6 +58,24 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
+# ── dovi_tool (Dolby Vision RPU conversion for DV-retaining encodes) ──
+# Static musl binary (~4 MB), used by the video worker to convert
+# Profile 7 (dual-layer) RPUs to Profile 8.1 before re-encoding.
+RUN set -eux; \
+    DT_VERSION=2.3.2; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) DT_ARCH=x86_64 ;; \
+        arm64) DT_ARCH=aarch64 ;; \
+        *) echo "unsupported architecture for dovi_tool" >&2; exit 1 ;; \
+    esac; \
+    python -c "import urllib.request; urllib.request.urlretrieve( \
+        'https://github.com/quietvoid/dovi_tool/releases/download/${DT_VERSION}/dovi_tool-${DT_VERSION}-${DT_ARCH}-unknown-linux-musl.tar.gz', \
+        '/tmp/dovi_tool.tgz')"; \
+    tar -xzf /tmp/dovi_tool.tgz -C /usr/local/bin ./dovi_tool; \
+    rm /tmp/dovi_tool.tgz; \
+    chmod +x /usr/local/bin/dovi_tool; \
+    dovi_tool --version
+
 RUN groupadd -g 1000 appgroup \
     && useradd -u 1000 -g appgroup -s /bin/sh -M appuser
 
