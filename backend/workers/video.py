@@ -21,7 +21,7 @@ from backend.utils.config import VideoConfig
 from backend.utils.ffprobe import AttachmentStream, FFProbe, VideoStream
 from backend.utils.hwaccel import HWAccelCaps, resolve_encoder
 from backend.workers._progress import ffmpeg_error_summary, run_ffmpeg_with_progress
-from backend.workers._safe_move import safe_replace
+from backend.workers._safe_move import safe_replace, wait_for_output_file
 
 logger = logging.getLogger(__name__)
 
@@ -514,18 +514,15 @@ class VideoConverter:
                     error=ffmpeg_error_summary(returncode, stderr_text),
                 )
 
-            # Sanity-check: FFmpeg exited 0 but didn't create the output file.
-            # Can happen on FUSE/mergerfs when a cross-device rename (EXDEV)
-            # causes shutil.move to fall back to copy2, and the source disk is
-            # transiently unavailable (spindown / heavy I/O at that moment).
-            # NFS/SMB attribute caching can delay a freshly-written file from appearing;
-            # retry a few times before giving up.
-            for _delay in (0, 1, 3):
-                if temp_file.exists():
-                    break
-                time.sleep(_delay)
-            else:
-                shutil.rmtree(temp_dir, ignore_errors=True)
+            # Sanity-check: FFmpeg exited 0 but the output file isn't visible.
+            # NFS/SMB attribute caching can hide a freshly-written file from
+            # stat() for a while; wait_for_output_file retries with backoff and
+            # forces dentry-cache revalidation between attempts.
+            if not wait_for_output_file(temp_file, log_cb=log_cb):
+                # FFmpeg reported a clean finish, so the file very likely
+                # exists server-side even though stat() can't see it.  Keep
+                # the temp dir for inspection/recovery instead of discarding
+                # a completed encode.
                 return VideoConversionResult(
                     success=False,
                     input_file=input_file,
@@ -535,7 +532,10 @@ class VideoConverter:
                     codec_from=video.codec_name,
                     codec_to=codec_to,
                     content_type=content_type.value,
-                    error=f"FFmpeg exited normally but output file is missing: {temp_file.name}",
+                    error=(
+                        "FFmpeg exited normally but output file is still missing "
+                        f"after retries — temp dir preserved for inspection: {temp_file}"
+                    ),
                 )
 
             # Confirm the DV metadata actually survived the encode. A missing

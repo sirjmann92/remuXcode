@@ -907,8 +907,12 @@ def process_file(
         for _t in chain_temps:
             _t.unlink(missing_ok=True)
         if chain_temps:
+            # rmdir (not rmtree): only removes the chain dir when empty. A
+            # worker may have deliberately preserved its temp dir inside it
+            # (output missing after a clean ffmpeg exit — likely network-fs
+            # cache lag) and that evidence must survive the job teardown.
             with contextlib.suppress(OSError):
-                shutil.rmtree(chain_temps[0].parent, ignore_errors=True)
+                chain_temps[0].parent.rmdir()
 
     def _log_cb(source: str, level: str, message: str) -> None:
         if job:

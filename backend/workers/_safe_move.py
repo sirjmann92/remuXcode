@@ -18,6 +18,8 @@ irreversibly destroyed.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+import contextlib
 import errno
 import logging
 from pathlib import Path
@@ -27,6 +29,50 @@ import time
 logger = logging.getLogger(__name__)
 
 _BACKUP_SUFFIX = ".remuxcode-backup"
+
+
+def wait_for_output_file(
+    path: Path,
+    *,
+    delays: tuple[float, ...] = (1, 3, 10, 30),
+    log_cb: Callable[[str, str, str], None] | None = None,
+) -> bool:
+    """Wait for a freshly-written file to become visible on disk.
+
+    On CIFS/NFS mounts a file that a child process just wrote and closed can
+    transiently fail ``stat()`` from the parent process — attribute-cache lag
+    or a brief server hiccup — even though it exists on the server.  Check
+    immediately, then retry with backoff; before each retry, list the parent
+    directory to force the network filesystem to revalidate its dentry cache
+    instead of re-serving a stale negative lookup.
+
+    Returns True as soon as the file appears, False when all retries expire.
+    """
+    if path.exists():
+        return True
+
+    waited = 0.0
+    for delay in delays:
+        logger.warning(
+            "Output file not yet visible (%.0f s elapsed), retrying in %.0f s: %s",
+            waited,
+            delay,
+            path.name,
+        )
+        time.sleep(delay)
+        waited += delay
+        # Directory listing forces dentry-cache revalidation on CIFS/NFS.
+        with contextlib.suppress(OSError):
+            for _ in path.parent.iterdir():
+                pass
+        if path.exists():
+            msg = f"Output file appeared after {waited:.0f} s (network fs attribute-cache lag): {path.name}"
+            logger.warning(msg)
+            if log_cb:
+                log_cb("app", "warning", msg)
+            return True
+
+    return False
 
 
 class SafeMoveError(Exception):

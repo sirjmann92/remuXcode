@@ -13,14 +13,13 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import time
 import uuid
 
 from backend.utils.config import CleanupConfig
 from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo, SubtitleStream
 from backend.utils.language import LANGUAGE_NAMES, LanguageDetector
 from backend.workers._progress import run_ffmpeg_with_progress
-from backend.workers._safe_move import safe_replace
+from backend.workers._safe_move import safe_replace, wait_for_output_file
 
 logger = logging.getLogger(__name__)
 
@@ -529,14 +528,12 @@ class StreamCleanup:
                     error=f"FFmpeg failed: {stderr_text[-2000:]}",
                 )
 
-            # NFS/SMB attribute caching can delay a freshly-written file from appearing;
-            # retry a few times before giving up.
-            for _delay in (0, 1, 3):
-                if temp_output.exists():
-                    break
-                time.sleep(_delay)
-            else:
-                shutil.rmtree(temp_dir, ignore_errors=True)
+            # NFS/SMB attribute caching can hide a freshly-written file from
+            # stat() for a while; wait_for_output_file retries with backoff and
+            # forces dentry-cache revalidation between attempts.  On exhaustion
+            # the temp dir is kept: FFmpeg reported a clean finish, so the file
+            # very likely exists server-side even though stat() can't see it.
+            if not wait_for_output_file(temp_output, log_cb=log_cb):
                 return CleanupResult(
                     success=False,
                     input_file=input_file,
@@ -548,7 +545,10 @@ class StreamCleanup:
                     original_size=info.size,
                     new_size=0,
                     original_language=original_lang,
-                    error=f"FFmpeg exited normally but output file is missing: {temp_output.name}",
+                    error=(
+                        "FFmpeg exited normally but output file is still missing "
+                        f"after retries — temp dir preserved for inspection: {temp_output}"
+                    ),
                 )
 
             # Move temp file to output location
