@@ -2,20 +2,10 @@ name: Linters
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'README.md'
-      - 'QUICKSTART.md'
-      - 'ROADMAP.md'
-      - 'docs/**'
-      - 'images/**'
-      - 'tests/**'
-      - 'legacy/**'
   workflow_dispatch:
-  # Reusable: the Publish Docker image workflow calls this so lint gates
-  # every release (a push to main only publishes after linters pass).
+  # Pushes to main are linted via workflow_call from the Publish Docker
+  # image workflow (lint gates the build), so there is no push trigger
+  # here — it would run the same suite twice on every push.
   workflow_call:
 
 jobs:
