@@ -784,9 +784,7 @@ class StreamCleanup:
         """
         if subtitle_keep or not subtitle_remove:
             return False
-        return any(
-            not (s.language or "").strip() or s.language.lower() == "und" for s in subtitle_remove
-        )
+        return any((s.language or "").strip().lower() in ("", "und") for s in subtitle_remove)
 
     def _should_keep_subtitle(self, stream: SubtitleStream, keep_languages: set[str]) -> bool:
         """Determine if a subtitle stream should be kept."""
