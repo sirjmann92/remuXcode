@@ -14,7 +14,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Gate publishing on the same lint suite that runs on PRs — a direct
+  # push to main must pass linters before an image/release is cut.
+  lint:
+    uses: ./.github/workflows/linters.yml
+
   build:
+    needs: lint
     runs-on: ubuntu-latest
 
     permissions:

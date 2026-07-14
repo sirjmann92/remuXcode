@@ -14,6 +14,9 @@ on:
       - 'tests/**'
       - 'legacy/**'
   workflow_dispatch:
+  # Reusable: the Publish Docker image workflow calls this so lint gates
+  # every release (a push to main only publishes after linters pass).
+  workflow_call:
 
 jobs:
   linters:
