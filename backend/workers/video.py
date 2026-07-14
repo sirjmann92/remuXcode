@@ -422,6 +422,8 @@ class VideoConverter:
                         temp_dir,
                         cancel_event=cancel_event,
                         log_cb=log_cb,
+                        progress_callback=progress_callback,
+                        detail_callback=detail_callback,
                     )
                 except DVPreparationError as exc:
                     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -904,6 +906,8 @@ class VideoConverter:
         temp_dir: Path,
         cancel_event: threading.Event | None = None,
         log_cb: Callable[[str, str, str], None] | None = None,
+        progress_callback: Callable[[float], None] | None = None,
+        detail_callback: Callable[[str], None] | None = None,
     ) -> str:
         """Extract the HEVC base layer with its RPU converted to DV Profile 8.1.
 
@@ -972,6 +976,7 @@ class VideoConverter:
             convert_proc.wait()
 
         deadline = time.monotonic() + 4 * 3600  # I/O bound; generous cap
+        last_heartbeat = 0.0
         while True:
             try:
                 convert_proc.wait(timeout=2)
@@ -983,6 +988,23 @@ class VideoConverter:
                 if time.monotonic() > deadline:
                     _kill_both()
                     raise DVPreparationError("timed out extracting base layer") from None
+                # Heartbeat: large remuxes take well over the 15-minute
+                # stale-job watchdog window to stream through dovi_tool, and
+                # only progress callbacks refresh job.last_progress_at — so
+                # pulse it (value unchanged) and surface bytes written.
+                if time.monotonic() - last_heartbeat >= 10:
+                    last_heartbeat = time.monotonic()
+                    if progress_callback:
+                        progress_callback(0.0)
+                    if detail_callback:
+                        try:
+                            _written = bl_path.stat().st_size
+                        except OSError:
+                            _written = 0
+                        detail_callback(
+                            "Preparing Dolby Vision base layer (Profile 7 → 8.1)... "
+                            f"{_written / 1e9:.1f} GB written"
+                        )
 
         extract_rc = extract_proc.wait()
         convert_stderr = (convert_proc.stderr.read() if convert_proc.stderr else b"").decode(
