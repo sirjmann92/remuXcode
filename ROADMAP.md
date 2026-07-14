@@ -91,3 +91,8 @@
 ### Quality of Life
 
 - **Settings change detection** — surface files in the library that no longer match current conversion settings (e.g. after loosening or tightening a rule)
+
+### Defects, Bugs & Known Issues
+
+- ✅ **FIXED — Dolby Vision 7 -> 8.1** — Preparing Dolby Vision base layer (Profile 7 -> 8.1) failed with "Dolby Vision preparation failed: cancelled" on large remuxes. Cause: the prep step (base-layer extract through dovi_tool) emitted no progress, so the 15-minute stale-job watchdog cancelled the job mid-prep. Fixed by pulsing the progress heartbeat every 10 s during prep and surfacing GB-written in the status detail
+- ✅ **FIXED — Subtitle Cleanup** — When the only remaining subtitle track(s) were explicitly tagged with a non-kept language, the file was flagged for Cleanup but the worker's keep-all safety net silently refused to remove them (permanent no-op badge). The safety net is now tag-aware: it only keeps everything when a removal candidate is *untagged*; explicitly-tagged foreign subtitles are removed even if none remain, and `should_cleanup` mirrors the same rule so the badge always matches what the worker will do

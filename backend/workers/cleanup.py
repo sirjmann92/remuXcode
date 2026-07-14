@@ -112,11 +112,23 @@ class StreamCleanup:
             if audio_keep and len(audio_keep) < len(info.audio_streams):
                 return True
 
-        # Check if any subtitle streams should be removed
+        # Check if any subtitle streams should be removed.
+        # Mirror the worker safety net: when NO subtitle would survive, the
+        # worker only removes them if all are explicitly tagged with non-kept
+        # languages — otherwise it keeps everything, so don't flag the file.
         if self.config.clean_subtitles:
-            for sub_stream in info.subtitle_streams:
-                if not self._should_keep_subtitle(sub_stream, sub_keep_languages):
-                    return True
+            sub_keep = [
+                s
+                for s in info.subtitle_streams
+                if self._should_keep_subtitle(s, sub_keep_languages)
+            ]
+            sub_remove = [
+                s
+                for s in info.subtitle_streams
+                if not self._should_keep_subtitle(s, sub_keep_languages)
+            ]
+            if sub_remove and not self._subtitle_safety_net_applies(sub_keep, sub_remove):
+                return True
 
         # Check if audio track order needs fixing (preferred language should be first)
         if self.config.clean_audio and self._needs_reorder(info.audio_streams, original_lang):
@@ -273,17 +285,27 @@ class StreamCleanup:
             else:
                 subtitle_remove.append(sub_stream)
 
-        # Safety net: never remove ALL subtitle streams — if all are untagged
-        # (language=null/und) and nothing matched, keep them all rather than
-        # silently stripping every subtitle from the file.
-        if info.subtitle_streams and not subtitle_keep:
+        # Safety net: when nothing matched, only keep everything if the
+        # removal set contains untagged streams (we can't judge those); if
+        # every subtitle is explicitly tagged with a non-kept language,
+        # removing them all is a confident, informed decision.
+        if self._subtitle_safety_net_applies(subtitle_keep, subtitle_remove):
             logger.warning(
-                "No subtitle streams match keep_languages %s for %s — keeping all subtitles",
+                "No subtitle streams match keep_languages %s for %s and some are "
+                "untagged — keeping all subtitles",
                 sub_keep_languages,
                 input_path.name,
             )
             subtitle_keep = list(info.subtitle_streams)
             subtitle_remove = []
+        elif subtitle_remove and not subtitle_keep:
+            logger.info(
+                "Removing all %d subtitle stream(s) — explicitly tagged outside "
+                "keep_languages %s: %s",
+                len(subtitle_remove),
+                sub_keep_languages,
+                input_path.name,
+            )
 
         # Sort audio so preferred language is first, commentary last
         if self.config.clean_audio:
@@ -744,6 +766,27 @@ class StreamCleanup:
             return bool(self.config.keep_audio_description)
 
         return True
+
+    @staticmethod
+    def _subtitle_safety_net_applies(
+        subtitle_keep: list[SubtitleStream],
+        subtitle_remove: list[SubtitleStream],
+    ) -> bool:
+        """Whether the keep-all safety net overrides subtitle removal.
+
+        Removing every subtitle stream from a file is allowed only when each
+        removal candidate is explicitly tagged with a non-kept language — a
+        confident, informed decision.  When nothing would survive and any
+        candidate is untagged (possible for forced untagged subs with
+        keep_undefined off), keep everything rather than guessing.  Shared by
+        the worker and should_cleanup so the work-needed flag always matches
+        what the worker will actually do.
+        """
+        if subtitle_keep or not subtitle_remove:
+            return False
+        return any(
+            not (s.language or "").strip() or s.language.lower() == "und" for s in subtitle_remove
+        )
 
     def _should_keep_subtitle(self, stream: SubtitleStream, keep_languages: set[str]) -> bool:
         """Determine if a subtitle stream should be kept."""
