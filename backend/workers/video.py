@@ -84,7 +84,14 @@ class VideoConversionResult:
 
 
 class DVPreparationError(Exception):
-    """Raised when the Dolby Vision base-layer preparation step fails."""
+    """Raised when the Dolby Vision base-layer preparation step fails.
+
+    preserve_temp: when True, the caller must not delete the job temp dir —
+    the prep output likely exists (network-fs stat lag) and is kept for
+    inspection/recovery.
+    """
+
+    preserve_temp: bool = False
 
 
 class VideoConverter:
@@ -426,7 +433,8 @@ class VideoConverter:
                         detail_callback=detail_callback,
                     )
                 except DVPreparationError as exc:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    if not exc.preserve_temp:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
                     return VideoConversionResult(
                         success=False,
                         input_file=input_file,
@@ -1024,14 +1032,23 @@ class VideoConverter:
             raise DVPreparationError(
                 f"base layer extraction failed: {extract_stderr.strip()[-500:] or 'unknown error'}"
             )
-        try:
-            if bl_path.stat().st_size == 0:
-                raise OSError
-        except OSError:
-            bl_path.unlink(missing_ok=True)
-            raise DVPreparationError("converted base layer is missing or empty") from None
+        # A freshly-closed multi-GB file can transiently fail stat() on
+        # CIFS/NFS (attribute-cache lag) even though it exists server-side —
+        # retry with dentry-cache revalidation before declaring it missing.
+        if not wait_for_output_file(bl_path, log_cb=log_cb):
+            exc = DVPreparationError(
+                "converted base layer is still not visible after retries — "
+                f"temp dir preserved for inspection: {bl_path}"
+            )
+            exc.preserve_temp = True
+            raise exc
 
-        logger.info("DV base layer ready: %s (%d bytes)", bl_path.name, bl_path.stat().st_size)
+        bl_size = bl_path.stat().st_size
+        if bl_size == 0:
+            bl_path.unlink(missing_ok=True)
+            raise DVPreparationError("converted base layer is empty")
+
+        logger.info("DV base layer ready: %s (%d bytes)", bl_path.name, bl_size)
         return str(bl_path)
 
     def _build_hevc_command(
