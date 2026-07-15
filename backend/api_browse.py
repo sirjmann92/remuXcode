@@ -16,7 +16,7 @@ import requests
 from backend import core
 from backend.core import translate_path
 from backend.utils.anime_detect import ContentType
-from backend.utils.ffprobe import FFProbe
+from backend.utils.ffprobe import FFProbe, _looks_like_commentary_participants
 
 logger = logging.getLogger("remuxcode")
 
@@ -340,6 +340,19 @@ def _needs_cleanup(media_info: dict[str, Any], *, is_anime: bool = False) -> boo
     return False
 
 
+def _dict_is_commentary(stream: dict[str, Any]) -> bool:
+    """Commentary detection for audio stream dicts of varying shapes.
+
+    Prefers an explicit is_commentary flag (set where dicts are built from
+    parsed AudioStream objects); falls back to the same title heuristics
+    ffprobe uses, so older cached analysis entries are covered too.
+    """
+    if stream.get("is_commentary"):
+        return True
+    title = stream.get("title") or ""
+    return "commentary" in title.lower() or _looks_like_commentary_participants(title)
+
+
 def _needs_cleanup_from_streams(
     audio_streams: list[dict[str, Any]],
     subtitle_langs: list[str],
@@ -378,8 +391,14 @@ def _needs_cleanup_from_streams(
 
         # Check if the first preferred-language track has fewer channels than a
         # better track later in the list — cleanup will reorder to fix this.
+        # Commentary tracks are exempt (mirrors the worker's _needs_reorder):
+        # a 2.0 commentary must not outrank a mono main track.
         if keep and audio_streams:
-            preferred = [s for s in audio_streams if (s.get("language") or "").lower() in keep]
+            preferred = [
+                s
+                for s in audio_streams
+                if (s.get("language") or "").lower() in keep and not _dict_is_commentary(s)
+            ]
             if len(preferred) > 1:
                 first_ch = preferred[0].get("channels") or 0
                 best_ch = max(s.get("channels") or 0 for s in preferred)
@@ -620,7 +639,8 @@ def analyze_file(
     subtitle_stream_dicts = [{"language": s.language} for s in info.subtitle_streams]
     subtitle_langs = [s.language or "und" for s in info.subtitle_streams]
     audio_stream_dicts_for_cleanup = [
-        {"language": a.language, "channels": a.channels} for a in info.audio_streams
+        {"language": a.language, "channels": a.channels, "is_commentary": a.is_commentary}
+        for a in info.audio_streams
     ]
 
     return {
@@ -1093,7 +1113,13 @@ def _build_movie_results(all_movies: list[dict[str, Any]], analyze: bool) -> lis
                     needs_video = _needs_video_conversion(info, is_anime)
                     # Precise cleanup check using full stream data with titles
                     stream_dicts = [
-                        {"language": a.language, "title": a.title} for a in info.audio_streams
+                        {
+                            "language": a.language,
+                            "title": a.title,
+                            "channels": a.channels,
+                            "is_commentary": a.is_commentary,
+                        }
+                        for a in info.audio_streams
                     ]
                     sub_langs = [s.language or "" for s in info.subtitle_streams]
                     item.update(

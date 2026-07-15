@@ -297,7 +297,9 @@ async function executeRemoveCoverArt() {
               <span class="badge badge-warning badge-sm">{videoCodecLabel(result.video_streams[0]?.codec ?? '')} will be re-encoded</span>
             {/if}
             {#if result.needs_cleanup}
-              <span class="badge badge-info badge-sm" title={result.subtitle_langs_to_remove?.join(', ')}>Subtitles will be cleaned</span>
+              <span class="badge badge-info badge-sm" title={result.subtitle_langs_to_remove?.join(', ')}>
+                {result.subtitle_langs_to_remove?.length ? 'Subtitles will be cleaned' : 'Streams will be cleaned'}
+              </span>
             {/if}
           </div>
         {/if}
