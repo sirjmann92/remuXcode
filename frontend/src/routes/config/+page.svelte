@@ -581,7 +581,7 @@ $effect(() => {
                 {/each}
                 <!-- VBV / Output Format -->
                 {#each [
-                  { field: 'vbv_maxrate', label: 'VBV Max Rate', hint: 'Max bitrate in kbps for rate control', min: 0, max: 100000 },
+                  { field: 'vbv_maxrate', label: 'VBV Max Rate', hint: 'Peak bitrate cap in kbps (CRF governs size; DV retention requires non-zero)', min: 0, max: 100000 },
                   { field: 'vbv_bufsize', label: 'VBV Buffer Size', hint: 'Buffer size in kbps for rate control', min: 0, max: 200000 },
                 ] as item}
                   <div class="flex items-center justify-between" title={item.hint}>

@@ -367,6 +367,14 @@ class VideoConverter:
                     _dv_error = "Dolby Vision retention cannot be combined with SDR tone-mapping"
                 elif _would_downscale:
                     _dv_error = "Dolby Vision retention requires original resolution (no downscale)"
+                elif self.config.vbv_maxrate <= 0 or self.config.vbv_bufsize <= 0:
+                    # Checked up front: x265 refuses DV RPU encoding without
+                    # VBV, and hitting that only after the base-layer prep
+                    # would waste 20+ minutes of I/O.
+                    _dv_error = (
+                        "Dolby Vision retention requires VBV rate control — set non-zero "
+                        "VBV Max Rate and Buffer Size in video settings (e.g. 40000/80000)"
+                    )
                 if _dv_error:
                     return VideoConversionResult(
                         success=False,

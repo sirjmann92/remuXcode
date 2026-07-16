@@ -163,9 +163,13 @@ class VideoConfig:
     nvenc_live_action_quality: int = 21
     nvenc_preset: str = "p5"
 
-    # Common encoding settings (HEVC-specific, not used for AV1)
-    vbv_maxrate: int = 5000
-    vbv_bufsize: int = 10000
+    # Common encoding settings (HEVC-specific, not used for AV1).
+    # VBV is a peak-rate ceiling only (CRF still governs actual size), so the
+    # default is sized for the heaviest supported content: 4K HDR/DV remux
+    # re-encodes. It is rarely engaged at 1080p. Dolby Vision retention
+    # requires a non-zero VBV (x265 refuses DV RPU encoding without it).
+    vbv_maxrate: int = 40000
+    vbv_bufsize: int = 80000
     profile: str = "main10"
     pix_fmt: str = "yuv420p10le"
     hw_accel: str = "none"  # none, auto, qsv, vaapi, nvenc
@@ -422,8 +426,8 @@ class Config:
             nvenc_anime_quality=self._get("video.nvenc_anime_quality", 18),
             nvenc_live_action_quality=self._get("video.nvenc_live_action_quality", 21),
             nvenc_preset=self._get("video.nvenc_preset", "p5"),
-            vbv_maxrate=self._get("video.vbv_maxrate", 5000),
-            vbv_bufsize=self._get("video.vbv_bufsize", 10000),
+            vbv_maxrate=self._get("video.vbv_maxrate", 40000),
+            vbv_bufsize=self._get("video.vbv_bufsize", 80000),
             profile=self._get("video.profile", "main10"),
             pix_fmt=self._get("video.pix_fmt", "yuv420p10le"),
             hw_accel=self._get("video.hw_accel", "none"),

@@ -91,8 +91,8 @@ When hardware acceleration is active:
 |---------|-------------|---------|
 | **Pixel Format** | Output pixel format. `yuv420p10le` = 10-bit. Leave as-is unless you have a specific reason to change it. | `yuv420p10le` |
 | **Profile / Level** | H.265 profile and level for compatibility. `main10` / `5.1` covers most devices. | `main10` / `5.1` |
-| **VBV Max Rate** | Maximum bitrate cap in kbps. `0` = no cap (recommended). Set a value if you need to limit peak bitrate for a specific streaming device. | `0` |
-| **VBV Buffer Size** | VBV buffer in kbps. `0` = no buffer cap. Used in conjunction with VBV Max Rate. | `0` |
+| **VBV Max Rate** | Peak bitrate ceiling in kbps for HEVC encodes. This only caps momentary spikes for decoder compatibility — CRF still determines the actual file size, so a 4K-safe ceiling costs nothing at lower resolutions. The default is sized for 4K HDR/DV remux re-encodes. **Dolby Vision retention requires a non-zero value** (x265 refuses DV RPU encoding without VBV). | `40000` |
+| **VBV Buffer Size** | VBV buffer in kbps, used with VBV Max Rate. 2× the max rate is the standard ratio for file-based playback. | `80000` |
 
 ---
 
