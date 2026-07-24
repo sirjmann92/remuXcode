@@ -1,5 +1,5 @@
 <script lang="ts">
-import { analyzeFile, getActiveJobs, removeCoverArt, retagFile } from '$lib/api';
+import { analyzeFile, getActiveJobs, getJob, removeCoverArt, retagFile } from '$lib/api';
 import { channelLabel, videoCodecLabel } from '$lib/format';
 import { langLabel, langNames } from '$lib/languages';
 import type { AnalyzeResult, RetagOverride } from '$lib/types';
@@ -13,6 +13,10 @@ interface Props {
   sonarr_episode_file_id?: number;
   onclose: () => void;
   oncoverartchanged?: (path: string, newCount: number) => void;
+  /** Called once a queued retag job has actually finished (success or failure) —
+   * lets the parent page re-fetch its data so badges reflect the fix without
+   * requiring the user to manually rescan/reload. */
+  onretagged?: () => void;
 }
 
 const {
@@ -23,6 +27,7 @@ const {
   sonarr_episode_file_id,
   onclose,
   oncoverartchanged,
+  onretagged,
 }: Props = $props();
 
 let result: AnalyzeResult | null = $state(null);
@@ -112,14 +117,34 @@ const pendingOverrides = $derived.by((): RetagOverride[] => {
   return overrides;
 });
 
+/** Poll a queued job until it leaves pending/running, or the timeout elapses. */
+async function waitForJob(jobId: string, timeoutMs = 30_000, intervalMs = 500): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const job = await getJob(jobId);
+    if (job.status === 'completed') return;
+    if (job.status === 'failed' || job.status === 'cancelled') {
+      throw new Error(job.error || `Retag job ${job.status}`);
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error('Retag job is taking longer than expected — check the Jobs page');
+}
+
 async function handleRetag() {
   if (!pendingOverrides.length) return;
   retagLoading = true;
   retagError = '';
   retagSuccess = false;
   try {
-    await retagFile(path, pendingOverrides);
+    const { job_id } = await retagFile(path, pendingOverrides);
+    // Retag (mkvpropedit) is normally near-instant, but the job also triggers
+    // a Sonarr/Radarr refresh+rescan afterward so their cached mediaInfo
+    // picks up the corrected tags — wait for the whole job, not just queuing,
+    // before telling the parent page to re-fetch.
+    await waitForJob(job_id);
     retagSuccess = true;
+    onretagged?.();
     setTimeout(() => onclose(), 1500);
   } catch (e: unknown) {
     retagError = e instanceof Error ? e.message : 'Retag failed';

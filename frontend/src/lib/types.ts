@@ -362,6 +362,7 @@ export interface EpisodeFile {
   episode_number: number;
   title: string;
   path: string;
+  sonarr_episode_file_id?: number;
   size: number | null;
   video_codec: string;
   audio_codec: string;

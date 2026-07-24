@@ -604,10 +604,35 @@ class JobQueue:
                 else:
                     job.status = JobStatus.COMPLETED
                     job.log("app", "info", "Retag completed successfully")
+                    # mkvpropedit/ffmpeg wrote new track tags in place, but
+                    # Sonarr/Radarr cache the mediaInfo they scanned at import
+                    # time — their own "needs cleanup" fallback (used when our
+                    # ffprobe cache isn't linked yet) would otherwise keep
+                    # reporting the pre-fix languages indefinitely. Trigger the
+                    # same refresh+rescan used after normal jobs so their cache
+                    # picks up the corrected tags, and use the resolved IDs to
+                    # link our own analysis cache row precisely.
+                    rename_result = RenameResult()
+                    try:
+                        rename_result = trigger_rename(job.file_path)
+                        # Rare, but possible: if the naming scheme includes an
+                        # audio-language token, correcting the language tag can
+                        # itself trigger a real rename.
+                        if rename_result.new_path and rename_result.new_path != job.file_path:
+                            job.output_path = rename_result.new_path
+                            job.log(
+                                "app", "info", f"Renamed to: {Path(rename_result.new_path).name}"
+                            )
+                    except Exception as refresh_err:
+                        logger.warning("Post-retag Sonarr/Radarr refresh failed: %s", refresh_err)
                     try:
                         from backend.api_analyze import analyze_and_store
 
-                        analyze_and_store(job.file_path)
+                        analyze_and_store(
+                            rename_result.new_path or job.file_path,
+                            radarr_movie_file_id=rename_result.radarr_movie_file_id,
+                            sonarr_episode_file_id=rename_result.sonarr_episode_file_id,
+                        )
                     except Exception as analyze_err:
                         logger.warning("Post-retag analysis failed: %s", analyze_err)
                 return

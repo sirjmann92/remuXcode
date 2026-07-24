@@ -1681,6 +1681,11 @@ def get_series_detail(
             "episode_number": ep.get("episodeNumber"),
             "title": ep.get("title", ""),
             "path": host_path,
+            # Lets the Analyze modal pass this straight to /api/analyze so the
+            # ffprobe cache row links precisely to this episode file (same
+            # pattern as radarr_movie_id on the Movies page), instead of
+            # relying on the path-match fallback.
+            "sonarr_episode_file_id": ep_file_id,
             "size": ef.get("size"),
             "video_codec": mi.get("videoCodec", ""),
             "audio_codec": mi.get("audioCodec", ""),

@@ -4,6 +4,7 @@ import type {
   ConfigSummary,
   EncodeOptions,
   HealthStatus,
+  Job,
   JobLogsResponse,
   JobsResponse,
   MoviesResponse,
@@ -81,6 +82,10 @@ export async function deleteJob(id: string): Promise<{ message: string }> {
 
 export async function cancelJob(id: string): Promise<{ message: string }> {
   return request(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+}
+
+export async function getJob(id: string): Promise<Job> {
+  return request(`/api/jobs/${encodeURIComponent(id)}`);
 }
 
 export async function retryJob(id: string): Promise<{ job_id: string; message: string }> {

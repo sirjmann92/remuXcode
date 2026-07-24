@@ -932,6 +932,16 @@ const sortOptions: { value: string; label: string }[] = [
     media_type="movie"
     radarr_movie_id={analyzePath.radarr_movie_id}
     onclose={() => (analyzePath = null)}
+    onretagged={async () => {
+      // Fix Metadata rewrote track tags and triggered a Radarr refresh, so
+      // the library-wide badges (needs_cleanup, etc.) are stale until we
+      // re-fetch. Keep the open detail panel in sync with the fresh data.
+      await reloadMovies();
+      if (detailMovie) {
+        const updated = movies.find((m) => m.path === detailMovie!.path);
+        if (updated) detailMovie = updated;
+      }
+    }}
     oncoverartchanged={(p, count) => {
       const m = movies.find((m) => m.path === p);
       if (m) m.cover_art_count = count;
