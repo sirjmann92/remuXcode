@@ -18,7 +18,13 @@ import uuid
 
 from backend.utils.anime_detect import AnimeDetector, ContentType
 from backend.utils.config import VideoConfig
-from backend.utils.ffprobe import AttachmentStream, FFProbe, VideoStream
+from backend.utils.ffprobe import (
+    AttachmentStream,
+    FFProbe,
+    SubtitleStream,
+    VideoStream,
+    subtitle_needs_transcode,
+)
 from backend.utils.hwaccel import HWAccelCaps, resolve_encoder
 from backend.workers._progress import ffmpeg_error_summary, run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace, wait_for_output_file
@@ -484,6 +490,7 @@ class VideoConverter:
                 encode_options=encode_options,
                 title=title,
                 attachments=info.attachment_streams or None,
+                subtitle_streams=info.subtitle_streams or None,
                 dv_passthrough=dv_retain_active,
                 dv_bl_input=dv_bl_input,
             )
@@ -729,6 +736,7 @@ class VideoConverter:
         encode_options: dict | None = None,
         title: str | None = None,
         attachments: list[AttachmentStream] | None = None,
+        subtitle_streams: list[SubtitleStream] | None = None,
         dv_passthrough: bool = False,
         dv_bl_input: str | None = None,
     ) -> list[str]:
@@ -825,6 +833,7 @@ class VideoConverter:
                 dv_bl_input=dv_bl_input,
             )
 
+        cmd = self._patch_subtitle_codecs(cmd, subtitle_streams)
         return self._patch_attachment_mimetypes(cmd, attachments or [])
 
     @staticmethod
@@ -1466,6 +1475,35 @@ class VideoConverter:
     def _append_copy_streams(cmd: list[str]) -> None:
         """Append flags to copy audio, subtitles, and attachments."""
         cmd.extend(["-c:a", "copy", "-c:s", "copy", "-c:t", "copy"])
+
+    @staticmethod
+    def _patch_subtitle_codecs(
+        cmd: list[str],
+        subtitle_streams: list[SubtitleStream] | None,
+    ) -> list[str]:
+        """Override incompatible subtitle codecs to SubRip before the output path.
+
+        Every encoder path here blanket-copies subtitles via ``-map 0:s?`` +
+        ``-c:s copy``, mapping them in their original file order. Some codecs
+        (mov_text from MP4 sources, eia_608 closed captions) make the
+        Matroska muxer refuse to write the output header at all — a failure
+        that kills every stream, not just the subtitle. This patches the
+        completed command with per-index ``-c:s:N srt`` overrides, inserted
+        immediately before the output filename (the last element) so they
+        take effect after the blanket copy.
+        """
+        if not subtitle_streams:
+            return cmd
+
+        fixes: list[str] = []
+        for i, sub in enumerate(subtitle_streams):
+            if subtitle_needs_transcode(sub.codec_name):
+                fixes += [f"-c:s:{i}", "srt"]
+
+        if not fixes:
+            return cmd
+
+        return cmd[:-1] + fixes + [cmd[-1]]
 
     @staticmethod
     def _patch_attachment_mimetypes(

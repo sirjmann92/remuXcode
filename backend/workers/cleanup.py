@@ -16,7 +16,13 @@ import threading
 import uuid
 
 from backend.utils.config import CleanupConfig
-from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo, SubtitleStream
+from backend.utils.ffprobe import (
+    AudioStream,
+    FFProbe,
+    MediaInfo,
+    SubtitleStream,
+    subtitle_needs_transcode,
+)
 from backend.utils.language import LANGUAGE_NAMES, LanguageDetector
 from backend.workers._progress import run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace, wait_for_output_file
@@ -1122,6 +1128,20 @@ class StreamCleanup:
 
         # Copy all streams (no re-encoding)
         cmd.extend(["-c", "copy"])
+
+        # Some subtitle codecs (mov_text from MP4 sources, eia_608 closed
+        # captions) make the Matroska muxer refuse to write the file at all
+        # ("Subtitle codec N is not supported") — a header-write failure that
+        # kills every stream, not just the subtitle. This only applies when
+        # the actual output container is Matroska: this worker's temp output
+        # inherits the INPUT's extension (chained after Video it's already
+        # .mkv, but a standalone Cleanup-only job on an untouched .mp4 source
+        # writes an .mp4 — where mov_text is the native, correct codec and
+        # forcing srt would break the mux instead of fixing it).
+        if Path(output_file).suffix.lower() == ".mkv":
+            for i, sub_stream in enumerate(subtitle_keep):
+                if subtitle_needs_transcode(sub_stream.codec_name):
+                    cmd.extend([f"-c:s:{i}", "srt"])
 
         # Tag the container so Sonarr detects a size change and re-reads MediaInfo
         cmd.extend(["-metadata:g", "ENCODED_BY=remuxcode"])

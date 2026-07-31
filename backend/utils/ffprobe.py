@@ -235,6 +235,19 @@ class AudioStream:
         )
 
 
+# Subtitle codecs the Matroska muxer refuses to write ("Subtitle codec N is
+# not supported" — a hard header-write failure that aborts the whole output,
+# not just the subtitle stream). Both are plain-text formats from non-MKV
+# source containers (MP4 tx3g, ATSC/OTA closed captions); FFmpeg can decode
+# and re-encode either straight to SubRip with no quality loss.
+MATROSKA_INCOMPATIBLE_SUBTITLE_CODECS = frozenset({"mov_text", "eia_608"})
+
+
+def subtitle_needs_transcode(codec_name: str) -> bool:
+    """Whether a subtitle stream must be transcoded (not copied) into an MKV output."""
+    return codec_name in MATROSKA_INCOMPATIBLE_SUBTITLE_CODECS
+
+
 @dataclass
 class SubtitleStream:
     """Represents a subtitle stream in a media file."""
