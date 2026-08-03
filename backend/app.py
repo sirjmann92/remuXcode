@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -129,7 +129,18 @@ def create_app() -> FastAPI:
     app.include_router(webhook_router, prefix="/api")
 
     @app.get("/health")
-    async def health() -> dict[str, Any]:
+    async def health(response: Response) -> dict[str, Any]:
+        from backend.core import check_media_mounts
+
+        mount_warnings = check_media_mounts()
+        if mount_warnings:
+            response.status_code = 503
+            return {
+                "status": "degraded",
+                "service": "remuxcode",
+                "version": __version__,
+                "mount_warnings": mount_warnings,
+            }
         return {
             "status": "healthy",
             "service": "remuxcode",

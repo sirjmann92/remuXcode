@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from backend.auth import require_auth
-from backend.core import JobType, create_job, translate_path
+from backend.core import JobType, check_media_mounts, create_job, translate_path
 
 logger = logging.getLogger("remuxcode")
 
@@ -71,6 +71,7 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
 
     # Queue jobs
     job_ids = []
+    missing: list[str] = []
     for file_path in files:
         if Path(file_path).exists():
             job = create_job(
@@ -82,7 +83,24 @@ async def handle_webhook(data: dict[str, Any]) -> dict[str, Any]:
             )
             job_ids.append(job.id)
         else:
+            missing.append(file_path)
             logger.warning("Webhook file not found on disk: %s", file_path)
+
+    if missing:
+        # A file genuinely being gone is normal (deleted before the webhook
+        # was processed). A whole network share being stale/unmounted looks
+        # identical from a single file's perspective — every file under it
+        # reports "not found" — so cross-check against Sonarr/Radarr's own
+        # root folders to tell the two apart and surface it loudly rather
+        # than silently dropping every affected job.
+        mount_warnings = check_media_mounts()
+        if mount_warnings:
+            logger.error(
+                "Webhook had %d missing file(s) AND a mount health check is failing — "
+                "this is likely a stale/unmounted share, not deleted files: %s",
+                len(missing),
+                "; ".join(mount_warnings),
+            )
 
     return {
         "message": f"Queued {len(job_ids)} file(s)",

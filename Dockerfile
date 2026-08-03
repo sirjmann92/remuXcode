@@ -102,4 +102,12 @@ RUN chmod +x /app/start.sh && mkdir -p /app/logs /app/config
 
 EXPOSE 7889
 USER root
+
+# Reports unhealthy (503) when Sonarr/Radarr root folders are visible but
+# empty inside the container — the signature of a bind-mounted network
+# share that wasn't up yet when the container started. No curl install
+# needed; the interpreter is already here.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+    CMD python3 -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:7889/health', timeout=8).status == 200 else 1)"
+
 ENTRYPOINT ["/app/start.sh"]

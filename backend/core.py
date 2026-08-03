@@ -1132,6 +1132,81 @@ def _get_sonarr_config() -> tuple[str, str]:
     return url, key
 
 
+_mount_health_cache: dict[str, Any] = {"checked_at": 0.0, "warnings": []}
+_MOUNT_HEALTH_CACHE_TTL = 30  # seconds — polled by Docker's healthcheck
+
+
+def check_media_mounts() -> list[str]:
+    """Detect stale/empty bind mounts by cross-checking Sonarr/Radarr root folders.
+
+    A network share that isn't up yet when this container starts (e.g. after
+    a host power loss where the NAS mount recovers slower than Docker) leaves
+    its bind-mounted path existing but permanently empty inside the
+    container. Remounting the share on the *host* afterward does not fix
+    this: Docker bind mounts snapshot whatever was at that host path when the
+    container started, and a filesystem mounted onto that path later does
+    not propagate into an already-running container's mount namespace —
+    only recreating the container after the host mount is ready does.
+
+    Cross-checking against Sonarr/Radarr's own root folders (rather than any
+    path hardcoded here) keeps this deployment-agnostic: whatever paths
+    Sonarr/Radarr manage are exactly the paths this app needs to see.
+
+    Returns a list of human-readable warnings; empty list means healthy.
+    Results are cached briefly since this is polled by Docker's healthcheck.
+    """
+    now = time.time()
+    if now - _mount_health_cache["checked_at"] < _MOUNT_HEALTH_CACHE_TTL:
+        return _mount_health_cache["warnings"]
+
+    warnings: list[str] = []
+
+    def _check_roots(service: str, url: str, key: str) -> None:
+        if not url or not key:
+            return
+        try:
+            resp = requests.get(f"{url}/api/v3/rootfolder", headers={"X-Api-Key": key}, timeout=10)
+            resp.raise_for_status()
+            roots = resp.json()
+        except Exception as exc:
+            logger.debug("Mount health check: could not query %s root folders: %s", service, exc)
+            return
+        for root in roots:
+            remote_path = root.get("path")
+            if not remote_path:
+                continue
+            local_path = Path(translate_path(remote_path))
+            if not local_path.is_dir():
+                warnings.append(
+                    f"{service} root folder '{remote_path}' does not exist at "
+                    f"'{local_path}' inside the container — check that the volume "
+                    "is mounted"
+                )
+                continue
+            try:
+                has_entries = any(local_path.iterdir())
+            except OSError as exc:
+                warnings.append(f"{service} root folder '{local_path}' is unreadable: {exc}")
+                continue
+            if not has_entries:
+                warnings.append(
+                    f"{service} root folder '{remote_path}' is empty at '{local_path}' "
+                    "inside the container — the network mount may not have been "
+                    "available when this container started (e.g. after a host "
+                    "reboot/power loss). Confirm the host mount is back, then "
+                    "restart this container to pick it up."
+                )
+
+    sonarr_url, sonarr_key = _get_sonarr_config()
+    radarr_url, radarr_key = _get_radarr_config()
+    _check_roots("Sonarr", sonarr_url, sonarr_key)
+    _check_roots("Radarr", radarr_url, radarr_key)
+
+    _mount_health_cache["checked_at"] = now
+    _mount_health_cache["warnings"] = warnings
+    return warnings
+
+
 def refresh_radarr() -> None:
     """Trigger a full Radarr library refresh (all movies)."""
     radarr_url, radarr_key = _get_radarr_config()
