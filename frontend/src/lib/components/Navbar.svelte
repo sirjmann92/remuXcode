@@ -113,7 +113,15 @@ function closeMobileDrawer() {
 
   <!-- Footer / health -->
   <div class="p-4 pt-2 border-t border-base-content/8">
-    {#if health}
+    {#if health && health.status === 'degraded'}
+      <div class="flex items-center gap-2 tooltip tooltip-top" data-tip={health.mount_warnings?.join(' — ') ?? 'A network share looks stale or unmounted'}>
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
+        </span>
+        <span class="text-xs text-warning">{health.version.match(/^\d/) ? `v${health.version}` : health.version} — mount issue</span>
+      </div>
+    {:else if health}
       <div class="flex items-center gap-2">
         <span class="relative flex h-2 w-2">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>

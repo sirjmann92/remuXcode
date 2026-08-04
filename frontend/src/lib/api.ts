@@ -43,7 +43,16 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = 60_000):
 
 // Health
 export async function getHealth(): Promise<HealthStatus> {
-  return request('/health');
+  // Unlike every other endpoint, a non-2xx here can still be a valid,
+  // meaningful payload: the backend returns 503 + {status: "degraded", ...}
+  // when a Sonarr/Radarr root folder looks stale/unmounted, specifically so
+  // Docker's HEALTHCHECK (a plain HTTP status check) can detect it. That's a
+  // real, actionable condition — not the same thing as "the app is
+  // unreachable" — so this bypasses the generic request() helper's
+  // throw-on-!ok behavior and always returns the parsed body when there is
+  // one, only throwing for genuine network/parse failures.
+  const res = await fetch('/health');
+  return res.json();
 }
 
 // Jobs

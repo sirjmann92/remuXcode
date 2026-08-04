@@ -272,6 +272,9 @@ export interface HealthStatus {
   status: string;
   service: string;
   version: string;
+  /** Present (and status: "degraded") when a Sonarr/Radarr root folder looks
+   * empty or missing inside the container — a stale/unmounted network share. */
+  mount_warnings?: string[];
 }
 
 // Browse types
