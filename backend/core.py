@@ -13,6 +13,7 @@ import json as _json
 import logging
 import os
 from pathlib import Path
+import random
 import shutil
 import tempfile
 import threading
@@ -1137,7 +1138,8 @@ _MOUNT_HEALTH_CACHE_TTL = 30  # seconds — polled by Docker's healthcheck
 
 
 def check_media_mounts() -> list[str]:
-    """Detect stale/empty bind mounts by cross-checking Sonarr/Radarr root folders.
+    """Detect stale/empty bind mounts by sampling real files Sonarr/Radarr
+    report as already present, rather than checking root folders.
 
     A network share that isn't up yet when this container starts (e.g. after
     a host power loss where the NAS mount recovers slower than Docker) leaves
@@ -1148,9 +1150,13 @@ def check_media_mounts() -> list[str]:
     not propagate into an already-running container's mount namespace —
     only recreating the container after the host mount is ready does.
 
-    Cross-checking against Sonarr/Radarr's own root folders (rather than any
-    path hardcoded here) keeps this deployment-agnostic: whatever paths
-    Sonarr/Radarr manage are exactly the paths this app needs to see.
+    An earlier version of this check tested whether each configured Sonarr/
+    Radarr *root folder* was non-empty. That produced false positives for
+    root folders that are legitimate, intentionally-unused organizational
+    categories (e.g. a "Cartoon" root with zero series ever assigned to it)
+    — empty by the user's own choice, nothing to do with mount health.
+    Sampling actual episode/movie files that Sonarr/Radarr say exist avoids
+    that: there is no ambiguity about whether a specific file "should" exist.
 
     Returns a list of human-readable warnings; empty list means healthy.
     Results are cached briefly since this is polled by Docker's healthcheck.
@@ -1160,47 +1166,82 @@ def check_media_mounts() -> list[str]:
         return _mount_health_cache["warnings"]
 
     warnings: list[str] = []
+    sample_size = 5
 
-    def _check_roots(service: str, url: str, key: str) -> None:
+    def _report_if_all_missing(service: str, paths: list[str]) -> None:
+        paths = [p for p in paths if p]
+        if not paths:
+            return  # nothing with files yet (fresh install) — nothing to check
+        missing = [p for p in paths if not Path(translate_path(p)).is_file()]
+        if len(missing) < len(paths):
+            return  # at least one sampled file is visible — mount is fine
+        warnings.append(
+            f"{service}: checked {len(paths)} file(s) it reports as already present "
+            f"and none are visible inside this container (e.g. '{missing[0]}') — the "
+            "network mount may not have been available when this container started "
+            "(e.g. after a host reboot/power loss). Confirm the host mount is back, "
+            "then restart this container to pick it up."
+        )
+
+    def _check_radarr(url: str, key: str) -> None:
         if not url or not key:
             return
         try:
-            resp = requests.get(f"{url}/api/v3/rootfolder", headers={"X-Api-Key": key}, timeout=10)
+            resp = requests.get(f"{url}/api/v3/movie", headers={"X-Api-Key": key}, timeout=10)
             resp.raise_for_status()
-            roots = resp.json()
+            movies = resp.json()
         except Exception as exc:
-            logger.debug("Mount health check: could not query %s root folders: %s", service, exc)
+            logger.debug("Mount health check: could not query Radarr movies: %s", exc)
             return
-        for root in roots:
-            remote_path = root.get("path")
-            if not remote_path:
-                continue
-            local_path = Path(translate_path(remote_path))
-            if not local_path.is_dir():
-                warnings.append(
-                    f"{service} root folder '{remote_path}' does not exist at "
-                    f"'{local_path}' inside the container — check that the volume "
-                    "is mounted"
-                )
-                continue
+        candidates = [
+            m["movieFile"]["path"]
+            for m in movies
+            if m.get("hasFile") and m.get("movieFile", {}).get("path")
+        ]
+        _report_if_all_missing(
+            "Radarr", random.sample(candidates, min(sample_size, len(candidates)))
+        )
+
+    def _check_sonarr(url: str, key: str) -> None:
+        if not url or not key:
+            return
+        try:
+            resp = requests.get(f"{url}/api/v3/series", headers={"X-Api-Key": key}, timeout=10)
+            resp.raise_for_status()
+            series = resp.json()
+        except Exception as exc:
+            logger.debug("Mount health check: could not query Sonarr series: %s", exc)
+            return
+        candidates = [
+            s for s in series if (s.get("statistics") or {}).get("episodeFileCount", 0) > 0
+        ]
+        if not candidates:
+            return
+        paths: list[str] = []
+        for s in random.sample(candidates, min(sample_size, len(candidates))):
             try:
-                has_entries = any(local_path.iterdir())
-            except OSError as exc:
-                warnings.append(f"{service} root folder '{local_path}' is unreadable: {exc}")
-                continue
-            if not has_entries:
-                warnings.append(
-                    f"{service} root folder '{remote_path}' is empty at '{local_path}' "
-                    "inside the container — the network mount may not have been "
-                    "available when this container started (e.g. after a host "
-                    "reboot/power loss). Confirm the host mount is back, then "
-                    "restart this container to pick it up."
+                r = requests.get(
+                    f"{url}/api/v3/episodefile",
+                    params={"seriesId": s["id"]},
+                    headers={"X-Api-Key": key},
+                    timeout=10,
                 )
+                r.raise_for_status()
+                episode_files = r.json()
+                if episode_files:
+                    paths.append(episode_files[0].get("path"))
+            except Exception as exc:
+                logger.debug(
+                    "Mount health check: could not query episode files for series %s: %s",
+                    s.get("id"),
+                    exc,
+                )
+        _report_if_all_missing("Sonarr", paths)
 
     sonarr_url, sonarr_key = _get_sonarr_config()
     radarr_url, radarr_key = _get_radarr_config()
-    _check_roots("Sonarr", sonarr_url, sonarr_key)
-    _check_roots("Radarr", radarr_url, radarr_key)
+    _check_sonarr(sonarr_url, sonarr_key)
+    _check_radarr(radarr_url, radarr_key)
 
     _mount_health_cache["checked_at"] = now
     _mount_health_cache["warnings"] = warnings
