@@ -23,6 +23,7 @@ from backend.utils.ffprobe import (
     FFProbe,
     SubtitleStream,
     VideoStream,
+    subtitle_is_unreadable,
     subtitle_needs_transcode,
 )
 from backend.utils.hwaccel import HWAccelCaps, resolve_encoder
@@ -1481,24 +1482,45 @@ class VideoConverter:
         cmd: list[str],
         subtitle_streams: list[SubtitleStream] | None,
     ) -> list[str]:
-        """Override incompatible subtitle codecs to SubRip before the output path.
+        """Fix up incompatible/unreadable subtitle codecs before the output path.
 
         Every encoder path here blanket-copies subtitles via ``-map 0:s?`` +
-        ``-c:s copy``, mapping them in their original file order. Some codecs
-        (mov_text from MP4 sources, eia_608 closed captions) make the
-        Matroska muxer refuse to write the output header at all — a failure
-        that kills every stream, not just the subtitle. This patches the
-        completed command with per-index ``-c:s:N srt`` overrides, inserted
-        immediately before the output filename (the last element) so they
-        take effect after the blanket copy.
+        ``-c:s copy``, mapping them in their original file order. Two distinct
+        problems get patched here, both inserted immediately before the
+        output filename (the last element) so they take effect after that
+        blanket copy:
+
+        - Codecs FFmpeg can decode but the Matroska muxer refuses to write
+          verbatim (mov_text from MP4 sources, eia_608 closed captions) get a
+          per-index ``-c:s:N srt`` re-encode override.
+        - Streams FFmpeg can't identify a codec for at all (seen with
+          non-compliantly-muxed WebVTT from some streaming-service WEBDL
+          rips — ffprobe reports an empty codec_name) have no decode path to
+          transcode from, so they're excluded from the output entirely via
+          ``-map -0:N`` (N = the stream's original input index, not its
+          position among subtitles) rather than copied or transcoded.
+
+        Excluding a stream shifts every later stream's *output* subtitle
+        position down by one — verified empirically, since it's easy to get
+        backwards: ``-map -0:3`` to drop a stream does not just leave a gap
+        at its old output slot, it closes it, so a later stream's
+        ``-c:s:N`` must use its position among the *surviving* streams, not
+        its position in the original ``subtitle_streams`` list. Excluded
+        streams never occupy an output slot, so they don't advance the
+        counter used for subsequent ``-c:s:N`` targets.
         """
         if not subtitle_streams:
             return cmd
 
         fixes: list[str] = []
-        for i, sub in enumerate(subtitle_streams):
+        output_pos = 0
+        for sub in subtitle_streams:
+            if subtitle_is_unreadable(sub.codec_name):
+                fixes += ["-map", f"-0:{sub.index}"]
+                continue
             if subtitle_needs_transcode(sub.codec_name):
-                fixes += [f"-c:s:{i}", "srt"]
+                fixes += [f"-c:s:{output_pos}", "srt"]
+            output_pos += 1
 
         if not fixes:
             return cmd

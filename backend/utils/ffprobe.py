@@ -248,6 +248,26 @@ def subtitle_needs_transcode(codec_name: str) -> bool:
     return codec_name in MATROSKA_INCOMPATIBLE_SUBTITLE_CODECS
 
 
+def subtitle_is_unreadable(codec_name: str) -> bool:
+    """Whether FFmpeg couldn't identify a codec for this subtitle stream at all.
+
+    Distinct from subtitle_needs_transcode: that covers codecs FFmpeg can
+    decode fine but the Matroska muxer refuses to copy verbatim (fixed by
+    re-encoding to SubRip). This covers streams FFmpeg's demuxer can't even
+    identify — ffprobe reports either no codec_name field at all (empty
+    string here) or the literal string "unknown", both meaning codec id 0
+    (AV_CODEC_ID_NONE). Seen with WebVTT tracks from some streaming-service
+    WEBDL rips whose muxing tool didn't set the Matroska BlockAddition/
+    CodecPrivate fields FFmpeg expects (mkvmerge, a more lenient tool,
+    correctly reports these as S_TEXT/WEBVTT; FFmpeg cannot — remuxing
+    through mkvmerge even upgrades FFmpeg's read from blank to the literal
+    "unknown", same underlying problem either way). There is no decode path
+    to transcode from, so the only safe handling is to drop the stream —
+    never map it into the output, regardless of target container.
+    """
+    return not codec_name or codec_name.lower() == "unknown"
+
+
 @dataclass
 class SubtitleStream:
     """Represents a subtitle stream in a media file."""

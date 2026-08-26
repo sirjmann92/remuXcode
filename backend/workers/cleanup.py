@@ -21,6 +21,7 @@ from backend.utils.ffprobe import (
     FFProbe,
     MediaInfo,
     SubtitleStream,
+    subtitle_is_unreadable,
     subtitle_needs_transcode,
 )
 from backend.utils.language import LANGUAGE_NAMES, LanguageDetector
@@ -117,6 +118,15 @@ class StreamCleanup:
             ]
             if audio_keep and len(audio_keep) < len(info.audio_streams):
                 return True
+
+        # A subtitle stream FFmpeg can't even identify a codec for (empty
+        # codec_name — seen with non-compliantly-muxed WebVTT from some
+        # streaming-service WEBDL rips) can never be safely copied into any
+        # output; this is unconditional, not a clean_subtitles preference —
+        # every worker that writes this file needs it flagged so the stream
+        # gets dropped rather than crashing the mux.
+        if any(subtitle_is_unreadable(s.codec_name) for s in info.subtitle_streams):
+            return True
 
         # Check if any subtitle streams should be removed.
         # Mirror the worker safety net: when NO subtitle would survive, the
@@ -283,9 +293,26 @@ class StreamCleanup:
             audio_keep = list(info.audio_streams)
             audio_remove = []
 
+        # Streams FFmpeg can't identify a codec for at all can never be
+        # copied into any output (there's no decode path to transcode from
+        # either) — pull them out before the language-based keep/remove
+        # decision so they can never be resurrected by the safety net below.
+        unreadable_subs = [s for s in info.subtitle_streams if subtitle_is_unreadable(s.codec_name)]
+        readable_subs = [
+            s for s in info.subtitle_streams if not subtitle_is_unreadable(s.codec_name)
+        ]
+        if unreadable_subs:
+            logger.warning(
+                "Dropping %d subtitle stream(s) with no identifiable codec "
+                "(FFmpeg cannot decode them) for %s: %s",
+                len(unreadable_subs),
+                input_path.name,
+                ", ".join(str(s.index) for s in unreadable_subs),
+            )
+
         subtitle_keep = []
         subtitle_remove = []
-        for sub_stream in info.subtitle_streams:
+        for sub_stream in readable_subs:
             if self._should_keep_subtitle(sub_stream, sub_keep_languages):
                 subtitle_keep.append(sub_stream)
             else:
@@ -302,7 +329,7 @@ class StreamCleanup:
                 sub_keep_languages,
                 input_path.name,
             )
-            subtitle_keep = list(info.subtitle_streams)
+            subtitle_keep = list(readable_subs)
             subtitle_remove = []
         elif subtitle_remove and not subtitle_keep:
             logger.info(
@@ -312,6 +339,11 @@ class StreamCleanup:
                 sub_keep_languages,
                 input_path.name,
             )
+
+        # Unconditional: never mapped regardless of language policy or the
+        # safety net above — there is no way to produce a valid file with
+        # these streams included.
+        subtitle_remove = subtitle_remove + unreadable_subs
 
         # Sort audio so preferred language is first, commentary last
         if self.config.clean_audio:
@@ -336,9 +368,14 @@ class StreamCleanup:
                         else original_lang
                     )
 
-        # If nothing to remove, skip processing
+        # If nothing to remove, skip processing. Unreadable subtitle streams
+        # are always counted here even when clean_subtitles is off — they
+        # aren't a content preference, they're a technical necessity — so
+        # this early-exit never bypasses dropping one.
         audio_to_remove = len(audio_remove) if self.config.clean_audio else 0
-        subs_to_remove = len(subtitle_remove) if self.config.clean_subtitles else 0
+        subs_to_remove = (
+            len(subtitle_remove) if self.config.clean_subtitles else len(unreadable_subs)
+        )
         needs_reorder = self.config.clean_audio and self._needs_reorder(
             info.audio_streams, original_lang
         )
@@ -511,7 +548,10 @@ class StreamCleanup:
                 str(temp_output),
                 info,
                 audio_keep if self.config.clean_audio else info.audio_streams,
-                subtitle_keep if self.config.clean_subtitles else info.subtitle_streams,
+                # Unreadable streams are dropped unconditionally (readable_subs
+                # already excludes them) even when clean_subtitles is off and
+                # language-based filtering is skipped.
+                subtitle_keep if self.config.clean_subtitles else readable_subs,
                 inferred_langs=inferred_langs or None,
             )
             logger.debug("Running: %s", " ".join(cmd))

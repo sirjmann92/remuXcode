@@ -16,7 +16,13 @@ import threading
 import uuid
 
 from backend.utils.config import AudioConfig
-from backend.utils.ffprobe import AudioStream, FFProbe, MediaInfo, subtitle_needs_transcode
+from backend.utils.ffprobe import (
+    AudioStream,
+    FFProbe,
+    MediaInfo,
+    subtitle_is_unreadable,
+    subtitle_needs_transcode,
+)
 from backend.utils.language import LANGUAGE_NAMES
 from backend.workers._progress import ffmpeg_error_summary, run_ffmpeg_with_progress
 from backend.workers._safe_move import safe_replace, wait_for_output_file
@@ -840,7 +846,23 @@ class AudioConverter:
 
         # Map subtitle and attachment streams — restore language/title/filename/mimetype since
         # -map_metadata:s -1 below clears per-stream tags from copied streams.
-        for sub_out_idx, ss in enumerate(info.subtitle_streams):
+        # sub_out_idx tracks the *output* position among subtitle streams
+        # actually mapped — not the raw enumerate index — since a stream
+        # with no identifiable codec is skipped entirely (never occupies an
+        # output slot), which would otherwise desync every later stream's
+        # -metadata:s:s:N / -c:s:N target by one. Verified empirically: a
+        # dropped stream closes the gap in FFmpeg's output stream numbering
+        # rather than leaving later indices unchanged.
+        sub_out_idx = 0
+        for ss in info.subtitle_streams:
+            if subtitle_is_unreadable(ss.codec_name):
+                # Seen with non-compliantly-muxed WebVTT from some
+                # streaming-service WEBDL rips (ffprobe reports an empty
+                # codec_name) — FFmpeg can't decode it, so there's no
+                # transcode path either; only dropping it is safe, and that
+                # has to happen regardless of output container, since a
+                # codec FFmpeg can't identify can't be copied anywhere.
+                continue
             map_args.extend(["-map", f"0:{ss.index}"])
             if ss.language:
                 codec_args.extend([f"-metadata:s:s:{sub_out_idx}", f"language={ss.language}"])
@@ -859,6 +881,7 @@ class AudioConverter:
                 ss.codec_name
             ):
                 codec_args.extend([f"-c:s:{sub_out_idx}", "srt"])
+            sub_out_idx += 1
         for att_out_idx, att in enumerate(info.attachment_streams):
             map_args.extend(["-map", f"0:{att.index}"])
             # Restore filename/mimetype since -map_metadata:s -1 clears them
