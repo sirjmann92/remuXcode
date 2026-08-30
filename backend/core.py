@@ -658,17 +658,39 @@ class JobQueue:
                 or (result.get("cleanup") and result["cleanup"].get("success"))
             )
             if any_success:
+                # job.file_path stays the original webhook-reported identity
+                # (job store, dedup, history all key off it); working_path
+                # tracks where the file actually is right now, same as
+                # rename_result.new_path does further down.
+                working_path = job.file_path
+
+                # Only correct the container extension when Video actually ran,
+                # succeeded, and was the last phase in the chain — i.e. nothing
+                # ran afterward that would have re-muxed to the original
+                # container. cleanup's result being absent means it was never
+                # planned to run at all (if it had been, it would have run
+                # right after Video regardless of Video's outcome).
+                if (
+                    result.get("video")
+                    and result["video"].get("success")
+                    and result.get("cleanup") is None
+                ):
+                    corrected_path = _correct_container_extension(working_path, job)
+                    if corrected_path != working_path:
+                        working_path = corrected_path
+                        job.output_path = corrected_path
+
                 rename_result = RenameResult()
                 try:
-                    rename_result = trigger_rename(job.file_path)
+                    rename_result = trigger_rename(working_path)
                 except Exception as rename_err:
                     logger.warning("Rename trigger failed (job still completed): %s", rename_err)
 
                 # Analyze the (possibly renamed) output file and store in
                 # media DB with the Sonarr/Radarr file ID so browse lookups
                 # find the updated analysis immediately.
-                analyze_path = rename_result.new_path or job.file_path
-                if rename_result.new_path and rename_result.new_path != job.file_path:
+                analyze_path = rename_result.new_path or working_path
+                if rename_result.new_path and rename_result.new_path != working_path:
                     job.output_path = rename_result.new_path
                     job.log("app", "info", f"Renamed to: {Path(rename_result.new_path).name}")
                 try:
@@ -1098,6 +1120,90 @@ class RenameResult:
     new_path: str | None = None
     radarr_movie_file_id: int | None = None
     sonarr_episode_file_id: int | None = None
+
+
+# Maps a probed container format family (one comma-separated alias from
+# ffprobe's format_name, e.g. "matroska,webm" or "mov,mp4,m4a,3gp,3g2,mj2")
+# to the extension remuXcode expects for it. Only families our own workers
+# can plausibly produce are listed; anything else is left alone rather than
+# guessed at.
+_CONTAINER_EXTENSIONS: dict[str, str] = {
+    "matroska": ".mkv",
+    "webm": ".mkv",
+    "mp4": ".mp4",
+    "mov": ".mp4",
+    "m4a": ".mp4",
+    "3gp": ".mp4",
+    "3g2": ".mp4",
+    "mj2": ".mp4",
+}
+
+
+def _correct_container_extension(file_path: str, job: ConversionJob | None) -> str:
+    """Rename *file_path* if its extension no longer matches its real container.
+
+    Video always encodes to a Matroska temp file internally regardless of
+    the source container, then hands it to ``safe_replace``, which moves
+    the bytes onto whatever path it was given verbatim — it does not
+    re-mux. When Video is the last phase to run in a job (nothing after it
+    re-muxes back to the original container), an originally non-Matroska
+    file (e.g. .mp4) ends up holding genuine Matroska content under its old
+    name: playable by most tools via content-sniffing, but no longer a real
+    file of that type. This corrects the extension to match reality.
+
+    Gated on ``config.fix_container_mismatch`` (default off): Sonarr/Radarr
+    can only pick up the resulting rename by deleting and recreating the
+    underlying moviefile/episodefile record, which permanently clears that
+    record's ``sceneName``/``originalFilePath`` — confirmed empirically to
+    be unrecoverable via any API, not just an oversight. Custom format
+    score and release group are preserved.
+    """
+    if not (config and config.fix_container_mismatch):
+        return file_path
+    if ffprobe is None:
+        return file_path
+
+    path = Path(file_path)
+    current_ext = path.suffix.lower()
+
+    try:
+        info = ffprobe.get_file_info(file_path)
+    except Exception as exc:
+        logger.warning("Container-mismatch check failed to probe %s: %s", file_path, exc)
+        return file_path
+    if info is None:
+        return file_path
+
+    families = {f.strip().lower() for f in info.format_name.split(",")}
+    actual_ext = next(
+        (ext for family, ext in _CONTAINER_EXTENSIONS.items() if family in families),
+        None,
+    )
+    if actual_ext is None or actual_ext == current_ext:
+        return file_path
+
+    new_path = path.with_suffix(actual_ext)
+    if new_path.exists():
+        logger.warning(
+            "Container mismatch detected for %s (actual container: %s) but %s already "
+            "exists — skipping rename",
+            file_path,
+            actual_ext,
+            new_path,
+        )
+        return file_path
+
+    try:
+        path.rename(new_path)
+    except OSError as exc:
+        logger.warning("Failed to correct container extension for %s: %s", file_path, exc)
+        return file_path
+
+    msg = f"Corrected container extension: {path.name} → {new_path.name}"
+    logger.info(msg)
+    if job:
+        job.log("app", "info", msg)
+    return str(new_path)
 
 
 def trigger_rename(file_path: str, media_type: str = "auto") -> RenameResult:

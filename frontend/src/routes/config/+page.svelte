@@ -813,6 +813,17 @@ $effect(() => {
                 onchange={(e) => { config!.strip_cover_art = e.currentTarget.checked; saveTop('strip_cover_art', e.currentTarget.checked); }}
               />
             </label>
+            <label class="flex items-center justify-between cursor-pointer" title="Video always encodes to a real Matroska file internally, even when the source (and tracked filename) is .mp4 — the final move does not re-mux, so an .mp4 that Video re-encoded ends up holding genuine Matroska content under an .mp4 name. This renames it to match. Sonarr/Radarr can only pick up the rename by recreating that file's record, which permanently clears its Scene Name and Original File Path metadata (used by some subtitle tools) — this cannot be recovered afterward, by remuXcode or any other means. Custom format score and release group are preserved.">
+              <span class="text-xs font-medium">Fix Container Mismatch
+                <span class="block text-xs text-base-content/75 font-normal">Correct extension after re-encode — permanently clears Scene Name/Original File Path</span>
+              </span>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={config.fix_container_mismatch}
+                onchange={(e) => { config!.fix_container_mismatch = e.currentTarget.checked; saveTop('fix_container_mismatch', e.currentTarget.checked); }}
+              />
+            </label>
             <div class="flex items-center justify-between" title="Completed and failed jobs are removed after this many days">
               <span class="text-xs font-medium">Job History<span class="block text-xs text-base-content/75 font-normal">Days to retain completed job records (1–365)</span></span>
               <input

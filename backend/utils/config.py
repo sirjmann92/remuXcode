@@ -235,6 +235,18 @@ class Config:
         # metadata and cause ffmpeg "dimensions not set" header failures.
         # Set to False to preserve cover art (may fail on malformed images).
         self.strip_cover_art: bool = bool(self._get("general.strip_cover_art", True))
+        # Correct a file's extension when Video re-encodes it into a
+        # different real container than its current extension (video.py's
+        # temp output is always Matroska internally; the final move onto the
+        # tracked path does not re-mux, so an .mp4 whose last processing
+        # phase was Video ends up holding genuine Matroska content under an
+        # .mp4 name). Off by default: Sonarr/Radarr can only pick up the
+        # resulting rename by deleting and recreating that file's
+        # moviefile/episodefile record, which permanently clears that
+        # record's sceneName/originalFilePath — confirmed empirically to be
+        # unrecoverable via any API, not just an oversight. Custom format
+        # score and release group are preserved.
+        self.fix_container_mismatch: bool = bool(self._get("general.fix_container_mismatch", False))
         # Effective app log level. Falls back to the LOG_LEVEL/LOGLEVEL env var
         # (set at container startup, before config is loaded) so existing
         # deployments keep working; once set here it persists across restarts.
@@ -563,6 +575,7 @@ class Config:
         self._raw_config.setdefault("general", {})
         self._raw_config["general"]["job_history_days"] = self.job_history_days
         self._raw_config["general"]["log_level"] = self.log_level
+        self._raw_config["general"]["fix_container_mismatch"] = self.fix_container_mismatch
 
         with self.config_path.open("w") as f:
             yaml.dump(self._raw_config, f, default_flow_style=False, sort_keys=False)

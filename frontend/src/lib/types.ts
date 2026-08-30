@@ -246,6 +246,7 @@ export interface ConfigSummary {
   effective_ffmpeg_threads: number;
   ffmpeg_pin_to_p_cores: boolean;
   strip_cover_art: boolean;
+  fix_container_mismatch: boolean;
   job_history_days: number;
   log_level: AppLogLevel;
   api_key: string;

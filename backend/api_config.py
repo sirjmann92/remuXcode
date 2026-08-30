@@ -115,6 +115,7 @@ async def get_config_summary() -> dict[str, Any]:
         "effective_ffmpeg_threads": cfg.effective_ffmpeg_threads,
         "ffmpeg_pin_to_p_cores": cfg.ffmpeg_pin_to_p_cores,
         "strip_cover_art": cfg.strip_cover_art,
+        "fix_container_mismatch": cfg.fix_container_mismatch,
         "job_history_days": cfg.job_history_days,
         "log_level": cfg.log_level,
         "api_key": get_api_key(),
@@ -326,6 +327,7 @@ class ConfigUpdate(BaseModel):
     ffmpeg_threads: int | None = Field(None, ge=0, le=128)
     ffmpeg_pin_to_p_cores: bool | None = None
     strip_cover_art: bool | None = None
+    fix_container_mismatch: bool | None = None
     job_history_days: int | None = Field(None, ge=1, le=365)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] | None = None
 
@@ -402,6 +404,9 @@ async def update_config(body: ConfigUpdate) -> dict[str, str]:
         cfg.strip_cover_art = body.strip_cover_art
         if core.ffprobe:
             core.ffprobe.strip_cover_art = body.strip_cover_art
+
+    if body.fix_container_mismatch is not None:
+        cfg.fix_container_mismatch = body.fix_container_mismatch
 
     if body.cleanup:
         for field, val in body.cleanup.model_dump(exclude_none=True).items():
