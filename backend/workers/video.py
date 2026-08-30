@@ -1095,11 +1095,24 @@ class VideoConverter:
             tune = self.config.live_action_tune
             framerate = self.config.live_action_framerate
 
+        # Per-job Custom Encode overrides
+        if encode_options:
+            crf = encode_options.get("crf", crf)
+            preset = encode_options.get("preset", preset)
+
+        # Per-job VBV override — 0 disables the cap entirely (CRF-only);
+        # buffer size follows the standard 2x-of-maxrate ratio automatically.
+        vbv_maxrate = self.config.vbv_maxrate
+        vbv_bufsize = self.config.vbv_bufsize
+        if encode_options and "vbv_maxrate" in encode_options:
+            vbv_maxrate = encode_options["vbv_maxrate"]
+            vbv_bufsize = vbv_maxrate * 2
+
         # Base x265 params
         x265_params = [
             f"crf={crf}",
-            f"vbv-maxrate={self.config.vbv_maxrate}",
-            f"vbv-bufsize={self.config.vbv_bufsize}",
+            f"vbv-maxrate={vbv_maxrate}",
+            f"vbv-bufsize={vbv_bufsize}",
             "ref=4",
             "bframes=6",
             "open-gop=0",
@@ -1283,6 +1296,11 @@ class VideoConverter:
             preset = self.config.av1_live_action_preset
             framerate = self.config.av1_live_action_framerate
 
+        # Per-job Custom Encode overrides
+        if encode_options:
+            crf = encode_options.get("crf", crf)
+            preset = encode_options.get("preset", preset)
+
         # Compute keyframe interval: 5 seconds × fps.
         # SVT-AV1 defaults to 2–3 s which wastes bitrate on I-frames.
         # Prefer the configured output framerate; fall back to the source
@@ -1427,12 +1445,19 @@ class VideoConverter:
     # Hardware-accelerated encoder builders
     # ------------------------------------------------------------------
 
-    def _get_quality_params(self, content_type: ContentType, encoder: str = "") -> tuple[int, str]:
+    def _get_quality_params(
+        self,
+        content_type: ContentType,
+        encoder: str = "",
+        encode_options: dict | None = None,
+    ) -> tuple[int, str]:
         """Return (quality_value, framerate) for given content type and encoder.
 
         Framerate depends on the target codec (HEVC vs AV1), not the encoder.
         Quality depends on the encoder method — HW encoders use their own
-        config fields while SW encoders use the CRF fields.
+        config fields while SW encoders use the CRF fields. A per-job
+        Custom Encode ``crf`` override (same key regardless of encoder)
+        takes precedence over all of the above when present.
         """
         is_anime = content_type == ContentType.ANIME
 
@@ -1469,6 +1494,9 @@ class VideoConverter:
             quality = self.config.av1_anime_crf if is_anime else self.config.av1_live_action_crf
         else:
             quality = self.config.anime_crf if is_anime else self.config.live_action_crf
+
+        if encode_options and "crf" in encode_options:
+            quality = encode_options["crf"]
 
         return quality, framerate
 
@@ -1667,7 +1695,7 @@ class VideoConverter:
         speed impact (encoding is the bottleneck, not decoding).
         """
         encoder = "hevc_qsv" if codec == "hevc" else "av1_qsv"
-        quality, framerate = self._get_quality_params(content_type, encoder)
+        quality, framerate = self._get_quality_params(content_type, encoder, encode_options)
 
         # When stripping HDR → SDR the output is 8-bit regardless of config.
         strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
@@ -1728,7 +1756,7 @@ class VideoConverter:
                 "-global_quality",
                 str(quality),
                 "-preset",
-                self.config.qsv_preset,
+                str((encode_options or {}).get("preset", self.config.qsv_preset)),
             ]
         )
 
@@ -1774,7 +1802,7 @@ class VideoConverter:
         + HW encode avoids those errors reliably.
         """
         encoder = "hevc_vaapi" if codec == "hevc" else "av1_vaapi"
-        quality, framerate = self._get_quality_params(content_type, encoder)
+        quality, framerate = self._get_quality_params(content_type, encoder, encode_options)
         device = "/dev/dri/renderD128"
         if self.hw_caps and self.hw_caps.render_devices:
             device = self.hw_caps.render_devices[0]
@@ -1881,7 +1909,7 @@ class VideoConverter:
         for every input.
         """
         encoder = "hevc_nvenc" if codec == "hevc" else "av1_nvenc"
-        quality, framerate = self._get_quality_params(content_type, encoder)
+        quality, framerate = self._get_quality_params(content_type, encoder, encode_options)
 
         # When stripping HDR → SDR the output is 8-bit regardless of config.
         strip_hdr = bool(encode_options and encode_options.get("strip_hdr"))
@@ -1942,7 +1970,7 @@ class VideoConverter:
                 "-cq",
                 str(quality),
                 "-preset",
-                self.config.nvenc_preset,
+                str((encode_options or {}).get("preset", self.config.nvenc_preset)),
             ]
         )
 

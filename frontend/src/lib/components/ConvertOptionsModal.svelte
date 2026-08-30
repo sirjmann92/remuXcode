@@ -23,6 +23,11 @@ let hdrMode = $state<HdrMode>('keep');
 let queuing = $state(false);
 let error = $state('');
 
+// Encoding overrides — blank means "use the configured default".
+let crfOverride = $state('');
+let presetOverride = $state('');
+let vbvOverride = $state('');
+
 const stripHdr = $derived(hdrMode === 'strip');
 const retainDv = $derived(hdrMode === 'keep_dv');
 
@@ -53,6 +58,19 @@ const summaryLines = $derived.by(() => {
       ? 'Force video re-encode to HEVC (software x265)'
       : 'Force video re-encode to configured codec (AV1/HEVC)',
   );
+  if (crfOverride !== '')
+    lines.push(`Quality/CRF override: ${crfOverride} (configured default otherwise)`);
+  if (presetOverride !== '')
+    lines.push(`Preset override: ${presetOverride} (configured default otherwise)`);
+  if (vbvOverride !== '') {
+    // `type="number"` inputs bind as an actual JS number once filled, not a
+    // string, so this must be a numeric comparison, not `vbvOverride === '0'`.
+    lines.push(
+      Number(vbvOverride) === 0
+        ? 'VBV cap disabled for this job (CRF-only, software HEVC)'
+        : `VBV max bitrate override: ${vbvOverride} kbps, software HEVC only (buffer follows the standard 2× ratio)`,
+    );
+  }
   lines.push('Audio and cleanup run per your configuration settings');
   return lines;
 });
@@ -66,6 +84,9 @@ async function handleQueue() {
     force_encode: true,
     retain_dv: retainDv,
   };
+  if (crfOverride !== '') opts.crf = Number(crfOverride);
+  if (presetOverride !== '') opts.preset = presetOverride;
+  if (vbvOverride !== '') opts.vbv_maxrate = Number(vbvOverride);
   const errors: string[] = [];
   for (const p of pathArray) {
     try {
@@ -88,7 +109,7 @@ async function handleQueue() {
 </script>
 
 <div class="modal modal-open" role="dialog" aria-modal="true">
-  <div class="modal-box max-w-sm">
+  <div class="modal-box max-w-md">
     <button
       class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
       onclick={onclose}
@@ -152,6 +173,41 @@ async function handleQueue() {
       {:else}
         <p class="text-xs text-base-content/85 mt-1">HDR10 metadata is preserved. Dolby Vision RPU is stripped (HDR10 base layer kept).</p>
       {/if}
+    </div>
+
+    <!-- Encoding overrides -->
+    <div class="mb-5">
+      <div class="text-sm font-medium mb-2">Encoding Overrides <span class="text-xs font-normal text-base-content/75">(optional)</span></div>
+      <div class="grid grid-cols-3 gap-2">
+        <label class="form-control">
+          <span class="label-text text-xs mb-1">Quality / CRF</span>
+          <input
+            type="number"
+            class="input input-sm input-bordered w-full"
+            placeholder="Default"
+            bind:value={crfOverride}
+          />
+        </label>
+        <label class="form-control">
+          <span class="label-text text-xs mb-1">Preset</span>
+          <input
+            type="text"
+            class="input input-sm input-bordered w-full"
+            placeholder="Default"
+            bind:value={presetOverride}
+          />
+        </label>
+        <label class="form-control">
+          <span class="label-text text-xs mb-1">VBV Max (kbps)</span>
+          <input
+            type="number"
+            class="input input-sm input-bordered w-full"
+            placeholder="Default"
+            bind:value={vbvOverride}
+          />
+        </label>
+      </div>
+      <p class="text-xs text-base-content/85 mt-1">Leave blank to use your configured defaults. VBV applies to software HEVC only — enter <code>0</code> to disable the cap entirely for this job.</p>
     </div>
 
     <!-- Summary -->

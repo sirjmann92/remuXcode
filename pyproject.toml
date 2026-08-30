@@ -176,6 +176,10 @@ fixable = ["ALL"]
     "SLF001", "PLR2004", "S101", "PLR0913", "C901", "E501",
     "B017", "PT006", "S108", "D401", "D417", "T201",
 ]
+# Standalone CLI scripts, not library code: progress output via print() is
+# the point, and reaching into backend.core's private helpers is deliberate
+# reuse of already-tested logic rather than a real encapsulation violation.
+"scripts/*" = ["SLF001", "T201", "D103"]
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = false

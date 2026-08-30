@@ -88,6 +88,11 @@ The **Custom Encode** button (in the detail panel and the Analyze modal) queues 
   - **Keep HDR + DV** — re-encodes Dolby Vision sources (including Profile 7 remuxes) while retaining DV as **Profile 8.1** with HDR10 fallback. Profile 7 RPUs are converted with `dovi_tool` before the encode. Requires a DV source and software HEVC (libx265) encoding, and locks resolution to Original
   - **Strip to SDR** — tone-maps HDR (including DV) to BT.709 SDR
 - The job always force-re-encodes the video; audio and cleanup phases still run per your configuration settings
+- **Encoding Overrides** *(optional)* — override the configured quality/preset/VBV for this job only, leaving your library-wide Settings untouched:
+  - **Quality / CRF** — overrides the configured CRF (software HEVC/AV1) or quality value (QSV/VAAPI/NVENC)
+  - **Preset** — overrides the configured encoder preset (format depends on the active encoder — e.g. `medium` for x265/QSV/NVENC, an integer 0–13 for SVT-AV1)
+  - **VBV Max (kbps)** — overrides the VBV max bitrate; software HEVC only. Buffer size follows the standard 2× ratio automatically. Enter `0` to disable the VBV cap entirely for this job (CRF-only)
+  - Leave any of these blank to use your configured default for that field
 
 Jobs queued this way show a **Custom Encode** badge on the Jobs page listing the chosen options.
 

@@ -16,6 +16,12 @@ export interface EncodeOptions {
   force_encode: boolean;
   /** Retain Dolby Vision as Profile 8.1 (DV sources, software HEVC only). */
   retain_dv?: boolean;
+  /** Override the configured CRF (software HEVC/AV1) or quality value (hardware encoders) for this job only. */
+  crf?: number;
+  /** Override the configured encoder preset for this job only (format depends on the active encoder — e.g. "medium" for x265/QSV/NVENC, an integer 0–13 for SVT-AV1). */
+  preset?: string;
+  /** Override the VBV max bitrate (kbps) for this job — software HEVC only. 0 disables the VBV cap entirely (CRF-only). Buffer size follows the standard 2× ratio automatically. */
+  vbv_maxrate?: number;
 }
 
 export interface JobLogEntry {
