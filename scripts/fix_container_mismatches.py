@@ -122,9 +122,7 @@ def get_active_job_paths(remuxcode_url: str, remuxcode_key: str) -> set[str]:
 
 
 def list_radarr_files(radarr_url: str, radarr_key: str) -> list[dict]:
-    resp = requests.get(
-        f"{radarr_url}/api/v3/movie", headers={"X-Api-Key": radarr_key}, timeout=60
-    )
+    resp = requests.get(f"{radarr_url}/api/v3/movie", headers={"X-Api-Key": radarr_key}, timeout=60)
     resp.raise_for_status()
     out = []
     for m in resp.json():
