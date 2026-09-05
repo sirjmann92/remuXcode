@@ -33,13 +33,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Auto-bumps the patch version on every publish (2.2.65 → 2.2.66).
+      # Auto-bumps the patch version on every publish: X.Y.Z becomes X.Y.(Z+1).
       # To cut a minor or major release instead, include "#minor" or
       # "#major" as a standalone word in a commit message being pushed:
-      #   #minor → 2.2.65 becomes 2.3.0   (new feature)
-      #   #major → 2.2.65 becomes 3.0.0   (breaking change)
-      # Only commit messages are scanned, never file contents, so this
-      # comment cannot promote a release.
+      #   #minor → X.Y.Z becomes X.(Y+1).0   (new feature)
+      #   #major → X.Y.Z becomes (X+1).0.0   (breaking change)
+      # Written without concrete version numbers so the example cannot go
+      # stale as the project releases. Only commit messages are scanned,
+      # never file contents, so this comment cannot promote a release.
       - name: Determine next version from tags
         id: version
         run: |
