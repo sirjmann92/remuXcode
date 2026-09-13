@@ -238,7 +238,7 @@ function handleDragOver(e: DragEvent, id: string) {
   e.preventDefault();
   if (!draggingId || id === draggingId || id === dragOverId) return;
   const targetJob = jobs.find((j) => j.id === id);
-  if (!targetJob || targetJob.status !== 'pending') return;
+  if (targetJob?.status !== 'pending') return;
   dragOverId = id;
   const from = jobs.findIndex((j) => j.id === draggingId);
   const to = jobs.findIndex((j) => j.id === id);
