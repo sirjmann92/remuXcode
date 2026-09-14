@@ -158,6 +158,47 @@ for a webhook to come back around.
 - **Prefer scoped lint globs over broad prefixes.** The Biome hook is scoped to
   source extensions rather than a bare `^frontend/`, because tools grow support
   for new file types and a broad prefix silently widens what they touch.
+- **Ship user-visible changes with their docs.** See below — a change a user can
+  see is not finished until the page describing it says so.
+
+---
+
+## Documentation Is Part of the Change
+
+`docs/` is user-facing reference, not a changelog or an afterthought. **Any
+change a user can observe must land in the same PR as its documentation
+update.** That includes:
+
+- a new feature, setting, toggle, page, button, modal, or job type
+- a changed default, renamed setting, or altered behaviour of an existing one
+- a removed or deprecated feature
+- a new or changed API endpoint, request body, or response shape
+- anything that changes what the UI shows or what a user has to do
+
+Pure refactors, internal helpers, test-only changes, and dependency bumps do
+not need a docs change — if a user cannot tell the difference, neither can the
+docs.
+
+### Where each change goes
+
+| Change | Update |
+| --- | --- |
+| New/changed setting or default | `docs/settings.md` (the settings tables are exhaustive — keep them that way) |
+| Dashboard, Movies, Shows, Jobs, or Logs page behaviour | the matching `docs/<page>.md` |
+| Sonarr/Radarr integration, webhook triggers, workflow advice | `docs/integrations.md` |
+| New API endpoint or changed payload | the `## API` section in `README.md` |
+| New headline capability | the Features list in `README.md`, plus the relevant `docs/` page |
+| New or changed screenshot-worthy UI | refresh the affected image in `images/` |
+
+Two further rules, both learned the same way version pins were:
+
+- **Don't duplicate.** `README.md` gets the one-line summary; `docs/` gets the
+  detail. Repeating the detail in both guarantees they drift apart, exactly as
+  a version pinned in five places does.
+- **Document the *why* for anything non-obvious**, especially opt-in defaults.
+  `general.fix_container_mismatch` ships off because enabling it makes an *arr
+  recreate the file record and permanently lose `sceneName` — a user reading
+  only "corrects the file extension" would turn it on and be surprised.
 
 ---
 
