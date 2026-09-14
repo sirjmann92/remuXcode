@@ -192,6 +192,13 @@ curl "http://localhost:7889/api/analyze?path=/share/movies/Movie/movie.mkv"
 
 ---
 
+## Acknowledgements
+
+remuXcode was built with help from AI coding tools. They accelerated
+the boring parts and made a project this size tractable for a one-person team. The application has been thoroughly tested, code-reviewed, audited, and operated by human hands and eyes.
+
+---
+
 ## License
 
 MIT
