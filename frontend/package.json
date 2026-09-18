@@ -8,8 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "lint": "biome check . --config-path=../biome.json",
-    "lint:fix": "biome check . --write --config-path=../biome.json"
+    "lint": "cd .. && biome check frontend",
+    "lint:fix": "cd .. && biome check frontend --write"
   },
   "dependencies": {
     "daisyui": "^5.7.37"
