@@ -66,5 +66,22 @@ jobs:
       - name: Run mypy
         run: mypy "./backend/" --install-types --non-interactive --config-file pyproject.toml
 
-      - uses: pre-commit-ci/lite-action@v1.1.0
-        if: always()
+      # Some tests are genuine integration tests: they run real ffmpeg and
+      # ffprobe against tiny fixtures in tests/fixtures/ rather than mocking
+      # the subprocess. Without the binaries they fail with a bare ENOENT.
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      # tests/test_workers.py is a manual script that takes a real media file
+      # argument, not a pytest suite -- it errors under plain collection.
+      - name: Run backend tests
+        run: pytest tests/ --ignore=tests/test_workers.py
+
+      # The frontend is built into the image at docker build time, so a broken
+      # frontend dependency used to surface only after merge, when the publish
+      # workflow ran. Building here moves that to the PR.
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build

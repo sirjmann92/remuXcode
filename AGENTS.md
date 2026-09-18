@@ -18,11 +18,21 @@ docker compose up -d --build
 
 # Tests (local venv)
 source .venv/bin/activate
-pytest tests/
+pytest tests/ --ignore=tests/test_workers.py
 
 # Lint — run what CI runs, NOT a --files subset
 pre-commit run --all-files
 ```
+
+### What CI actually runs
+
+The **Run Linters** workflow is the required check, and it is more than its
+name suggests — `pre-commit run --all-files`, then `mypy ./backend/`, then the
+test suite, then `npm run build`. A clean pre-commit alone does not mean CI is
+green.
+
+`docker-publish.yml` invokes that same workflow via `workflow_call` before it
+builds an image, so these four gate releases as well as pull requests.
 
 ### Linting rules that matter
 
@@ -31,11 +41,14 @@ pre-commit run --all-files
   `ruff format` failure through to a red `main`.
 - A formatting hook that **modifies** a file fails the run *by design*, even
   though the fix itself succeeded. Re-stage and re-run; it is not a real error.
-- CI runs **`mypy ./backend/`** as a **separate step**, so a clean pre-commit
-  alone does not mean CI is green.
 - `tests/test_workers.py` is a manual script requiring a real media file
-  argument, not a pytest suite — it errors under plain collection. Run
-  `pytest tests/ --ignore=tests/test_workers.py`.
+  argument, not a pytest suite — it errors under plain collection. Always pass
+  `--ignore=tests/test_workers.py`, as CI does.
+- **The suite needs `ffmpeg` and `ffprobe` on `PATH`.** Some tests are real
+  integration tests that run the binaries against fixtures in
+  `tests/fixtures/` rather than mocking the subprocess; without them you get
+  two failures and a bare `No such file or directory: 'ffprobe'`. CI installs
+  FFmpeg for exactly this reason.
 
 ### Biome's version lives in exactly one place
 
