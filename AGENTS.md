@@ -37,33 +37,34 @@ pre-commit run --all-files
   argument, not a pytest suite — it errors under plain collection. Run
   `pytest tests/ --ignore=tests/test_workers.py`.
 
-### Biome's version is pinned in five places
+### Biome's version lives in exactly one place
 
-They must all agree, and `scripts/check_biome_pins.py` (wired into pre-commit)
-fails the run when they don't:
+`frontend/package.json` → `@biomejs/biome` (with the lockfile npm maintains
+alongside it). Nothing else declares a Biome version, so Dependabot can bump it
+unaided and there is nothing to keep in sync.
 
-| Location |
-| --- |
-| `frontend/package.json` → `@biomejs/biome` |
-| `frontend/package-lock.json` → resolved entry |
-| `.pre-commit-config.yaml` → `rev` |
-| `.pre-commit-config.yaml` → `additional_dependencies` |
-| `biome.json` → `$schema` URL |
+It was not always so. Biome used to run through the remote
+`biomejs/pre-commit` hook, which fetches its own hermetic copy and never looks
+at `frontend/node_modules`. That copy needed its own version — a `rev` plus an
+`additional_dependencies` pin — which, with the npm pin, the lockfile and
+`biome.json`'s `$schema` URL, made five declarations of one fact. When they
+drifted **nothing failed**: the gate just quietly enforced the older ruleset.
+That is how this repo once enforced 2.2.4 against a declared 2.5.11, nine
+releases apart (issue #81). A guard script was added to catch the drift, then
+removed along with the drift itself.
 
-The pre-commit `rev`/`additional_dependencies` pair is what actually gates CI:
-the hook runs its own pinned copy of Biome in an isolated environment and never
-touches `frontend/node_modules`. `npm run lint` uses the npm pin but CI never
-invokes it. When these drift, **nothing fails** — the gate just silently
-enforces an older ruleset. That is how the repo once ended up enforcing 2.2.4
-against a declared 2.5.11, nine minor releases apart.
+Biome now runs as a `repo: local` hook invoking `npm run lint`, the same
+command a developer runs by hand — the pattern `svelte-check` already used.
+Two consequences worth knowing:
 
-Dependabot bumps the first two and **cannot** touch the other three, so expect
-`check-biome-pins` to fail on the first run after a Biome bump. Update all five
-together.
-
-`frontend/node_modules` can also be stale relative to the lockfile — run
-`npm ci` before trusting any local lint result. A stale tree is what masked the
-nine-version discrepancy above.
+- **The hook needs `frontend/node_modules` to exist**, so run `npm ci` before
+  trusting any local lint result. A stale tree is what masked the nine-version
+  discrepancy above. CI installs it before running pre-commit.
+- **What Biome looks at is `biome.json`'s `files.includes`**, not a regex in
+  `.pre-commit-config.yaml`. That scoping used to live in the hook, which meant
+  `npm run lint` had none: it swept `frontend/.svelte-kit/` and reported ~5600
+  diagnostics, so the command was effectively unusable. Change the scope in
+  `biome.json` and both the hook and the npm script follow.
 
 ---
 
@@ -155,9 +156,12 @@ for a webhook to come back around.
   several releases, review the diagnostics — a bump once began reformatting
   `app.html`/`favicon.svg` (reordered attributes, a trailing space before `>`,
   a rewritten pre-paint script) and erroring on the favicon, none of it wanted.
-- **Prefer scoped lint globs over broad prefixes.** The Biome hook is scoped to
-  source extensions rather than a bare `^frontend/`, because tools grow support
-  for new file types and a broad prefix silently widens what they touch.
+- **Keep lint scoping in the tool's own config, not the hook's.** `biome.json`
+  names the source extensions it covers rather than a bare `frontend/`, because
+  tools grow support for new file types and a broad prefix silently widens what
+  they touch — Biome gained HTML/SVG support after 2.2.4, which would sweep in
+  `app.html` and `favicon.svg`. Scoping there rather than in the hook also
+  keeps `npm run lint` and CI enforcing the same set.
 - **Ship user-visible changes with their docs.** See below — a change a user can
   see is not finished until the page describing it says so.
 
@@ -222,7 +226,6 @@ frontend/
   src/routes/config/+page.svelte  # Settings UI
   src/lib/types.ts                # Types matching backend API responses
 scripts/
-  check_biome_pins.py             # Lint-gate version-drift guard
   fix_container_mismatches.py     # One-off library sweep, dry-run by default
 docs/                             # User-facing reference
 ```

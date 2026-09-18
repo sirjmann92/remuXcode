@@ -48,36 +48,24 @@ repos:
         types_or: [ts, svelte]
         pass_filenames: false
 
-      - id: check-biome-pins
-        name: check biome version pins agree
-        entry: python3 scripts/check_biome_pins.py
-        language: system
-        files: '^(frontend/package(-lock)?\.json|\.pre-commit-config\.yaml|biome\.json)$'
-        pass_filenames: false
-
-  # Both pins below must match "@biomejs/biome" in frontend/package.json.
-  # The rev is what actually gates CI; the npm pin only governs `npm run
-  # lint`, which CI never runs. When they drift, the gate silently enforces
-  # the older ruleset. The check-biome-pins hook above fails the run if so.
-  - repo: https://github.com/biomejs/pre-commit
-    rev: 'v2.5.13'
-    hooks:
+      # Runs the Biome that npm installed, via the same `npm run lint` a
+      # developer runs by hand, so there is exactly one Biome version in the
+      # repo: frontend/package.json. It used to be declared here as well (a
+      # `rev` plus an `additional_dependencies` pin) because pre-commit
+      # fetches its own hermetic copy and never looks at frontend/
+      # node_modules -- which is how this repo once enforced 2.2.4 against a
+      # declared 2.5.11, nine releases apart and silently (issue #81).
+      #
+      # What Biome looks at is now biome.json's files.includes, not a regex
+      # here. Keeping that scoping in this file meant `npm run lint` had no
+      # scoping at all: it swept frontend/.svelte-kit/ and reported ~5600
+      # diagnostics, so nobody could use it.
       - id: biome-check
-        # Scoped to source files rather than a bare ^frontend/. Biome gained
-        # HTML/SVG support after 2.2.4, so a bare prefix now sweeps in files
-        # the old pin silently skipped:
-        #   - app.html / favicon.svg: attributes get reordered, a trailing
-        #     space is emitted before '>', the pre-paint theme script's
-        #     function expression is rewritten, and noSvgWithoutTitle fails
-        #     on the favicon. Linting markup is a separate decision from
-        #     this version bump.
-        #   - app.css: the only CSS file, and biome.json already excludes it
-        #     twice. Passing it explicitly bypasses experimentalScannerIgnores
-        #     and the parser rejects Tailwind's @plugin before the override's
-        #     disabled linter/formatter applies.
-        files: '^frontend/.*\.(jsx?|tsx?|c(js|ts)|m(js|ts)|jsonc?|svelte)$'
-        additional_dependencies:
-          - '@biomejs/biome@2.5.13'
+        name: biome check
+        entry: bash -c "cd frontend && npm run lint"
+        language: system
+        types_or: [ts, tsx, javascript, jsx, json, svelte]
+        pass_filenames: false
 
 ci:
   autofix_commit_msg: |
