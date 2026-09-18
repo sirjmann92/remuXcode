@@ -44,6 +44,11 @@ builds an image, so these four gate releases as well as pull requests.
 - `tests/test_workers.py` is a manual script requiring a real media file
   argument, not a pytest suite — it errors under plain collection. Always pass
   `--ignore=tests/test_workers.py`, as CI does.
+- **The suite needs `ffmpeg` and `ffprobe` on `PATH`.** Some tests are real
+  integration tests that run the binaries against fixtures in
+  `tests/fixtures/` rather than mocking the subprocess; without them you get
+  two failures and a bare `No such file or directory: 'ffprobe'`. CI installs
+  FFmpeg for exactly this reason.
 
 ### Biome's version lives in exactly one place
 
