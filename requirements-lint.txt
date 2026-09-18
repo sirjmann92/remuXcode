@@ -2,6 +2,7 @@
 mypy
 pre-commit
 pytest
+pytest-timeout
 ruff
 types-PyYAML
 types-requests
