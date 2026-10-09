@@ -1,6 +1,4 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
-import { page } from '$app/stores';
 import {
   convertFile,
   getActiveJobs,
@@ -10,25 +8,27 @@ import {
   refreshRadarr,
   startMovieScan,
   stopScan,
-} from '$lib/api';
+} from '#lib/api.ts';
 import {
   audioCodecMatches,
   buildAudioOptions,
   buildVideoOptions,
   videoCodecMatches,
-} from '$lib/codecs';
-import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
-import ConvertOptionsModal from '$lib/components/ConvertOptionsModal.svelte';
-import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
-import { langName } from '$lib/languages';
-import { buildResolutionOptions, resolutionMatches } from '$lib/resolution';
+} from '#lib/codecs.ts';
+import AnalyzeModal from '#lib/components/AnalyzeModal.svelte';
+import ConvertOptionsModal from '#lib/components/ConvertOptionsModal.svelte';
+import { formatSize, keptTracks, removableTracks, trackSummary } from '#lib/format.ts';
+import { langName } from '#lib/languages.ts';
+import { buildResolutionOptions, resolutionMatches } from '#lib/resolution.ts';
 import {
   deduplicatedMoviesFetch,
   getCachedMovies,
   invalidateMovies,
   setCachedMovies,
-} from '$lib/stores';
-import type { ActiveJobsMap, BrowseMovie, ConfigSummary, ScanProgress } from '$lib/types';
+} from '#lib/stores.ts';
+import type { ActiveJobsMap, BrowseMovie, ConfigSummary, ScanProgress } from '#lib/types.ts';
+import { goto } from '$app/navigation';
+import { page } from '$app/state';
 
 let movies: BrowseMovie[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -353,7 +353,7 @@ getConfig()
 
 // Deep-link: open movie detail from ?file= param (e.g. from job card)
 $effect(() => {
-  const fileParam = $page.url.searchParams.get('file');
+  const fileParam = page.url.searchParams.get('file');
   if (!fileParam || movies.length === 0) return;
   const match = movies.find((m) => m.path === fileParam);
   if (match) {

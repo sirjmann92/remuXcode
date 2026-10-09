@@ -1,3 +1,4 @@
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
@@ -7,7 +8,18 @@ const backendHost = process.env.VITE_BACKEND_HOST || 'localhost';
 const backendUrl = process.env.VITE_BACKEND_URL || `http://${backendHost}:${backendPort}`;
 
 export default defineConfig({
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [
+    tailwindcss(),
+    sveltekit({
+      adapter: adapter({
+        pages: 'build',
+        assets: 'build',
+        fallback: 'index.html',
+        precompress: false,
+        strict: false,
+      }),
+    }),
+  ],
   server: {
     port: 5173,
     proxy: {

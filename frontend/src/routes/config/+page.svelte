@@ -1,7 +1,7 @@
 <script lang="ts">
-import { cleanupTempDirs, getConfig, getSystemInfo, updateConfig } from '$lib/api';
-import LanguageSelect from '$lib/components/LanguageSelect.svelte';
-import type { ConfigSummary, HWAccelCaps } from '$lib/types';
+import { cleanupTempDirs, getConfig, getSystemInfo, updateConfig } from '#lib/api.ts';
+import LanguageSelect from '#lib/components/LanguageSelect.svelte';
+import type { ConfigSummary, HWAccelCaps } from '#lib/types.ts';
 
 let config: ConfigSummary | null = $state(null);
 let cpuCount = $state(0);

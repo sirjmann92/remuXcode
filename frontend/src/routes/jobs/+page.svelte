@@ -1,8 +1,8 @@
 <script lang="ts">
-import { page } from '$app/stores';
-import { cancelAllPending, cancelRunning, deleteFinished, getJobs, reorderJobs } from '$lib/api';
-import JobCard from '$lib/components/JobCard.svelte';
-import type { Job, JobStatus, JobsCounts } from '$lib/types';
+import { cancelAllPending, cancelRunning, deleteFinished, getJobs, reorderJobs } from '#lib/api.ts';
+import JobCard from '#lib/components/JobCard.svelte';
+import type { Job, JobStatus, JobsCounts } from '#lib/types.ts';
+import { page } from '$app/state';
 
 let jobs: Job[] = $state([]);
 let initialLoad = $state(true);
@@ -32,7 +32,7 @@ const validFilters: Array<JobStatus | 'all'> = [
   'failed',
   'cancelled',
 ];
-const urlFilter = $page.url.searchParams.get('filter') ?? 'all';
+const urlFilter = page.url.searchParams.get('filter') ?? 'all';
 let filter: JobStatus | 'all' = $state(
   validFilters.includes(urlFilter as JobStatus | 'all') ? (urlFilter as JobStatus | 'all') : 'all',
 );

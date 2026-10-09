@@ -1,5 +1,5 @@
 <script lang="ts">
-import { langNames } from '$lib/languages';
+import { langNames } from '#lib/languages.ts';
 
 interface Props {
   selected: string[];

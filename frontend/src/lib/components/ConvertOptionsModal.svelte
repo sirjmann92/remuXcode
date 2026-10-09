@@ -1,6 +1,6 @@
 <script lang="ts">
-import { convertFile } from '$lib/api';
-import type { EncodeOptions, TargetResolution } from '$lib/types';
+import { convertFile } from '#lib/api.ts';
+import type { EncodeOptions, TargetResolution } from '#lib/types.ts';
 
 interface Props {
   paths: string | string[];

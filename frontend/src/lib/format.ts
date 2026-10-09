@@ -1,5 +1,5 @@
-import { langName } from '$lib/languages';
-import type { ConfigSummary } from '$lib/types';
+import { langName } from '#lib/languages.ts';
+import type { ConfigSummary } from '#lib/types.ts';
 
 const VIDEO_CODEC_NAMES: Record<string, string> = {
   h264: 'AVC',
