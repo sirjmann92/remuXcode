@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { JobStatus } from '$lib/types';
+import type { JobStatus } from '#lib/types.ts';
 
 interface Props {
   status: JobStatus;

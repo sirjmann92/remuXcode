@@ -5,8 +5,8 @@ import {
   testRadarrWebhook,
   testSonarrWebhook,
   updateConfig,
-} from '$lib/api';
-import type { ConfigSummary } from '$lib/types';
+} from '#lib/api.ts';
+import type { ConfigSummary } from '#lib/types.ts';
 
 let config: ConfigSummary | null = $state(null);
 let loading = $state(true);

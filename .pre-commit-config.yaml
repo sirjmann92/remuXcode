@@ -43,7 +43,7 @@ repos:
     hooks:
       - id: svelte-check
         name: svelte-check
-        entry: bash -c "cd frontend && npx svelte-check --tsconfig ./tsconfig.json"
+        entry: bash -c "cd frontend && npm run check"
         language: system
         types_or: [ts, svelte]
         pass_filenames: false

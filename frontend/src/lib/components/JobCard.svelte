@@ -1,7 +1,7 @@
 <script lang="ts">
-import { cancelJob, deleteJob, getJobLogs, retryJob } from '$lib/api';
-import { channelLabel, formatSize, formatTimestamp } from '$lib/format';
-import type { Job, JobLogEntry, JobPhase, LogLevel, LogSource } from '$lib/types';
+import { cancelJob, deleteJob, getJobLogs, retryJob } from '#lib/api.ts';
+import { channelLabel, formatSize, formatTimestamp } from '#lib/format.ts';
+import type { Job, JobLogEntry, JobPhase, LogLevel, LogSource } from '#lib/types.ts';
 import StatusBadge from './StatusBadge.svelte';
 
 interface Props {

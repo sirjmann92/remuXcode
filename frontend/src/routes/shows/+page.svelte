@@ -1,7 +1,5 @@
 <script lang="ts">
 import { tick } from 'svelte';
-import { goto } from '$app/navigation';
-import { page } from '$app/stores';
 import {
   convertFile,
   getActiveJobs,
@@ -12,24 +10,24 @@ import {
   refreshSonarr,
   startSeriesScan,
   stopScan,
-} from '$lib/api';
+} from '#lib/api.ts';
 import {
   audioCodecMatches,
   buildAudioOptions,
   buildVideoOptions,
   videoCodecMatches,
-} from '$lib/codecs';
-import AnalyzeModal from '$lib/components/AnalyzeModal.svelte';
-import ConvertOptionsModal from '$lib/components/ConvertOptionsModal.svelte';
-import { formatSize, keptTracks, removableTracks, trackSummary } from '$lib/format';
-import { langName } from '$lib/languages';
-import { buildResolutionOptions, resolutionMatches } from '$lib/resolution';
+} from '#lib/codecs.ts';
+import AnalyzeModal from '#lib/components/AnalyzeModal.svelte';
+import ConvertOptionsModal from '#lib/components/ConvertOptionsModal.svelte';
+import { formatSize, keptTracks, removableTracks, trackSummary } from '#lib/format.ts';
+import { langName } from '#lib/languages.ts';
+import { buildResolutionOptions, resolutionMatches } from '#lib/resolution.ts';
 import {
   deduplicatedSeriesFetch,
   getCachedSeries,
   invalidateSeries,
   setCachedSeries,
-} from '$lib/stores';
+} from '#lib/stores.ts';
 import type {
   ActiveJobsMap,
   BrowseSeries,
@@ -38,7 +36,9 @@ import type {
   ScanProgress,
   Season,
   SeriesDetail,
-} from '$lib/types';
+} from '#lib/types.ts';
+import { goto } from '$app/navigation';
+import { page } from '$app/state';
 
 let seriesList: BrowseSeries[] = $state([]);
 let config: ConfigSummary | null = $state(null);
@@ -72,7 +72,7 @@ let scanProgress: ScanProgress | null = $state(null);
 let scanPollTimer: ReturnType<typeof setInterval> | null = null;
 let prevActiveKeys: Set<string> = new Set();
 let jobPollTimer: ReturnType<typeof setInterval> | null = null;
-let deepLinkFile: string | null = $page.url.searchParams.get('file');
+let deepLinkFile: string | null = page.url.searchParams.get('file');
 let scrollY = $state(0);
 let savedScrollY = 0;
 

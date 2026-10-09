@@ -1,6 +1,6 @@
 <script lang="ts">
-import { getAppLogs, getConfig, updateConfig } from '$lib/api';
-import type { AppLogEntry, AppLogLevel } from '$lib/types';
+import { getAppLogs, getConfig, updateConfig } from '#lib/api.ts';
+import type { AppLogEntry, AppLogLevel } from '#lib/types.ts';
 
 const ALL_LEVELS: AppLogLevel[] = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'];
 

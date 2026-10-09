@@ -1,8 +1,8 @@
 <script lang="ts">
-import { analyzeFile, getActiveJobs, getJob, removeCoverArt, retagFile } from '$lib/api';
-import { channelLabel, videoCodecLabel } from '$lib/format';
-import { langLabel, langNames } from '$lib/languages';
-import type { AnalyzeResult, RetagOverride } from '$lib/types';
+import { analyzeFile, getActiveJobs, getJob, removeCoverArt, retagFile } from '#lib/api.ts';
+import { channelLabel, videoCodecLabel } from '#lib/format.ts';
+import { langLabel, langNames } from '#lib/languages.ts';
+import type { AnalyzeResult, RetagOverride } from '#lib/types.ts';
 import ConvertOptionsModal from './ConvertOptionsModal.svelte';
 
 interface Props {
@@ -190,7 +190,7 @@ function fileName(path: string): string {
   return path.split('/').pop() ?? path;
 }
 
-function hdrLabel(v: import('$lib/types').AnalyzeVideoStream): string {
+function hdrLabel(v: import('#lib/types.ts').AnalyzeVideoStream): string {
   const parts: string[] = [];
   if (v.is_dolby_vision) parts.push('Dolby Vision');
   if (v.is_hdr10_plus) parts.push('HDR10+');

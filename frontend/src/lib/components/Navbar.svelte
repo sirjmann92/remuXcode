@@ -1,7 +1,7 @@
 <script lang="ts">
-import { page } from '$app/stores';
-import { getHealth } from '$lib/api';
-import type { HealthStatus } from '$lib/types';
+import { getHealth } from '#lib/api.ts';
+import type { HealthStatus } from '#lib/types.ts';
+import { page } from '$app/state';
 
 const { drawerCheckbox }: { drawerCheckbox?: string } = $props();
 
@@ -95,7 +95,7 @@ function closeMobileDrawer() {
   <ul class="menu menu-md flex-1 px-2 gap-0.5">
     <li class="menu-title text-[10px] uppercase tracking-wider text-base-content/75 px-3 pt-2 pb-1">Navigation</li>
     {#each nav as item}
-      {@const active = $page.url.pathname === item.href}
+      {@const active = page.url.pathname === item.href}
       <li>
         <a
           href={item.href}

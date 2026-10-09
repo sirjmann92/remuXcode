@@ -1,7 +1,7 @@
 <script lang="ts">
-import { getConfig, getJobs, reorderJobs } from '$lib/api';
-import JobCard from '$lib/components/JobCard.svelte';
-import type { ConfigSummary, Job } from '$lib/types';
+import { getConfig, getJobs, reorderJobs } from '#lib/api.ts';
+import JobCard from '#lib/components/JobCard.svelte';
+import type { ConfigSummary, Job } from '#lib/types.ts';
 
 let activeJobs: Job[] = $state([]);
 let pendingJobs: Job[] = $state([]);

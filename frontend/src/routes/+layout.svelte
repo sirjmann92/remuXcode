@@ -1,6 +1,6 @@
 <script lang="ts">
-import { page } from '$app/stores';
-import Navbar from '$lib/components/Navbar.svelte';
+import Navbar from '#lib/components/Navbar.svelte';
+import { page } from '$app/state';
 import '../app.css';
 
 const { children } = $props();
@@ -20,7 +20,7 @@ function toggleTheme() {
 }
 
 const pageTitle = $derived.by(() => {
-  const path = $page.url.pathname;
+  const path = page.url.pathname;
   if (path === '/') return 'Dashboard';
   if (path.startsWith('/movies')) return 'Movies';
   if (path.startsWith('/shows')) return 'Shows';

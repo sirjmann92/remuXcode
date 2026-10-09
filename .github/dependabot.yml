@@ -15,6 +15,16 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      # SvelteKit's packages are peer-locked across majors (adapter-static 4
+      # requires kit 3, adapter-static 3 rejects it), so bumped one at a time
+      # neither PR can pass `npm ci`. Group them at every update type so a
+      # major lands as one PR. Must precede frontend-dependencies: Dependabot
+      # assigns each dependency to the first group it matches.
+      sveltekit:
+        patterns:
+          - "@sveltejs/*"
+          - "svelte"
+          - "vite"
       frontend-dependencies:
         patterns:
           - "*"
