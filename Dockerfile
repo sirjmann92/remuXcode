@@ -17,7 +17,7 @@ RUN npm run build \
 # Debian Trixie ships FFmpeg 7.1 with QSV (libvpl), VAAPI, and NVENC
 # support built in.  Intel GPU drivers + oneVPL runtime are installed
 # from the same repos — apt handles all transitive dependencies.
-FROM python:3.14-slim AS backend
+FROM python:3.15-slim AS backend
 WORKDIR /app
 
 # ── Stable build/runtime vars (needed before apt-get) ────────────────
