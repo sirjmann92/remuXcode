@@ -15,7 +15,7 @@ RUN npm run build \
 
 # ── Stage 2: Runtime (FastAPI + FFmpeg) ──────────────────────────────
 # Debian Trixie ships FFmpeg 7.1 with QSV (libvpl), VAAPI, and NVENC
-# support built in.  Intel GPU drivers + oneVPL runtime are installed
+# support built in.  Intel + AMD (Mesa) VA drivers and oneVPL runtime are installed
 # from the same repos — apt handles all transitive dependencies.
 FROM python:3.15-slim AS backend
 WORKDIR /app
@@ -31,9 +31,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ── System packages ───────────────────────────────────────────────────
 # All apt operations in one layer: install → trim → clean.
 #
-# Mesa/LLVM/z3 OpenGL chain is removed via rm -f because Mesa dlopen's
-# these at runtime (they are NOT in the ldd NEEDED chain of ffmpeg or
-# ffprobe) — only needed for OpenGL display output, never for encode.
+# mesa-va-drivers provides the AMD VAAPI driver (radeonsi_drv_video.so).
+# That driver is a symlink into libgallium, which in turn links libLLVM,
+# so neither may be trimmed — doing so silently breaks AMD encode
+# (va_openDriver() returns -1). Intel's iHD driver is standalone.
 # Most other large transitive deps (libcodec2, libflite1, librsvg2,
 # libplacebo, libjxl, libhwy) are hard Depends of libavcodec61 /
 # libavfilter10 and CANNOT be purged without pulling down FFmpeg itself.
@@ -47,12 +48,8 @@ RUN set -eux; \
     if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
         INTEL_PKGS="intel-media-va-driver-non-free libvpl2 libmfx-gen1.2"; \
     fi; \
-    apt-get install -y --no-install-recommends gosu ffmpeg mkvtoolnix $INTEL_PKGS; \
-    # ── Trim Mesa/LLVM/z3 OpenGL chain (dlopen'd, never in ldd output) ─
-    LIBDIR="/usr/lib/$(dpkg --print-architecture | sed 's/amd64/x86_64-linux-gnu/;s/arm64/aarch64-linux-gnu/')"; \
-    rm -f "$LIBDIR"/libLLVM*.so* \
-          "$LIBDIR"/libgallium*.so* \
-          "$LIBDIR"/libz3*.so*; \
+    # mesa-va-drivers: AMD (radeonsi) VAAPI encode
+    apt-get install -y --no-install-recommends gosu ffmpeg mkvtoolnix mesa-va-drivers $INTEL_PKGS; \
     # ── Strip package docs (not useful at runtime, ~5 MB) ────────────
     rm -rf /usr/share/doc/*; \
     apt-get clean; \

@@ -128,10 +128,21 @@ def detect_hw_capabilities(*, force: bool = False) -> HWAccelCaps:
                     caps.av1_encoders.remove(enc)
             caps.qsv_available = any("_qsv" in e for e in caps.hevc_encoders + caps.av1_encoders)
 
+    # 4. Same for VAAPI: compiled-in is not the same as supported.  E.g. AMD
+    # Vega/Lucienne APUs (radeonsi) encode HEVC but not AV1, and a missing
+    # VA driver makes every VAAPI encoder fail at device init.
     if caps.vaapi_available and not caps.render_devices:
         caps.vaapi_available = False
         caps.hevc_encoders = [e for e in caps.hevc_encoders if "_vaapi" not in e]
         caps.av1_encoders = [e for e in caps.av1_encoders if "_vaapi" not in e]
+    elif caps.vaapi_available:
+        device = caps.render_devices[0]
+        for enc_list in (caps.hevc_encoders, caps.av1_encoders):
+            for enc in list(enc_list):
+                if enc.endswith("_vaapi") and not _test_vaapi_encoder(enc, device):
+                    logger.info("%s encode test failed — removing from available encoders", enc)
+                    enc_list.remove(enc)
+        caps.vaapi_available = any("_vaapi" in e for e in caps.hevc_encoders + caps.av1_encoders)
 
     # NVENC requires an NVIDIA GPU — the encoder may be compiled in but unusable
     if caps.nvenc_available and caps.gpu_vendor != "nvidia":
@@ -255,6 +266,47 @@ def _test_qsv_encoder(encoder: str) -> bool:
                 encoder,
                 "-global_quality",
                 "28",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+def _test_vaapi_encoder(encoder: str, device: str) -> bool:
+    """Test whether a VAAPI encoder can actually encode on *device*.
+
+    Mirrors :func:`_test_qsv_encoder`: a 1-frame encode catches both a
+    missing/broken VA driver and encoders the GPU does not support.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-init_hw_device",
+                f"vaapi=hw:{device}",
+                "-filter_hw_device",
+                "hw",
+                "-f",
+                "lavfi",
+                "-i",
+                "nullsrc=s=256x256:d=0.1",
+                "-vf",
+                "format=nv12,hwupload",
+                "-frames:v",
+                "1",
+                "-c:v",
+                encoder,
                 "-f",
                 "null",
                 "-",
