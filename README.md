@@ -11,7 +11,7 @@ The web UI lets you browse your entire Sonarr/Radarr library — movies and show
 - **Audio conversion** — DTS/DTS-HD → AC3 (5.1), EAC3 (7.1+), or AAC (stereo); configurable bitrate caps; optional keep-original; TrueHD passthrough
 - **Video encoding** — 10-bit H.264, 8-bit H.264 (optional), and legacy codecs (VC-1, MPEG-2, MPEG-4/XviD/DivX) → HEVC or AV1
 - **Dolby Vision retention** — re-encode DV sources (including Profile 7 remuxes) to compact HEVC while keeping Dolby Vision as Profile 8.1 with HDR10 fallback, via `dovi_tool` + FFmpeg RPU passthrough; selectable per job in the Custom Encode modal
-- **Hardware acceleration** — Intel QSV/VAAPI and NVIDIA NVENC auto-detected at startup; software fallback when no GPU is available
+- **Hardware acceleration** — Intel QSV/VAAPI, AMD VAAPI and NVIDIA NVENC auto-detected at startup; software fallback when no GPU is available
 - **Stream cleanup** — remove audio and subtitle tracks outside your keep-languages list; preserve forced subtitles, SDH, commentary, and audio description; always-keep-original option for anime and live-action
 - **Anime support** — per-worker anime-only mode, anime-optimized encoding presets, dual-audio preservation
 - **Library browse** — Movies and Shows pages backed by Radarr/Sonarr APIs with poster art, filters, sort, multi-select batch queue; deep links back to Radarr/Sonarr
@@ -64,7 +64,7 @@ services:
       - ./logs:/app/logs
       - /mnt/yournas:/share:rw       # match the path Sonarr/Radarr use internally
     devices:
-      - /dev/dri:/dev/dri            # optional — Intel QSV/VAAPI GPU passthrough
+      - /dev/dri:/dev/dri            # optional — Intel QSV/VAAPI or AMD VAAPI GPU passthrough
     environment:
       - TZ=America/Chicago
     restart: unless-stopped
