@@ -70,7 +70,7 @@ cat config/.api_key
 
 | Setting | Description |
 |---------|-------------|
-| **Hardware Accelerator** | `none` (software), `qsv` (Intel Quick Sync), `vaapi` (Intel or AMD VAAPI), or `nvenc` (NVIDIA). Auto-detected at startup — each hardware encoder is test-encoded on the GPU, and only those that actually work are offered, so the best available method is selected automatically. Encoders the GPU cannot do fall back to software: e.g. older AMD APUs (Vega/Lucienne) encode HEVC (8- and 10-bit) via VAAPI but not AV1, so AV1 there uses SVT-AV1. |
+| **Hardware Accelerator** | `none` (software), `qsv` (Intel Quick Sync), `vaapi` (Intel or AMD VAAPI), or `nvenc` (NVIDIA). Auto-detected at startup — each QSV and VAAPI encoder is test-encoded on the GPU with a 10-bit frame (the default output), and only those that pass are offered; NVENC is offered when an NVIDIA GPU is present. Encoders the GPU cannot do fall back to software: e.g. older AMD APUs (Vega/Lucienne) encode HEVC via VAAPI but not AV1, so AV1 there uses SVT-AV1. A GPU that encodes only 8-bit HEVC (e.g. AMD Polaris, Intel Skylake) is not offered for hardware HEVC, because default jobs would fail on it. |
 
 When hardware acceleration is active:
 - Encoding quality is controlled by a **Quality** value (similar to CRF) per accelerator

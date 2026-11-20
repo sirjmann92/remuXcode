@@ -112,6 +112,11 @@ def detect_hw_capabilities(*, force: bool = False) -> HWAccelCaps:
     # av1_qsv requires Intel Arc / Meteor Lake+; Xe-LP iGPUs (UHD 7xx) only support
     # hevc_qsv and h264_qsv.  We probe each encoder with a 1-frame test encode so
     # the caps list only contains encoders that actually work on this machine.
+    #
+    # Probes encode a *10-bit* frame because that is what real jobs upload by
+    # default (pix_fmt yuv420p10le / main10).  Some GPUs encode 8-bit HEVC but
+    # not Main10 (AMD Polaris, Intel Skylake); an 8-bit probe would pass there
+    # and every default job would then fail with no software fallback.
     if caps.qsv_available:
         if not caps.render_devices:
             caps.qsv_available = False
@@ -241,7 +246,8 @@ def _test_qsv_encoder(encoder: str) -> bool:
     Presence in ``ffmpeg -encoders`` only means the codec is compiled in.
     This probe runs a 1-frame encode to verify the GPU supports it at runtime.
     For example, av1_qsv is compiled into FFmpeg but is unsupported on Xe-LP
-    iGPUs (Intel UHD 7xx / 12th–13th gen integrated graphics).
+    iGPUs (Intel UHD 7xx / 12th–13th gen integrated graphics).  The frame is
+    10-bit (p010) to match the default main10 job.
     """
     try:
         result = subprocess.run(
@@ -259,7 +265,7 @@ def _test_qsv_encoder(encoder: str) -> bool:
                 "-i",
                 "nullsrc=s=256x256:d=0.1",
                 "-vf",
-                "format=nv12,hwupload=extra_hw_frames=64",
+                "format=p010le,hwupload=extra_hw_frames=64",
                 "-frames:v",
                 "1",
                 "-c:v",
@@ -302,11 +308,17 @@ def _test_vaapi_encoder(encoder: str, device: str) -> bool:
                 "-i",
                 "nullsrc=s=256x256:d=0.1",
                 "-vf",
-                "format=nv12,hwupload",
+                # 10-bit, CQP: the same surface format and rate control as
+                # _build_vaapi_command uses for a default (main10) job.
+                "format=p010,hwupload",
                 "-frames:v",
                 "1",
                 "-c:v",
                 encoder,
+                "-rc_mode",
+                "CQP",
+                "-qp",
+                "28",
                 "-f",
                 "null",
                 "-",
