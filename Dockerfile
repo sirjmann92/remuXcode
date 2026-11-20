@@ -23,13 +23,13 @@ WORKDIR /app
 # ── Stable build/runtime vars (needed before apt-get) ────────────────
 # NOTE: PUID/PGID/APP_VERSION/paths are declared AFTER pip install so
 # that version bumps (--build-arg APP_VERSION=x.y.z) and requirements
-# changes only invalidate the fast COPY layers, not the 300 MB apt layer.
+# changes only invalidate the fast COPY layers, not the large apt layer.
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 # ── System packages ───────────────────────────────────────────────────
-# All apt operations in one layer: install → trim → clean.
+# All apt operations in one layer: install → strip docs → clean.
 #
 # mesa-va-drivers provides the AMD VAAPI driver (radeonsi_drv_video.so).
 # That driver is a symlink into libgallium, which in turn links libLLVM,
@@ -78,7 +78,7 @@ RUN groupadd -g 1000 appgroup \
 
 # ── Python deps ───────────────────────────────────────────────────────
 # After the system layer: requirements.txt changes only bust pip install
-# and the fast COPY layers below — not the 300 MB apt layer above.
+# and the fast COPY layers below — not the large apt layer above.
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 

@@ -1,8 +1,19 @@
 """Tests for VAAPI runtime probing in hardware capability detection."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from backend.utils import hwaccel
+
+
+@pytest.fixture(autouse=True)
+def _restore_caps_cache():
+    """detect_hw_capabilities caches module-wide; don't leak mocked caps into other tests."""
+    saved = hwaccel._cached_caps
+    yield
+    hwaccel._cached_caps = saved
+
 
 ENCODERS = """
  V....D hevc_vaapi           H.265/HEVC (VAAPI) (codec hevc)
@@ -38,3 +49,18 @@ def test_broken_va_driver_disables_vaapi():
     caps = _detect(lambda _enc, _dev: False)
     assert not caps.vaapi_available
     assert hwaccel.resolve_encoder("hevc", "vaapi", caps) == "libx265"
+
+
+@pytest.mark.parametrize(
+    ("probe", "args", "fmt"),
+    [
+        (hwaccel._test_vaapi_encoder, ("hevc_vaapi", "/dev/dri/renderD128"), "format=p010,"),
+        (hwaccel._test_qsv_encoder, ("hevc_qsv",), "format=p010le,"),
+    ],
+)
+def test_probe_encodes_10bit(probe, args, fmt):
+    """Default jobs are main10; an 8-bit probe would pass on 8-bit-only GPUs (Polaris, Skylake)."""
+    with patch.object(hwaccel.subprocess, "run", return_value=MagicMock(returncode=0)) as run:
+        assert probe(*args)
+    cmd = run.call_args.args[0]
+    assert any(a.startswith(fmt) for a in cmd)
