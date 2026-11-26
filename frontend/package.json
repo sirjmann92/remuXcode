@@ -16,7 +16,7 @@
     "lint:fix": "cd .. && biome check frontend --write"
   },
   "dependencies": {
-    "daisyui": "^5.8.1"
+    "daisyui": "^5.8.2"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
